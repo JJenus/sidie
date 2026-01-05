@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Vehicle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Core Tracking Module</a> &gt; <a href="index.source.html" class="el_package">com.jjenus.tracker.core.domain</a> &gt; <span class="el_source">Vehicle.java</span></div><h1>Vehicle.java</h1><pre class="source lang-java linenums">package com.jjenus.tracker.core.domain;
+
+import com.jjenus.tracker.core.exception.TripException;
+import com.jjenus.tracker.core.exception.VehicleException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Vehicle {
+    private final String vehicleId;
+    private String deviceId;
+    private LocationPoint currentLocation;
+    private EngineState engineState;
+    private FuelStatus fuelStatus;
+    private boolean isFuelCutActive;
+    private Instant lastMovementTime;
+    private Trip activeTrip;
+    private final List&lt;String&gt; recentAlerts;
+
+<span class="fc" id="L21">    public Vehicle(String vehicleId) {</span>
+<span class="fc" id="L22">        this.vehicleId = vehicleId;</span>
+<span class="fc" id="L23">        this.engineState = EngineState.OFF;</span>
+<span class="fc" id="L24">        this.isFuelCutActive = false;</span>
+<span class="fc" id="L25">        this.currentLocation = new LocationPoint(0.0, 0.0, 0.0f, Instant.now());</span>
+<span class="fc" id="L26">        this.fuelStatus = new FuelStatus(100.0f, 0.0f, Instant.now());</span>
+<span class="fc" id="L27">        this.recentAlerts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L28">    }</span>
+
+    public void processNewTelemetry(LocationPoint newLocation) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (!newLocation.isValid()) {</span>
+<span class="fc" id="L32">            throw VehicleException.invalidLocationData();</span>
+        }
+
+<span class="fc" id="L35">        this.currentLocation = newLocation;</span>
+
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (newLocation.speedKmh() &gt; 0) {</span>
+<span class="fc" id="L38">            this.engineState = EngineState.MOVING;</span>
+<span class="fc" id="L39">            this.lastMovementTime = Instant.now();</span>
+
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (this.activeTrip == null) {</span>
+<span class="fc" id="L42">                startTrip(newLocation);</span>
+            }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        } else if (this.engineState == EngineState.MOVING) {</span>
+<span class="fc" id="L45">            this.engineState = EngineState.IDLE;</span>
+<span class="fc" id="L46">            this.lastMovementTime = Instant.now();</span>
+        }
+
+<span class="pc bpc" id="L49" title="1 of 4 branches missed.">        if (this.engineState == EngineState.MOVING &amp;&amp; this.activeTrip != null) {</span>
+<span class="fc" id="L50">            this.activeTrip.addLocation(newLocation);</span>
+        }
+<span class="fc" id="L52">    }</span>
+
+    private void startTrip(LocationPoint startLocation) {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (this.activeTrip != null) {</span>
+<span class="nc" id="L56">            throw com.jjenus.tracker.core.exception.TripException.alreadyActive(vehicleId);</span>
+        }
+<span class="fc" id="L58">        this.activeTrip = new Trip(this.vehicleId, startLocation);</span>
+<span class="fc" id="L59">        System.out.println(&quot;DOMAIN EVENT: Trip started for vehicle &quot; + vehicleId);</span>
+<span class="fc" id="L60">    }</span>
+
+    public void endTrip(LocationPoint endLocation) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (this.activeTrip == null) {</span>
+<span class="fc" id="L64">            throw TripException.notActive(vehicleId);</span>
+        }
+<span class="fc" id="L66">        this.activeTrip.end(endLocation);</span>
+<span class="fc" id="L67">        System.out.println(&quot;DOMAIN EVENT: Trip ended for vehicle &quot; + vehicleId);</span>
+<span class="fc" id="L68">        this.activeTrip = null;</span>
+<span class="fc" id="L69">    }</span>
+
+    public void issueFuelCutOffCommand() {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (this.currentLocation.speedKmh() &gt; 10) {</span>
+<span class="fc" id="L73">            throw VehicleException.fuelCutNotAllowedWhileMoving(this.currentLocation.speedKmh());</span>
+        }
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (this.isFuelCutActive) {</span>
+<span class="fc" id="L77">            throw VehicleException.fuelCutAlreadyActive();</span>
+        }
+
+<span class="fc" id="L80">        this.isFuelCutActive = true;</span>
+<span class="fc" id="L81">        this.engineState = EngineState.FUEL_CUT_ACTIVE;</span>
+
+<span class="fc" id="L83">        System.out.println(&quot;DOMAIN EVENT: Fuel cut requested for vehicle &quot; + vehicleId);</span>
+<span class="fc" id="L84">    }</span>
+
+    public void issueFuelRestoreCommand() {
+<span class="fc" id="L87">        this.isFuelCutActive = false;</span>
+
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (this.currentLocation.speedKmh() &gt; 0) {</span>
+<span class="nc" id="L90">            this.engineState = EngineState.MOVING;</span>
+        } else {
+<span class="fc" id="L92">            this.engineState = EngineState.ON;</span>
+        }
+
+<span class="fc" id="L95">        System.out.println(&quot;DOMAIN EVENT: Fuel restore requested for vehicle &quot; + vehicleId);</span>
+<span class="fc" id="L96">    }</span>
+
+    public Duration getIdleDuration() {
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (this.lastMovementTime == null || this.engineState != EngineState.IDLE) {</span>
+<span class="fc" id="L100">            return Duration.ZERO;</span>
+        }
+<span class="nc" id="L102">        return Duration.between(this.lastMovementTime, Instant.now());</span>
+    }
+
+    public void addAlert(String alertMessage) {
+<span class="fc" id="L106">        this.recentAlerts.add(Instant.now() + &quot;: &quot; + alertMessage);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (this.recentAlerts.size() &gt; 100) {</span>
+<span class="fc" id="L108">            this.recentAlerts.remove(0);</span>
+        }
+<span class="fc" id="L110">    }</span>
+
+<span class="fc" id="L112">    public String getVehicleId() { return vehicleId; }</span>
+<span class="fc" id="L113">    public String getDeviceId() { return deviceId; }</span>
+<span class="fc" id="L114">    public LocationPoint getCurrentLocation() { return currentLocation; }</span>
+<span class="fc" id="L115">    public EngineState getEngineState() { return engineState; }</span>
+<span class="fc" id="L116">    public FuelStatus getFuelStatus() { return fuelStatus; }</span>
+<span class="fc" id="L117">    public boolean isFuelCutActive() { return isFuelCutActive; }</span>
+<span class="fc" id="L118">    public Trip getActiveTrip() { return activeTrip; }</span>
+<span class="fc" id="L119">    public List&lt;String&gt; getRecentAlerts() { return new ArrayList&lt;&gt;(recentAlerts); }</span>
+
+<span class="fc" id="L121">    protected void setDeviceId(String deviceId) { this.deviceId = deviceId; }</span>
+<span class="fc" id="L122">    protected void setFuelStatus(FuelStatus fuelStatus) { this.fuelStatus = fuelStatus; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

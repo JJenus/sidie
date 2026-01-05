@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocationPoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Core Tracking Module</a> &gt; <a href="index.source.html" class="el_package">com.jjenus.tracker.core.domain</a> &gt; <span class="el_source">LocationPoint.java</span></div><h1>LocationPoint.java</h1><pre class="source lang-java linenums">package com.jjenus.tracker.core.domain;
+
+import java.time.Instant;
+
+<span class="fc" id="L5">public record LocationPoint(</span>
+    double latitude,
+    double longitude,
+    float speedKmh,
+    Instant timestamp
+) {
+    public boolean isValid() {
+<span class="fc bfc" id="L12" title="All 12 branches covered.">        return latitude &gt;= -90 &amp;&amp; latitude &lt;= 90 &amp;&amp;</span>
+               longitude &gt;= -180 &amp;&amp; longitude &lt;= 180 &amp;&amp;
+               speedKmh &gt;= 0 &amp;&amp;
+               timestamp != null;
+    }
+
+    public double distanceTo(LocationPoint other) {
+<span class="fc" id="L19">        final int R = 6371;</span>
+
+<span class="fc" id="L21">        double latDistance = Math.toRadians(other.latitude() - this.latitude());</span>
+<span class="fc" id="L22">        double lonDistance = Math.toRadians(other.longitude() - this.longitude());</span>
+
+<span class="fc" id="L24">        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)</span>
+<span class="fc" id="L25">                 + Math.cos(Math.toRadians(this.latitude()))</span>
+<span class="fc" id="L26">                 * Math.cos(Math.toRadians(other.latitude()))</span>
+<span class="fc" id="L27">                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);</span>
+
+<span class="fc" id="L29">        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));</span>
+
+<span class="fc" id="L31">        return R * c;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

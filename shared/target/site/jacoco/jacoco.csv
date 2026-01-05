@@ -1,0 +1,7 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+Shared Module,com.jjenus.tracker.shared.exception,ValidationException,0,11,0,0,0,4,0,2,0,2
+Shared Module,com.jjenus.tracker.shared.exception,BusinessRuleException,6,5,0,0,2,2,1,1,1,1
+Shared Module,com.jjenus.tracker.shared.exception,DomainException,0,18,0,0,0,7,0,3,0,3
+Shared Module,com.jjenus.tracker.shared.exception,InfrastructureException,6,5,0,0,2,2,1,1,1,1
+Shared Module,com.jjenus.tracker.shared.pubsub,DomainEvent,6,10,0,0,2,4,2,1,2,1
+Shared Module,com.jjenus.tracker.shared.pubsub,SimpleEventBus,9,98,7,11,5,28,7,9,0,7

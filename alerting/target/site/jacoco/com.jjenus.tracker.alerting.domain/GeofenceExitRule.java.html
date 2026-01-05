@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeofenceExitRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Alerting Module</a> &gt; <a href="index.source.html" class="el_package">com.jjenus.tracker.alerting.domain</a> &gt; <span class="el_source">GeofenceExitRule.java</span></div><h1>GeofenceExitRule.java</h1><pre class="source lang-java linenums">package com.jjenus.tracker.alerting.domain;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import java.awt.geom.Path2D;
+import java.util.List;
+
+public class GeofenceExitRule implements IAlertRule {
+    private final String ruleKey;
+    private final String ruleName;
+    private final String geofenceId;
+    private final List&lt;LocationPoint&gt; boundaryPoints;
+    private boolean enabled;
+    private final int priority;
+    private boolean wasInside;
+    
+    public GeofenceExitRule(String ruleKey, String geofenceId, 
+<span class="nc" id="L18">                           List&lt;LocationPoint&gt; boundaryPoints) {</span>
+<span class="nc" id="L19">        this.ruleKey = ruleKey;</span>
+<span class="nc" id="L20">        this.ruleName = &quot;Geofence Exit Rule&quot;;</span>
+<span class="nc" id="L21">        this.geofenceId = geofenceId;</span>
+<span class="nc" id="L22">        this.boundaryPoints = boundaryPoints;</span>
+<span class="nc" id="L23">        this.enabled = true;</span>
+<span class="nc" id="L24">        this.priority = 3;</span>
+<span class="nc" id="L25">        this.wasInside = false;</span>
+<span class="nc" id="L26">    }</span>
+    
+    @Override
+    public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        if (!enabled) return null;</span>
+        
+<span class="nc" id="L32">        boolean isInside = isPointInPolygon(newLocation);</span>
+<span class="nc" id="L33">        AlertEvent alert = null;</span>
+        
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        if (wasInside &amp;&amp; !isInside) {</span>
+<span class="nc" id="L36">            String message = String.format(</span>
+                &quot;Vehicle %s exited geofence %s&quot;,
+<span class="nc" id="L38">                vehicle.getVehicleId(),</span>
+                geofenceId
+            );
+            
+<span class="nc" id="L42">            alert = new AlertEvent(</span>
+                ruleKey,
+<span class="nc" id="L44">                vehicle.getVehicleId(),</span>
+                message,
+                AlertSeverity.WARNING,
+                newLocation
+            );
+        }
+        
+<span class="nc" id="L51">        wasInside = isInside;</span>
+<span class="nc" id="L52">        return alert;</span>
+    }
+    
+    private boolean isPointInPolygon(LocationPoint point) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (boundaryPoints.size() &lt; 3) return false;</span>
+        
+<span class="nc" id="L58">        Path2D polygon = new Path2D.Double();</span>
+<span class="nc" id="L59">        polygon.moveTo(boundaryPoints.get(0).longitude(), </span>
+<span class="nc" id="L60">                      boundaryPoints.get(0).latitude());</span>
+        
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        for (int i = 1; i &lt; boundaryPoints.size(); i++) {</span>
+<span class="nc" id="L63">            polygon.lineTo(boundaryPoints.get(i).longitude(), </span>
+<span class="nc" id="L64">                          boundaryPoints.get(i).latitude());</span>
+        }
+<span class="nc" id="L66">        polygon.closePath();</span>
+        
+<span class="nc" id="L68">        return polygon.contains(point.longitude(), point.latitude());</span>
+    }
+    
+    @Override
+<span class="nc" id="L72">    public String getRuleKey() { return ruleKey; }</span>
+    
+    @Override
+<span class="nc" id="L75">    public String getRuleName() { return ruleName; }</span>
+    
+    @Override
+<span class="nc" id="L78">    public boolean isEnabled() { return enabled; }</span>
+    
+    @Override
+<span class="nc" id="L81">    public void setEnabled(boolean enabled) { this.enabled = enabled; }</span>
+    
+    @Override
+<span class="nc" id="L84">    public int getPriority() { return priority; }</span>
+    
+<span class="nc" id="L86">    public String getGeofenceId() { return geofenceId; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

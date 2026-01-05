@@ -1,0 +1,14 @@
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/FuelStatus.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/LocationPoint.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/VehicleUpdatedEvent.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/exception/TripException.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/Trip.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/application/ITripService.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/application/VehicleCommandService.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/infrastructure/IVehicleRepository.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/application/VehicleQueryService.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/Vehicle.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/infrastructure/InMemoryVehicleRepository.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/EngineState.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/exception/VehicleException.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/main/java/com/jjenus/tracker/core/domain/FuelCutRequestedEvent.java

@@ -1,0 +1,5 @@
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/test/java/com/jjenus/tracker/core/domain/VehicleTest.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/test/java/com/jjenus/tracker/core/application/VehicleQueryServiceTest.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/test/java/com/jjenus/tracker/core/domain/TripTest.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/test/java/com/jjenus/tracker/core/domain/LocationPointTest.java
+/home/jjenus/workbench/apps/tracking-engine/core-tracking/src/test/java/com/jjenus/tracker/core/application/VehicleCommandServiceTest.java

@@ -1,0 +1,4 @@
+/home/jjenus/workbench/apps/tracking-engine/alerting/src/test/java/com/jjenus/tracker/alerting/domain/IdleTimeRuleTest.java
+/home/jjenus/workbench/apps/tracking-engine/alerting/src/test/java/com/jjenus/tracker/alerting/domain/MaxSpeedRuleTest.java
+/home/jjenus/workbench/apps/tracking-engine/alerting/src/test/java/com/jjenus/tracker/alerting/application/AlertingEngineTest.java
+/home/jjenus/workbench/apps/tracking-engine/alerting/src/test/java/com/jjenus/tracker/alerting/application/AlertRuleEvaluationServiceTest.java

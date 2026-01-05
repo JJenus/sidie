@@ -1,0 +1,14 @@
+com/jjenus/tracker/core/exception/TripException.class
+com/jjenus/tracker/core/domain/VehicleUpdatedEvent.class
+com/jjenus/tracker/core/application/VehicleQueryService.class
+com/jjenus/tracker/core/domain/EngineState.class
+com/jjenus/tracker/core/infrastructure/InMemoryVehicleRepository.class
+com/jjenus/tracker/core/domain/FuelStatus.class
+com/jjenus/tracker/core/domain/FuelCutRequestedEvent.class
+com/jjenus/tracker/core/infrastructure/IVehicleRepository.class
+com/jjenus/tracker/core/application/ITripService.class
+com/jjenus/tracker/core/domain/Vehicle.class
+com/jjenus/tracker/core/domain/Trip.class
+com/jjenus/tracker/core/application/VehicleCommandService.class
+com/jjenus/tracker/core/exception/VehicleException.class
+com/jjenus/tracker/core/domain/LocationPoint.class

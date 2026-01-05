@@ -1,0 +1,157 @@
+package com.jjenus.tracker.devicecomm.infrastructure;
+
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class AutoseekerProtocolParserTest {
+
+    private AutoseekerProtocolParser parser;
+
+    @BeforeEach
+    void setUp() {
+        parser = new AutoseekerProtocolParser();
+    }
+
+    @Test
+    void testCanParseValidAutoseekerData() {
+        String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
+        byte[] bytes = data.getBytes();
+
+        assertTrue(parser.canParse(bytes));
+    }
+
+    @Test
+    void testCanParseInvalidHeader() {
+        String data = "$GPS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
+        byte[] bytes = data.getBytes();
+
+        assertFalse(parser.canParse(bytes));
+    }
+
+    @Test
+    void testCanParseNullData() {
+        assertFalse(parser.canParse(null));
+    }
+
+    @Test
+    void testCanParseEmptyData() {
+        assertFalse(parser.canParse(new byte[0]));
+    }
+
+    @Test
+    void testParseValidAutoseekerData() {
+        String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
+        byte[] bytes = data.getBytes();
+
+        LocationPoint location = parser.parse(bytes);
+
+        assertNotNull(location);
+        assertTrue(location.isValid());
+        assertEquals(40.7128, location.latitude(), 0.0001);
+        assertEquals(-74.0060, location.longitude(), 0.0001);
+        assertEquals(55.5f, location.speedKmh(), 0.1f);
+    }
+
+    @Test
+    void testParseInvalidHeader() {
+        String data = "$GPS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
+        byte[] bytes = data.getBytes();
+
+        ProtocolException exception = assertThrows(ProtocolException.class,
+            () -> parser.parse(bytes));
+
+        assertEquals("PROTOCOL_INVALID_HEADER", exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("Autoseeker"));
+    }
+
+    @Test
+    void testParseIncompleteData() {
+        String data = "$POS,DEV001,40.7128";
+        byte[] bytes = data.getBytes();
+
+        ProtocolException exception = assertThrows(ProtocolException.class,
+            () -> parser.parse(bytes));
+
+        assertEquals("PROTOCOL_PARSE_ERROR", exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("Incomplete data packet"));
+    }
+
+    @Test
+    void testParseMalformedNumber() {
+        String data = "$POS,DEV001,invalid,-74.0060,55.5,1700000000,1#";
+        byte[] bytes = data.getBytes();
+
+        ProtocolException exception = assertThrows(ProtocolException.class,
+            () -> parser.parse(bytes));
+
+        assertEquals("PROTOCOL_PARSE_ERROR", exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("Autoseeker"));
+    }
+
+    @Test
+    void testBuildFuelCutCommand() {
+        String deviceId = "DEV-001";
+        byte[] command = parser.buildFuelCutCommand(deviceId);
+
+        assertNotNull(command);
+        String commandString = new String(command);
+        assertEquals("$CMD,DEV-001,FUEL,OFF#", commandString);
+    }
+
+    @Test
+    void testBuildEngineOnCommand() {
+        String deviceId = "DEV-001";
+        byte[] command = parser.buildEngineOnCommand(deviceId);
+
+        assertNotNull(command);
+        String commandString = new String(command);
+        assertEquals("$CMD,DEV-001,FUEL,ON#", commandString);
+    }
+
+    @Test
+    void testGetProtocolName() {
+        assertEquals("Autoseeker", parser.getProtocolName());
+    }
+
+    @Test
+    void testParseWithDifferentFormats() {
+        // Test with extra fields (should still parse basic data)
+        String data = "$POS,DEV001,34.0522,-118.2437,75.0,1700000000,1,extra,fields#";
+        byte[] bytes = data.getBytes();
+
+        LocationPoint location = parser.parse(bytes);
+
+        assertNotNull(location);
+        assertEquals(34.0522, location.latitude(), 0.0001);
+        assertEquals(-118.2437, location.longitude(), 0.0001);
+        assertEquals(75.0f, location.speedKmh(), 0.1f);
+    }
+
+    @Test
+    void testParseZeroSpeed() {
+        String data = "$POS,DEV001,40.7128,-74.0060,0.0,1700000000,0#";
+        byte[] bytes = data.getBytes();
+
+        LocationPoint location = parser.parse(bytes);
+
+        assertNotNull(location);
+        assertEquals(0.0f, location.speedKmh(), 0.1f);
+        assertTrue(location.isValid());
+    }
+
+    @Test
+    void testParseNegativeSpeed() {
+        // Even though negative speed doesn't make sense, parser should handle it
+        String data = "$POS,DEV001,40.7128,-74.0060,-10.5,1700000000,1#";
+        byte[] bytes = data.getBytes();
+
+        LocationPoint location = parser.parse(bytes);
+
+        assertNotNull(location);
+        assertEquals(-10.5f, location.speedKmh(), 0.1f);
+        // Note: LocationPoint.isValid() will return false for negative speed
+    }
+}

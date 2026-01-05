@@ -1,0 +1,9 @@
+com/jjenus/tracker/alerting/domain/MaxSpeedRule.class
+com/jjenus/tracker/alerting/application/AlertRuleEvaluationService.class
+com/jjenus/tracker/alerting/exception/AlertException.class
+com/jjenus/tracker/alerting/domain/GeofenceExitRule.class
+com/jjenus/tracker/alerting/domain/IAlertRule.class
+com/jjenus/tracker/alerting/domain/AlertSeverity.class
+com/jjenus/tracker/alerting/domain/AlertEvent.class
+com/jjenus/tracker/alerting/domain/IdleTimeRule.class
+com/jjenus/tracker/alerting/application/AlertingEngine.class
