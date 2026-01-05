@@ -4,7 +4,7 @@ import java.time.Instant;
 
 public record DeviceDataPacket(
     String deviceId,
-    byte[] rawData,
+    String rawData,
     Instant receivedAt,
     String sourceIp
 ) {}
