@@ -16,7 +16,12 @@
 
     <dependencies>
         <!-- PRODUCTION dependencies - SHARED NOW NEEDS SPRING! -->
-        
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+
         <!-- Jackson for JSON serialization in Redis/Artemis -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -28,21 +33,26 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
             <scope>provided</scope>
         </dependency>
-        
+
         <!-- Spring Context for @Component annotations -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
             <scope>provided</scope>
         </dependency>
-        
+
         <!-- Spring Data Redis for RedisConnectionTracker -->
         <dependency>
             <groupId>org.springframework.data</groupId>
             <artifactId>spring-data-redis</artifactId>
             <scope>provided</scope>
         </dependency>
-        
+
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty</artifactId>
+        </dependency>
+
         <!-- Spring JMS for ArtemisEventPublisher -->
         <dependency>
             <groupId>org.springframework</groupId>
@@ -54,7 +64,7 @@
             <artifactId>jakarta.jms-api</artifactId>
             <scope>provided</scope>
         </dependency>
-        
+
         <!-- Redis Client -->
         <dependency>
             <groupId>redis.clients</groupId>

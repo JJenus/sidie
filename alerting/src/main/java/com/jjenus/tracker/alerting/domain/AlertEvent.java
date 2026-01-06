@@ -1,6 +1,6 @@
 package com.jjenus.tracker.alerting.domain;
 
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 import java.time.Instant;
 

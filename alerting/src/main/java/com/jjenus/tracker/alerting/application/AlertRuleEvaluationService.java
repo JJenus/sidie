@@ -3,8 +3,10 @@ package com.jjenus.tracker.alerting.application;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertEvent;
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
+import org.springframework.stereotype.Service;
 
+@Service
 public class AlertRuleEvaluationService {
 
     public AlertEvent evaluateRule(IAlertRule rule, Vehicle vehicle, LocationPoint location) {

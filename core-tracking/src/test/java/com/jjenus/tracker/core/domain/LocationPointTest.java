@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain;
 
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;

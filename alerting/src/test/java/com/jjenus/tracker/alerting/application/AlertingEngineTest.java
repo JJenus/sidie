@@ -5,7 +5,7 @@ import com.jjenus.tracker.alerting.domain.AlertEvent;
 import com.jjenus.tracker.alerting.domain.AlertSeverity;
 import com.jjenus.tracker.alerting.domain.MaxSpeedRule;
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import org.junit.jupiter.api.BeforeEach;

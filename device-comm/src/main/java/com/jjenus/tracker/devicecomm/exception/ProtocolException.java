@@ -12,12 +12,11 @@ public class ProtocolException extends InfrastructureException {
         super(errorCode, message, cause);
     }
 
-    public static ProtocolException parserNotFound(byte[] data) {
-        String dataPreview = data != null && data.length > 0 ?
-            String.format(" (first byte: 0x%02x)", data[0]) : "";
+    public static ProtocolException parserNotFound(String data) {
+
         return new ProtocolException(
             "PROTOCOL_PARSER_NOT_FOUND",
-            String.format("No parser found for the provided data%s", dataPreview)
+            String.format("No parser found for the provided data%s", data)
         );
     }
 

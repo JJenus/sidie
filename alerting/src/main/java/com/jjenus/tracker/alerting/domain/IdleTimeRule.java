@@ -1,7 +1,7 @@
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.time.Duration;
 
 public class IdleTimeRule implements IAlertRule {

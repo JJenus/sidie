@@ -1,10 +1,9 @@
 package com.jjenus.tracker.devicecomm.infrastructure;
 
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import java.time.Instant;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 public class AutoseekerProtocolParser implements ITrackerProtocolParser {

@@ -2,8 +2,8 @@ package com.jjenus.tracker.devicecomm.application;
 
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.devicecomm.domain.LocationDataEvent;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationDataEvent;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import com.jjenus.tracker.devicecomm.exception.DeviceException;
@@ -32,9 +32,7 @@ public class DeviceDataProcessor {
 
             eventPublisher.publish(event);
             
-        } catch (ProtocolException e) {
-            throw e;
-        } catch (DeviceException e) {
+        } catch (ProtocolException | DeviceException e) {
             throw e;
         } catch (Exception e) {
             throw new com.jjenus.tracker.shared.exception.InfrastructureException(

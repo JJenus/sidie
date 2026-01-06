@@ -1,6 +1,5 @@
-package com.jjenus.tracker.devicecomm.domain;
+package com.jjenus.tracker.shared.domain;
 
-import com.jjenus.tracker.core.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 
 public class LocationDataEvent extends DomainEvent {
@@ -13,7 +12,7 @@ public class LocationDataEvent extends DomainEvent {
         this.location = location;
         this.protocol = protocol;
     }
-    
+
     public String getDeviceId() { return deviceId; }
     public LocationPoint getLocation() { return location; }
     public String getProtocol() { return protocol; }

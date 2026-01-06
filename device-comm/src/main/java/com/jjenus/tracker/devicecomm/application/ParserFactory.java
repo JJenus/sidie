@@ -2,9 +2,12 @@ package com.jjenus.tracker.devicecomm.application;
 
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.Optional;
 
+@Component
 public class ParserFactory {
     private final List<ITrackerProtocolParser> parsers;
 
@@ -12,7 +15,7 @@ public class ParserFactory {
         this.parsers = parsers;
     }
 
-    public ITrackerProtocolParser getParser(byte[] rawData) {
+    public ITrackerProtocolParser getParser(String rawData) {
         return parsers.stream()
             .filter(parser -> parser.canParse(rawData))
             .findFirst()

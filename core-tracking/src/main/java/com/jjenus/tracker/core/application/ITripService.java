@@ -1,7 +1,7 @@
 package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Trip;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

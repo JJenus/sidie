@@ -1,11 +1,14 @@
 package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
+import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 
+@Service
 public class VehicleQueryService {
     private final IVehicleRepository vehicleRepository;
     

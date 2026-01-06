@@ -24,10 +24,10 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>17</java.version>
-        <spring-boot.version>3.1.5</spring-boot.version>
+        <spring-boot.version>3.5.9</spring-boot.version>
         <junit.version>5.10.0</junit.version>
         <mockito.version>5.5.0</mockito.version>
-        <reactor-netty.version>1.1.13</reactor-netty.version>
+        <reactor-netty.version>2025.0.1</reactor-netty.version>
         <jackson.version>2.15.3</jackson.version>
         <surefire.version>3.1.2</surefire.version>
         <jacoco.version>0.8.11</jacoco.version>
@@ -80,9 +80,11 @@
             
             <!-- Reactor Netty -->
             <dependency>
-                <groupId>io.projectreactor.netty</groupId>
-                <artifactId>reactor-netty</artifactId>
+                <groupId>io.projectreactor</groupId>
+                <artifactId>reactor-bom</artifactId>
                 <version>${reactor-netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope> <!-- This line is essential -->
             </dependency>
             
             <!-- Jackson -->

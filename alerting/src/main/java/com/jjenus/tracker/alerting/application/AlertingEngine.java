@@ -3,14 +3,17 @@ package com.jjenus.tracker.alerting.application;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertEvent;
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.alerting.exception.AlertException;
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Comparator;
 
+@Component
 public class AlertingEngine {
     private final List<IAlertRule> activeRules;
     private final EventPublisher eventPublisher;

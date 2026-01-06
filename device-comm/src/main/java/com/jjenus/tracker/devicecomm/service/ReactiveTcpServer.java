@@ -2,6 +2,7 @@ package com.jjenus.tracker.devicecomm.service;
 
 import com.jjenus.tracker.devicecomm.application.DeviceDataProcessor;
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
+import com.jjenus.tracker.shared.domain.ConnectionInfo;
 import com.jjenus.tracker.shared.redis.RedisConnectionTracker;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
@@ -14,9 +15,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
+import reactor.netty.DisposableServer;
 import reactor.netty.tcp.TcpServer;
 
 import java.net.InetSocketAddress;
@@ -32,24 +33,24 @@ public class ReactiveTcpServer {
 
     private final DeviceDataProcessor deviceDataProcessor;
     private final RedisConnectionTracker connectionTracker;
-    
-    @Value("${tracking.tcp.server.port:8080}")
+
+    @Value("${tracking.tcp.server.port:8888}")
     private int tcpPort;
-    
+
     @Value("${tracking.tcp.server.message-delimiter:#}")
     private String messageDelimiter;
-    
+
     @Value("${tracking.tcp.server.max-message-length:1024}")
     private int maxMessageLength;
-    
+
     @Value("${tracking.tcp.server.read-timeout:300}")
     private int readTimeoutSeconds;
-    
-    private Connection serverConnection;
+
+    private DisposableServer server;
     private volatile boolean running = false;
 
     public ReactiveTcpServer(DeviceDataProcessor deviceDataProcessor,
-                            RedisConnectionTracker connectionTracker) {
+                             RedisConnectionTracker connectionTracker) {
         this.deviceDataProcessor = deviceDataProcessor;
         this.connectionTracker = connectionTracker;
     }
@@ -60,11 +61,11 @@ public class ReactiveTcpServer {
             logger.warn("TCP Server is already running");
             return;
         }
-        
+
         logger.info("Starting Reactive TCP Server on port {}", tcpPort);
-        
+
         try {
-            serverConnection = TcpServer.create()
+            server = TcpServer.create()
                     .port(tcpPort)
                     .option(ChannelOption.SO_BACKLOG, 100)
                     .option(ChannelOption.SO_REUSEADDR, true)
@@ -77,34 +78,44 @@ public class ReactiveTcpServer {
                     .wiretap("reactor.netty.tcp.TcpServer", LogLevel.DEBUG)
                     .handle((inbound, outbound) -> {
                         String connectionId = "conn-" + CONNECTION_COUNTER.incrementAndGet();
-                        InetSocketAddress remoteAddress = (InetSocketAddress) inbound.address();
-                        String clientIp = remoteAddress != null ? 
-                            remoteAddress.getAddress().getHostAddress() : "unknown";
-                        
-                        // Get the Netty Connection object
-                        Connection nettyConnection = inbound.context().channel().attr(Connection.class).get();
-                        
-                        // Initially deviceId is unknown - will be updated when we parse first message
-                        String initialDeviceId = "unknown";
-                        connectionTracker.registerConnection(connectionId, initialDeviceId, clientIp, nettyConnection);
-                        
-                        // Add timeout handler
-                        inbound.withConnection(conn ->
-                                conn.addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS)));
-                        
+
+                        final String[] clientIp = new String[]{"unknown"};
+                        final Connection[] nettyConnection = new Connection[1];
+
+                        // CORRECT: Use withConnection (one of the 3 methods) to get the Connection
+                        inbound.withConnection(conn -> {
+                            nettyConnection[0] = conn;
+
+                            // Get client IP from the Connection, not from inbound
+                            InetSocketAddress remoteAddress = (InetSocketAddress) conn.address();
+                            clientIp[0] = remoteAddress != null ?
+                                    remoteAddress.getAddress().getHostAddress() : "unknown";
+
+                            // Register connection in tracker
+                            String initialDeviceId = "unknown";
+                            connectionTracker.registerConnection(connectionId, initialDeviceId, clientIp[0], conn);
+
+                            // Add timeout handler
+                            conn.addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS));
+
+                            logger.debug("Connection {} established from {}", connectionId, clientIp[0]);
+                        });
+
+                        // CORRECT: Simplified message framing using bufferUntil
+                        // Alternative: Use receive().asString().transform() with custom framing
                         return inbound.receive()
                                 .asString()
-                                .transform(this::frameMessages)
-                                .doOnNext(message -> processRawMessage(message, connectionId, clientIp))
+                                .transform(this::frameMessagesWithDelimiter)
+                                .doOnNext(message -> processRawMessage(message, connectionId, clientIp[0]))
                                 .doOnError(error -> handleConnectionError(error, connectionId))
                                 .doFinally(signal -> cleanupConnection(connectionId))
                                 .then();
                     })
-                    .bindNow(Duration.ofSeconds(30));
-            
+                    .bindNow();
+
             running = true;
             logger.info("TCP Server started successfully on port {}", tcpPort);
-            
+
         } catch (Exception e) {
             logger.error("Failed to start TCP Server on port {}", tcpPort, e);
             throw new RuntimeException("Failed to start TCP Server", e);
@@ -115,84 +126,66 @@ public class ReactiveTcpServer {
         InetSocketAddress remoteAddress = (InetSocketAddress) connection.address();
         String clientIp = remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "unknown";
         int clientPort = remoteAddress != null ? remoteAddress.getPort() : 0;
-        
+
         logger.info("New TCP connection from {}:{}", clientIp, clientPort);
-        
+
         connection.onDispose(() -> {
             logger.info("Connection from {}:{} closed", clientIp, clientPort);
         });
     }
 
-    private Flux<String> frameMessages(Flux<String> dataStream) {
-        return Flux.create(sink -> {
-            StringBuilder buffer = new StringBuilder();
-            
-            dataStream.subscribe(
-                chunk -> {
-                    buffer.append(chunk);
-                    splitByDelimiter(buffer, sink);
-                },
-                sink::error,
-                () -> {
-                    if (buffer.length() > 0) {
-                        sink.next(buffer.toString());
+    /**
+     * Correct framing implementation using only Flux operators
+     * No manual Flux.create needed
+     */
+    private Flux<String> frameMessagesWithDelimiter(Flux<String> dataStream) {
+        return dataStream
+                .windowUntil(s -> s.contains(messageDelimiter), true)
+                .flatMap(window -> window.reduce(String::concat))
+                .map(combined -> {
+                    // Remove the delimiter for processing
+                    if (combined.endsWith(messageDelimiter)) {
+                        return combined.substring(0, combined.length() - 1);
                     }
-                    sink.complete();
-                }
-            );
-        });
-    }
-
-    private void splitByDelimiter(StringBuilder buffer, Sinks.Many<String> sink) {
-        int delimiterIndex;
-        while ((delimiterIndex = buffer.indexOf(messageDelimiter)) != -1) {
-            String completeMessage = buffer.substring(0, delimiterIndex + 1);
-            buffer.delete(0, delimiterIndex + 1);
-            sink.tryEmitNext(completeMessage);
-        }
-        
-        if (buffer.length() > maxMessageLength) {
-            logger.warn("Message buffer overflow ({} > {}), clearing buffer", 
-                       buffer.length(), maxMessageLength);
-            buffer.setLength(0);
-        }
+                    return combined;
+                });
     }
 
     private void processRawMessage(String rawMessage, String connectionId, String clientIp) {
         try {
             logger.debug("Received message ({} chars) from connection {}", rawMessage.length(), connectionId);
-            
+
             // Extract device ID from the raw message
             String deviceId = extractDeviceIdFromRawMessage(rawMessage);
-            
+
             // Update connection tracker with actual device ID if we extracted it
             if (!"unknown".equals(deviceId)) {
                 connectionTracker.updateConnectionDevice(connectionId, deviceId);
             }
-            
+
             DeviceDataPacket packet = new DeviceDataPacket(
-                deviceId,
-                rawMessage,
-                Instant.now(),
-                clientIp
+                    deviceId,
+                    rawMessage,
+                    Instant.now(),
+                    clientIp
             );
-            
+
             // Process asynchronously
             Mono.fromRunnable(() -> deviceDataProcessor.processDeviceData(packet))
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                    null,
-                    error -> logger.error("Error processing device data for connection {}", connectionId, error)
-                );
-            
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(
+                            null,
+                            error -> logger.error("Error processing device data for connection {}", connectionId, error)
+                    );
+
             // Update last seen in connection tracker
             connectionTracker.updateLastSeen(connectionId);
-            
+
         } catch (Exception e) {
             logger.error("Error processing raw message from connection {}", connectionId, e);
         }
     }
-    
+
     private String extractDeviceIdFromRawMessage(String rawMessage) {
         // Simple extraction - assumes format: *XX,DEVICE_ID,...
         try {
@@ -203,8 +196,8 @@ public class ReactiveTcpServer {
                 }
             }
         } catch (Exception e) {
-            logger.warn("Failed to extract device ID from message: {}", 
-                       rawMessage.substring(0, Math.min(rawMessage.length(), 50)));
+            logger.warn("Failed to extract device ID from message: {}",
+                    rawMessage.substring(0, Math.min(rawMessage.length(), 50)));
         }
         return "unknown";
     }
@@ -223,13 +216,13 @@ public class ReactiveTcpServer {
             logger.warn("TCP Server is not running");
             return;
         }
-        
+
         logger.info("Stopping TCP Server...");
-        
-        if (serverConnection != null && !serverConnection.isDisposed()) {
-            serverConnection.disposeNow();
+
+        if (server != null && !server.isDisposed()) {
+            server.disposeNow();
         }
-        
+
         running = false;
         logger.info("TCP Server stopped");
     }
@@ -242,35 +235,32 @@ public class ReactiveTcpServer {
         return Mono.fromCallable(() -> {
             try {
                 // Get connection from Redis
-                RedisConnectionTracker.ConnectionInfo connectionInfo = 
-                    connectionTracker.getConnectionByDeviceId(deviceId);
-                
+                ConnectionInfo connectionInfo =
+                        connectionTracker.getConnectionByDeviceId(deviceId);
+
                 if (connectionInfo == null) {
                     logger.warn("No active connection found for device {}", deviceId);
                     return false;
                 }
-                
+
                 // Get Netty connection
-                reactor.netty.Connection nettyConnection = connectionInfo.getNettyConnection();
+                Connection nettyConnection = connectionInfo.getNettyConnection();
                 if (nettyConnection == null || nettyConnection.isDisposed()) {
                     logger.warn("Connection for device {} is not available", deviceId);
                     // Clean up stale connection
                     connectionTracker.removeConnection(connectionInfo.getConnectionId());
                     return false;
                 }
-                
+
                 // Send command through the connection
-                return nettyConnection.outbound()
-                    .sendString(Mono.just(command + messageDelimiter))
-                    .then()
-                    .timeout(Duration.ofSeconds(10))
-                    .thenReturn(true)
-                    .onErrorResume(e -> {
-                        logger.warn("Failed to send command to device {}: {}", deviceId, e.getMessage());
-                        return Mono.just(false);
-                    })
-                    .block(); // This is okay in fromCallable as it runs on boundedElastic
-                    
+                nettyConnection.outbound()
+                        .sendString(Mono.just(command + messageDelimiter))
+                        .then()
+                        .block(Duration.ofSeconds(10));
+
+                logger.debug("Command sent to device {}: {}", deviceId, command);
+                return true;
+
             } catch (Exception e) {
                 logger.error("Error sending command to device {}", deviceId, e);
                 return false;

@@ -1,6 +1,6 @@
 package com.jjenus.tracker.devicecomm.infrastructure;
 
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,17 +18,15 @@ class AutoseekerProtocolParserTest {
     @Test
     void testCanParseValidAutoseekerData() {
         String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-        byte[] bytes = data.getBytes();
 
-        assertTrue(parser.canParse(bytes));
+        assertTrue(parser.canParse(data));
     }
 
     @Test
     void testCanParseInvalidHeader() {
         String data = "$GPS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-        byte[] bytes = data.getBytes();
 
-        assertFalse(parser.canParse(bytes));
+        assertFalse(parser.canParse(data));
     }
 
     @Test
@@ -38,15 +36,14 @@ class AutoseekerProtocolParserTest {
 
     @Test
     void testCanParseEmptyData() {
-        assertFalse(parser.canParse(new byte[0]));
+        assertFalse(parser.canParse(null));
     }
 
     @Test
     void testParseValidAutoseekerData() {
         String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-        byte[] bytes = data.getBytes();
 
-        LocationPoint location = parser.parse(bytes);
+        LocationPoint location = parser.parse(data);
 
         assertNotNull(location);
         assertTrue(location.isValid());
@@ -58,10 +55,9 @@ class AutoseekerProtocolParserTest {
     @Test
     void testParseInvalidHeader() {
         String data = "$GPS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-        byte[] bytes = data.getBytes();
 
         ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parser.parse(bytes));
+            () -> parser.parse(data));
 
         assertEquals("PROTOCOL_INVALID_HEADER", exception.getErrorCode());
         assertTrue(exception.getMessage().contains("Autoseeker"));
@@ -70,10 +66,9 @@ class AutoseekerProtocolParserTest {
     @Test
     void testParseIncompleteData() {
         String data = "$POS,DEV001,40.7128";
-        byte[] bytes = data.getBytes();
 
         ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parser.parse(bytes));
+            () -> parser.parse(data));
 
         assertEquals("PROTOCOL_PARSE_ERROR", exception.getErrorCode());
         assertTrue(exception.getMessage().contains("Incomplete data packet"));
@@ -82,10 +77,9 @@ class AutoseekerProtocolParserTest {
     @Test
     void testParseMalformedNumber() {
         String data = "$POS,DEV001,invalid,-74.0060,55.5,1700000000,1#";
-        byte[] bytes = data.getBytes();
 
         ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parser.parse(bytes));
+            () -> parser.parse(data));
 
         assertEquals("PROTOCOL_PARSE_ERROR", exception.getErrorCode());
         assertTrue(exception.getMessage().contains("Autoseeker"));
@@ -94,7 +88,7 @@ class AutoseekerProtocolParserTest {
     @Test
     void testBuildFuelCutCommand() {
         String deviceId = "DEV-001";
-        byte[] command = parser.buildFuelCutCommand(deviceId);
+        String command = parser.buildFuelCutCommand(deviceId);
 
         assertNotNull(command);
         String commandString = new String(command);
@@ -104,7 +98,7 @@ class AutoseekerProtocolParserTest {
     @Test
     void testBuildEngineOnCommand() {
         String deviceId = "DEV-001";
-        byte[] command = parser.buildEngineOnCommand(deviceId);
+        String command = parser.buildEngineOnCommand(deviceId);
 
         assertNotNull(command);
         String commandString = new String(command);
@@ -120,9 +114,8 @@ class AutoseekerProtocolParserTest {
     void testParseWithDifferentFormats() {
         // Test with extra fields (should still parse basic data)
         String data = "$POS,DEV001,34.0522,-118.2437,75.0,1700000000,1,extra,fields#";
-        byte[] bytes = data.getBytes();
 
-        LocationPoint location = parser.parse(bytes);
+        LocationPoint location = parser.parse(data);
 
         assertNotNull(location);
         assertEquals(34.0522, location.latitude(), 0.0001);
@@ -133,9 +126,8 @@ class AutoseekerProtocolParserTest {
     @Test
     void testParseZeroSpeed() {
         String data = "$POS,DEV001,40.7128,-74.0060,0.0,1700000000,0#";
-        byte[] bytes = data.getBytes();
 
-        LocationPoint location = parser.parse(bytes);
+        LocationPoint location = parser.parse(data);
 
         assertNotNull(location);
         assertEquals(0.0f, location.speedKmh(), 0.1f);
@@ -146,9 +138,8 @@ class AutoseekerProtocolParserTest {
     void testParseNegativeSpeed() {
         // Even though negative speed doesn't make sense, parser should handle it
         String data = "$POS,DEV001,40.7128,-74.0060,-10.5,1700000000,1#";
-        byte[] bytes = data.getBytes();
 
-        LocationPoint location = parser.parse(bytes);
+        LocationPoint location = parser.parse(data);
 
         assertNotNull(location);
         assertEquals(-10.5f, location.speedKmh(), 0.1f);

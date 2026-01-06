@@ -1,14 +1,16 @@
 package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
 import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.shared.exception.ValidationException;
+import org.springframework.stereotype.Service;
 
+@Service
 public class VehicleCommandService {
     private final IVehicleRepository vehicleRepository;
     private final EventPublisher eventPublisher;

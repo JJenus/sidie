@@ -23,7 +23,7 @@ class ParserFactoryTest {
 
     @Test
     void testGetParserForAutoseekerData() {
-        byte[] autoseekerData = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#".getBytes();
+        String autoseekerData = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
 
         ITrackerProtocolParser parser = parserFactory.getParser(autoseekerData);
 
@@ -34,7 +34,7 @@ class ParserFactoryTest {
 
     @Test
     void testGetParserForUnknownData() {
-        byte[] unknownData = "UNKNOWN,FORMAT,DATA".getBytes();
+        String unknownData = "UNKNOWN,FORMAT,DATA";
 
         ProtocolException exception = assertThrows(ProtocolException.class,
             () -> parserFactory.getParser(unknownData));
@@ -53,7 +53,7 @@ class ParserFactoryTest {
     @Test
     void testGetParserForEmptyData() {
         ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parserFactory.getParser(new byte[0]));
+            () -> parserFactory.getParser("new byte[0]"));
 
         assertEquals("PROTOCOL_PARSER_NOT_FOUND", exception.getErrorCode());
     }
@@ -76,7 +76,7 @@ class ParserFactoryTest {
     void testFactoryWithEmptyParserList() {
         ParserFactory emptyFactory = new ParserFactory(List.of());
 
-        byte[] anyData = "any data".getBytes();
+        String anyData = "any data";
         ProtocolException exception = assertThrows(ProtocolException.class,
             () -> emptyFactory.getParser(anyData));
 

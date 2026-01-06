@@ -1,11 +1,14 @@
 package com.jjenus.tracker.core.infrastructure;
 
 import com.jjenus.tracker.core.domain.Vehicle;
+import org.springframework.stereotype.Repository;
+
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Repository
 public class InMemoryVehicleRepository implements IVehicleRepository {
     private final Map<String, Vehicle> vehicles = new ConcurrentHashMap<>();
     
