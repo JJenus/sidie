@@ -42,8 +42,10 @@ package com.jjenus.tracker.alerting.application;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertEvent;
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
+import org.springframework.stereotype.Service;
 
+@Service
 public class AlertRuleEvaluationService {
 
     public AlertEvent evaluateRule(IAlertRule rule, Vehicle vehicle, LocationPoint location) {
@@ -80,14 +82,17 @@ package com.jjenus.tracker.alerting.application;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertEvent;
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.alerting.exception.AlertException;
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Comparator;
 
+@Component
 public class AlertingEngine {
     private final List<IAlertRule> activeRules;
     private final EventPublisher eventPublisher;
@@ -181,7 +186,7 @@ public class AlertingEngine {
 ```.java
 package com.jjenus.tracker.alerting.domain;
 
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 import java.time.Instant;
 
@@ -228,7 +233,7 @@ public enum AlertSeverity {
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.awt.geom.Path2D;
 import java.util.List;
 
@@ -319,7 +324,7 @@ public class GeofenceExitRule implements IAlertRule {
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public interface IAlertRule {
     AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation);
@@ -337,7 +342,7 @@ public interface IAlertRule {
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.time.Duration;
 
 public class IdleTimeRule implements IAlertRule {
@@ -404,7 +409,7 @@ public class IdleTimeRule implements IAlertRule {
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public class MaxSpeedRule implements IAlertRule {
     private final String ruleKey;
@@ -529,7 +534,7 @@ public class AlertException extends BusinessRuleException {
 package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Trip;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -549,14 +554,16 @@ public interface ITripService {
 package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
 import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.shared.exception.ValidationException;
+import org.springframework.stereotype.Service;
 
+@Service
 public class VehicleCommandService {
     private final IVehicleRepository vehicleRepository;
     private final EventPublisher eventPublisher;
@@ -644,7 +651,7 @@ public class VehicleCommandService {
 ```.java
 package com.jjenus.tracker.core.application;
 
-import com.jjenus.tracker.devicecomm.domain.LocationDataEvent;
+import com.jjenus.tracker.shared.domain.LocationDataEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -684,11 +691,14 @@ public class VehicleEventHandler {
 package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
+import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 
+@Service
 public class VehicleQueryService {
     private final IVehicleRepository vehicleRepository;
     
@@ -777,46 +787,11 @@ public record FuelStatus(
 }
 ```
 
-=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/LocationPoint.java ===
-```.java
-package com.jjenus.tracker.core.domain;
-
-import java.time.Instant;
-
-public record LocationPoint(
-    double latitude,
-    double longitude,
-    float speedKmh,
-    Instant timestamp
-) {
-    public boolean isValid() {
-        return latitude >= -90 && latitude <= 90 &&
-               longitude >= -180 && longitude <= 180 &&
-               speedKmh >= 0 &&
-               timestamp != null;
-    }
-
-    public double distanceTo(LocationPoint other) {
-        final int R = 6371;
-
-        double latDistance = Math.toRadians(other.latitude() - this.latitude());
-        double lonDistance = Math.toRadians(other.longitude() - this.longitude());
-
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                 + Math.cos(Math.toRadians(this.latitude()))
-                 * Math.cos(Math.toRadians(other.latitude()))
-                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c;
-    }
-}
-```
-
 === ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/Trip.java ===
 ```.java
 package com.jjenus.tracker.core.domain;
+
+import com.jjenus.tracker.shared.domain.LocationPoint;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -920,6 +895,8 @@ package com.jjenus.tracker.core.domain;
 
 import com.jjenus.tracker.core.exception.TripException;
 import com.jjenus.tracker.core.exception.VehicleException;
+import com.jjenus.tracker.shared.domain.LocationPoint;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -1046,6 +1023,7 @@ public class Vehicle {
 package com.jjenus.tracker.core.domain;
 
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public class VehicleUpdatedEvent extends DomainEvent {
     private final Vehicle vehicle;
@@ -1183,11 +1161,14 @@ public interface IVehicleRepository {
 package com.jjenus.tracker.core.infrastructure;
 
 import com.jjenus.tracker.core.domain.Vehicle;
+import org.springframework.stereotype.Repository;
+
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Repository
 public class InMemoryVehicleRepository implements IVehicleRepository {
     private final Map<String, Vehicle> vehicles = new ConcurrentHashMap<>();
     
@@ -1226,8 +1207,8 @@ package com.jjenus.tracker.devicecomm.application;
 
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.devicecomm.domain.LocationDataEvent;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationDataEvent;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import com.jjenus.tracker.devicecomm.exception.DeviceException;
@@ -1256,9 +1237,7 @@ public class DeviceDataProcessor {
 
             eventPublisher.publish(event);
             
-        } catch (ProtocolException e) {
-            throw e;
-        } catch (DeviceException e) {
+        } catch (ProtocolException | DeviceException e) {
             throw e;
         } catch (Exception e) {
             throw new com.jjenus.tracker.shared.exception.InfrastructureException(
@@ -1270,15 +1249,121 @@ public class DeviceDataProcessor {
     }
 }```
 
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/application/GT06CommandBuilder.java ===
+```.java
+package com.jjenus.tracker.devicecomm.application;
+
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
+
+public class GT06CommandBuilder {
+    
+    private static final DateTimeFormatter TIME_FORMATTER = 
+        DateTimeFormatter.ofPattern("HHmmss");
+    
+    public static String buildChangePasswordCommand(String imei, String oldPassword, String newPassword) {
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,S1,%s,%s,%s#", imei, time, oldPassword, newPassword);
+    }
+    
+    public static String buildSetCenterNumberCommand(String imei, String centerNumber) {
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,S2,%s,%s#", imei, time, centerNumber);
+    }
+    
+    public static String buildSetAdminNumberCommand(String imei, String... adminNumbers) {
+        String time = getCurrentTime();
+        StringBuilder numbers = new StringBuilder();
+        for (int i = 0; i < Math.min(adminNumbers.length, 5); i++) {
+            if (i > 0) numbers.append(",");
+            numbers.append(adminNumbers[i]);
+        }
+        return String.format("*HQ,%s,S3,%s,%s#", imei, time, numbers.toString());
+    }
+    
+    public static String buildSetAlarmModeCommand(String imei, int mode) {
+        // 0: close SMS and Calling alarm
+        // 1: SMS alarm
+        // 2: Calling center number as alarm
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,S18,%s,%d#", imei, time, mode);
+    }
+    
+    public static String buildSetGeoFenceCommand(String imei, int radiusMeters, int mode) {
+        // mode: 1=out fence, 2=in fence, 3=out and in
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,S21,%s,%d,%d#", imei, time, radiusMeters, mode);
+    }
+    
+    public static String buildSetIPPortCommand(String imei, String ip, int port) {
+        String time = getCurrentTime();
+        String ipParts = ip.replace(".", ",");
+        return String.format("*HQ,%s,S23,%s,%s,%d#", imei, time, ipParts, port);
+    }
+    
+    public static String buildSetAPNCommand(String imei, String apn, String password) {
+        String time = getCurrentTime();
+        if (password == null || password.isEmpty()) {
+            return String.format("*HQ,%s,S24,%s,%s,#", imei, time, apn);
+        }
+        return String.format("*HQ,%s,S24,%s,%s,%s#", imei, time, apn, password);
+    }
+    
+    public static String buildRestartCommand(String imei) {
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,R1,%s#", imei, time);
+    }
+    
+    public static String buildSetGPRSIntervalCommand(String imei, int intervalSeconds) {
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,D1,%s,%d#", imei, time, intervalSeconds);
+    }
+    
+    public static String buildSetOverspeedAlarmCommand(String imei, int speedLimitKmh) {
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,S33,%s,%d#", imei, time, speedLimitKmh);
+    }
+    
+    public static String buildSetWorkingModeCommand(String imei, int mode) {
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,WKMD,%s,%d#", imei, time, mode);
+    }
+    
+    public static String buildReadDeviceStateCommand(String imei, int type) {
+        // type: 0=basic data, 1=software version, 2=other data
+        String time = getCurrentTime();
+        return String.format("*HQ,%s,S26,%s,%d#", imei, time, type);
+    }
+    
+    private static String getCurrentTime() {
+        return LocalTime.now().format(TIME_FORMATTER);
+    }
+    
+    public static Map<String, String> getCommandExamples() {
+        return Map.of(
+            "Change Password", "*HQ,865205030330012,S1,130305,123456,000000#",
+            "Set Center Number", "*HQ,865205030330012,S2,130305,13812341234#",
+            "Fuel Cut", "*HQ,865205033365775,S20,092353,1,3,10,3,5,5,7#",
+            "Fuel Restore", "*HQ,865205030330012,S20,130305,1,0#",
+            "Set Geo-fence", "*HQ,865205030330012,S21,130305,1000,1#",
+            "Set IP/Port", "*HQ,865205030330012,S23,130305,116,205,4,25,8800#"
+        );
+    }
+}```
+
 === ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/application/ParserFactory.java ===
 ```.java
 package com.jjenus.tracker.devicecomm.application;
 
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.Optional;
 
+@Component
 public class ParserFactory {
     private final List<ITrackerProtocolParser> parsers;
 
@@ -1286,7 +1371,7 @@ public class ParserFactory {
         this.parsers = parsers;
     }
 
-    public ITrackerProtocolParser getParser(byte[] rawData) {
+    public ITrackerProtocolParser getParser(String rawData) {
         return parsers.stream()
             .filter(parser -> parser.canParse(rawData))
             .findFirst()
@@ -1301,52 +1386,66 @@ public class ParserFactory {
 }
 ```
 
-=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/config/TcpServerConfig.java ===
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/config/ProtocolParserConfig.java ===
 ```.java
-package com.jjenus.tracker.devicecomm.config;
-
-import com.jjenus.tracker.devicecomm.service.ReactiveTcpServer;
-import jakarta.annotation.PreDestroy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.event.EventListener;
-
 @Configuration
-public class TcpServerConfig {
-    private static final Logger logger = LoggerFactory.getLogger(TcpServerConfig.class);
-
+public class ProtocolParserConfig {
+    
     @Bean
-    public ReactiveTcpServer reactiveTcpServer() {
-        return new ReactiveTcpServer(deviceDataProcessor);
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void startTcpServerOnStartup(ApplicationReadyEvent event) {
-        // Delay startup to ensure all beans are ready
-        ReactiveTcpServer server = event.getApplicationContext()
-                .getBean(ReactiveTcpServer.class);
-
-        // Start in a separate thread to not block main thread
-        new Thread(() -> {
-            try {
-                Thread.sleep(3000); // Wait for Spring to fully initialize
-                server.start();
-            } catch (Exception e) {
-                logger.error("Failed to start TCP server", e);
-                // Don't crash the app, just log error
-            }
-        }, "tcp-server-starter").start();
-    }
-
-    @PreDestroy
-    public void cleanup() {
-        ReactiveTcpServer server = applicationContext.getBean(ReactiveTcpServer.class);
-        server.stop();
+    public List<ITrackerProtocolParser> protocolParsers() {
+        return List.of(
+            new GT06ProtocolParser(),
+            new AutoseekerProtocolParser()
+        );
     }
 }```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/config/TcpServerConfig.java ===
+```.java
+//package com.jjenus.tracker.devicecomm.config;
+//
+//import com.jjenus.tracker.devicecomm.service.ReactiveTcpServer;
+//import jakarta.annotation.PreDestroy;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+//import org.springframework.boot.context.event.ApplicationReadyEvent;
+//import org.springframework.context.annotation.Bean;
+//import org.springframework.context.annotation.Configuration;
+//import org.springframework.context.event.EventListener;
+//
+//@Configuration
+//public class TcpServerConfig {
+//    private static final Logger logger = LoggerFactory.getLogger(TcpServerConfig.class);
+//
+//    @Bean
+//    public ReactiveTcpServer reactiveTcpServer() {
+//        return new ReactiveTcpServer(deviceDataProcessor);
+//    }
+//
+//    @EventListener(ApplicationReadyEvent.class)
+//    public void startTcpServerOnStartup(ApplicationReadyEvent event) {
+//        // Delay startup to ensure all beans are ready
+//        ReactiveTcpServer server = event.getApplicationContext()
+//                .getBean(ReactiveTcpServer.class);
+//
+//        // Start in a separate thread to not block main thread
+//        new Thread(() -> {
+//            try {
+//                Thread.sleep(3000); // Wait for Spring to fully initialize
+//                server.start();
+//            } catch (Exception e) {
+//                logger.error("Failed to start TCP server", e);
+//                // Don't crash the app, just log error
+//            }
+//        }, "tcp-server-starter").start();
+//    }
+//
+//    @PreDestroy
+//    public void cleanup() {
+//        ReactiveTcpServer server = applicationContext.getBean(ReactiveTcpServer.class);
+//        server.stop();
+//    }
+//}```
 
 === ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/domain/DeviceDataPacket.java ===
 ```.java
@@ -1386,41 +1485,17 @@ public class FuelCutCommand extends DomainEvent {
 ```.java
 package com.jjenus.tracker.devicecomm.domain;
 
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
 
 public interface ITrackerProtocolParser {
-    LocationPoint parse(byte[] rawData) throws ProtocolParseException;
-    boolean canParse(byte[] rawData);
-    byte[] buildFuelCutCommand(String deviceId);
-    byte[] buildEngineOnCommand(String deviceId);
+    LocationPoint parse(String rawData) throws ProtocolParseException;
+    boolean canParse(String rawData);
+    String buildFuelCutCommand(String deviceId);
+    String buildEngineOnCommand(String deviceId);
     String getProtocolName();
 }
 
-```
-
-=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/domain/LocationDataEvent.java ===
-```.java
-package com.jjenus.tracker.devicecomm.domain;
-
-import com.jjenus.tracker.core.domain.LocationPoint;
-import com.jjenus.tracker.shared.pubsub.DomainEvent;
-
-public class LocationDataEvent extends DomainEvent {
-    private final String deviceId;
-    private final LocationPoint location;
-    private final String protocol;
-    
-    public LocationDataEvent(String deviceId, LocationPoint location, String protocol) {
-        this.deviceId = deviceId;
-        this.location = location;
-        this.protocol = protocol;
-    }
-    
-    public String getDeviceId() { return deviceId; }
-    public LocationPoint getLocation() { return location; }
-    public String getProtocol() { return protocol; }
-}
 ```
 
 === ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/exception/DeviceException.java ===
@@ -1493,12 +1568,11 @@ public class ProtocolException extends InfrastructureException {
         super(errorCode, message, cause);
     }
 
-    public static ProtocolException parserNotFound(byte[] data) {
-        String dataPreview = data != null && data.length > 0 ?
-            String.format(" (first byte: 0x%02x)", data[0]) : "";
+    public static ProtocolException parserNotFound(String data) {
+
         return new ProtocolException(
             "PROTOCOL_PARSER_NOT_FOUND",
-            String.format("No parser found for the provided data%s", dataPreview)
+            String.format("No parser found for the provided data%s", data)
         );
     }
 
@@ -1548,10 +1622,9 @@ public class ProtocolParseException extends Exception {
 package com.jjenus.tracker.devicecomm.infrastructure;
 
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import java.time.Instant;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 public class AutoseekerProtocolParser implements ITrackerProtocolParser {
@@ -1637,103 +1710,485 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     }
 }```
 
-=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/infrastructure/SocketServer.java ===
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/infrastructure/BatteryCalculator.java ===
 ```.java
 package com.jjenus.tracker.devicecomm.infrastructure;
 
-import com.jjenus.tracker.devicecomm.application.DeviceDataProcessor;
-import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.time.Instant;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-public class SocketServer {
-    private final int port;
-    private final DeviceDataProcessor dataProcessor;
-    private final ExecutorService executor;
-    private ServerSocket serverSocket;
-    private volatile boolean running;
+public class BatteryCalculator {
     
-    public SocketServer(int port, DeviceDataProcessor dataProcessor) {
-        this.port = port;
-        this.dataProcessor = dataProcessor;
-        this.executor = Executors.newCachedThreadPool();
+    /**
+     * Calculate battery percentage from hex voltage value
+     * According to GT06 protocol: 0x0000-0x0299 represents battery voltage
+     * Formula: voltage = (hex_value / 1024) * 5.6V
+     * Percentage = (voltage / 3.6V) * 100%
+     */
+    public static float calculateBatteryPercentage(String batteryHex) {
+        try {
+            if (batteryHex == null || batteryHex.length() != 4) {
+                return 0.0f;
+            }
+            
+            int hexValue = Integer.parseInt(batteryHex, 16);
+            
+            // Calculate voltage
+            float voltage = (hexValue / 1024.0f) * 5.6f;
+            
+            // Calculate percentage (nominal voltage is 3.6V)
+            float percentage = (voltage / 3.6f) * 100.0f;
+            
+            // Clamp between 1% and 100%
+            if (percentage < 1.0f) return 1.0f;
+            if (percentage > 100.0f) return 100.0f;
+            
+            return percentage;
+            
+        } catch (Exception e) {
+            return 0.0f;
+        }
     }
     
-    public void start() throws IOException {
-        serverSocket = new ServerSocket(port);
-        running = true;
-        System.out.println("Socket server started on port " + port);
-        
-        while (running) {
-            try {
-                Socket clientSocket = serverSocket.accept();
-                executor.submit(() -> handleClient(clientSocket));
-            } catch (IOException e) {
-                if (running) {
-                    System.err.println("Error accepting connection: " + e.getMessage());
+    /**
+     * Calculate battery voltage from hex value
+     */
+    public static float calculateBatteryVoltage(String batteryHex) {
+        try {
+            if (batteryHex == null || batteryHex.length() != 4) {
+                return 0.0f;
+            }
+            
+            int hexValue = Integer.parseInt(batteryHex, 16);
+            return (hexValue / 1024.0f) * 5.6f;
+            
+        } catch (Exception e) {
+            return 0.0f;
+        }
+    }
+}```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/infrastructure/GT06ProtocolParser.java ===
+```.java
+package com.jjenus.tracker.devicecomm.infrastructure;
+
+import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+public class GT06ProtocolParser implements ITrackerProtocolParser {
+    private static final Pattern GT06_PATTERN = Pattern.compile("^\\*[A-Z]{2},[0-9]{15},.*#");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = 
+        DateTimeFormatter.ofPattern("ddMMyyHHmmss");
+    
+    @Override
+    public LocationPoint parse(String data) throws ProtocolParseException {
+        try {
+            if (!canParse(data)) {
+                throw new ProtocolParseException("Not a valid GT06 protocol message");
+            }
+            
+            // Remove * and #
+            String cleanData = data.substring(1, data.length() - 1);
+            String[] parts = cleanData.split(",");
+            
+            String protocolType = parts[2]; // V1, V2, V3, V4, V5, HTBT
+            
+            switch (protocolType) {
+                case "V0":
+                    return parseLoginPacket(parts);
+                case "V1":
+                case "V2":
+                case "V4":
+                    return parseGPSPacket(parts);
+                case "V3":
+                    return parseLBSPacket(parts);
+                case "V5":
+                    return parseWifiPacket(parts);
+                case "HTBT":
+                    return parseHeartbeatPacket(parts);
+                default:
+                    throw new ProtocolParseException("Unknown protocol type: " + protocolType);
+            }
+            
+        } catch (Exception e) {
+            throw new ProtocolParseException("Failed to parse GT06 data: " + e.getMessage());
+        }
+    }
+    
+    private LocationPoint parseGPSPacket(String[] parts) throws ProtocolParseException {
+        try {
+            // Format: *XX,IMEI,V1/V2/V4,HHMMSS,valid,latitude,N/S,longitude,E/W,speed,direction,DDMMYY,status#
+            // Example: *HQ,865205030330012,V1,145452,A,2240.55181,N,11358.32389,E,0.00,0,100815,FFFFFBFF#
+            
+            if (parts.length < 12) {
+                throw new ProtocolParseException("Incomplete GPS packet");
+            }
+            
+            String imei = parts[1];
+            String timeStr = parts[3];
+            String validity = parts[4];
+            String latStr = parts[5];
+            String latDir = parts[6];
+            String lonStr = parts[7];
+            String lonDir = parts[8];
+            String speedKnotStr = parts[9];
+            String directionStr = parts[10];
+            String dateStr = parts[11];
+            
+            // Parse latitude (DDMM.MMMMM format)
+            double latitude = parseDDMMtoDecimal(latStr);
+            if ("S".equals(latDir)) {
+                latitude = -latitude;
+            }
+            
+            // Parse longitude (DDDMM.MMMMM format)
+            double longitude = parseDDMMtoDecimal(lonStr);
+            if ("W".equals(lonDir)) {
+                longitude = -longitude;
+            }
+            
+            // Parse speed (knots to km/h)
+            float speedKnots = Float.parseFloat(speedKnotStr);
+            float speedKmh = speedKnots * 1.852f;
+            
+            // Parse timestamp
+            Instant timestamp = parseDateTime(dateStr, timeStr);
+            
+            // Data is only valid if validity is 'A'
+            boolean isValid = "A".equals(validity);
+            
+            // For invalid GPS, we might still want to process it but with 0 speed
+            if (!isValid) {
+                speedKmh = 0.0f;
+            }
+            
+            return new LocationPoint(latitude, longitude, speedKmh, timestamp);
+            
+        } catch (Exception e) {
+            throw new ProtocolParseException("Failed to parse GPS packet: " + e.getMessage());
+        }
+    }
+    
+    private LocationPoint parseLBSPacket(String[] parts) throws ProtocolParseException {
+        try {
+            // Format: *XX,IMEI,V3,HHMMSS,base_info,battery_info,failure_info,cont,DDMMYY,status#
+            // Example: *HQ,865205030330012,V3,000201,46000,07,...#
+            
+            if (parts.length < 9) {
+                throw new ProtocolParseException("Incomplete LBS packet");
+            }
+            
+            String imei = parts[1];
+            String timeStr = parts[3];
+            String mccMnc = parts[4];
+            String dateStr = parts[parts.length - 2];
+            
+            // Extract battery info
+            String batteryHex = "0000";
+            for (int i = 5; i < parts.length; i++) {
+                if (parts[i].length() == 4 && parts[i].matches("[0-9A-Fa-f]{4}")) {
+                    batteryHex = parts[i];
+                    break;
                 }
             }
+            
+            // Parse timestamp (for LBS, we still need a timestamp)
+            Instant timestamp = parseDateTime(dateStr, timeStr);
+            
+            // LBS doesn't have real GPS coordinates, so we return default with 0 speed
+            // In production, you'd look up the cell tower location
+            return new LocationPoint(0.0, 0.0, 0.0f, timestamp);
+            
+        } catch (Exception e) {
+            throw new ProtocolParseException("Failed to parse LBS packet: " + e.getMessage());
         }
     }
     
-    private void handleClient(Socket clientSocket) {
+    private LocationPoint parseWifiPacket(String[] parts) throws ProtocolParseException {
         try {
-            String clientIp = clientSocket.getInetAddress().getHostAddress();
-            System.out.println("Client connected: " + clientIp);
+            // Format: *XX,IMEI,V5,HHMMSS,wifi_count,wifi_info...,battery_info,DDMMYY,status#
             
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            
-            while (!clientSocket.isClosed() && 
-                   (bytesRead = clientSocket.getInputStream().read(buffer)) != -1) {
-                
-                byte[] data = new byte[bytesRead];
-                System.arraycopy(buffer, 0, data, 0, bytesRead);
-                
-                String deviceId = extractDeviceId(data, clientIp);
-                
-                DeviceDataPacket packet = new DeviceDataPacket(
-                    deviceId,
-                    data,
-                    Instant.now(),
-                    clientIp
-                );
-                
-                dataProcessor.processDeviceData(packet);
+            if (parts.length < 8) {
+                throw new ProtocolParseException("Incomplete WIFI packet");
             }
             
-        } catch (IOException e) {
-            System.err.println("Client connection error: " + e.getMessage());
-        } finally {
-            try {
-                clientSocket.close();
-            } catch (IOException e) {
-                // Ignore
-            }
+            String timeStr = parts[3];
+            String dateStr = parts[parts.length - 2];
+            
+            // Parse timestamp
+            Instant timestamp = parseDateTime(dateStr, timeStr);
+            
+            // WIFI tracking doesn't have GPS coordinates by default
+            return new LocationPoint(0.0, 0.0, 0.0f, timestamp);
+            
+        } catch (Exception e) {
+            throw new ProtocolParseException("Failed to parse WIFI packet: " + e.getMessage());
         }
     }
     
-    private String extractDeviceId(byte[] data, String clientIp) {
-        return "DEV_" + clientIp.replace(".", "_") + "_" + System.currentTimeMillis();
-    }
-    
-    public void stop() {
-        running = false;
+    private LocationPoint parseHeartbeatPacket(String[] parts) throws ProtocolParseException {
         try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close();
-            }
-        } catch (IOException e) {
-            // Ignore
+            // Format: *XX,IMEI,HTBT# or *XX,IMEI,HTBT,battery_percent#
+            
+            String imei = parts[1];
+            Instant timestamp = Instant.now();
+            
+            // Heartbeat doesn't have location, return current location or default
+            // In your system, you might want to fetch last known location
+            return new LocationPoint(0.0, 0.0, 0.0f, timestamp);
+            
+        } catch (Exception e) {
+            throw new ProtocolParseException("Failed to parse heartbeat packet: " + e.getMessage());
         }
-        executor.shutdown();
     }
-}
-```
+    
+    private LocationPoint parseLoginPacket(String[] parts) throws ProtocolParseException {
+        // Login packet just announces device presence
+        Instant timestamp = Instant.now();
+        return new LocationPoint(0.0, 0.0, 0.0f, timestamp);
+    }
+    
+    private double parseDDMMtoDecimal(String ddmm) {
+        try {
+            double value = Double.parseDouble(ddmm);
+            int degrees = (int)(value / 100);
+            double minutes = value - (degrees * 100);
+            return degrees + (minutes / 60.0);
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+    
+    private Instant parseDateTime(String dateStr, String timeStr) {
+        try {
+            String dateTimeStr = dateStr + timeStr;
+            LocalDateTime ldt = LocalDateTime.parse(dateTimeStr, DATE_TIME_FORMATTER);
+            return ldt.atZone(ZoneId.systemDefault()).toInstant();
+        } catch (Exception e) {
+            // If parsing fails, return current time
+            return Instant.now();
+        }
+    }
+    
+    @Override
+    public boolean canParse(String data) {
+        if (data == null || data.isEmpty()) {
+            return false;
+        }
+        
+        return GT06_PATTERN.matcher(data).matches();
+    }
+    
+    @Override
+    public byte[] buildFuelCutCommand(String deviceId) {
+        try {
+            // GT06 fuel cut command format: *XX,IMEI,S20,HHMMSS,C,time1,time2,...#
+            // From protocol: C=1 (static disable), time1=3 (3 seconds)
+            
+            String timeStr = getCurrentTimeString();
+            String command = String.format("*HQ,%s,S20,%s,1,3#", deviceId, timeStr);
+            return command.getBytes();
+            
+        } catch (Exception e) {
+            throw ProtocolException.commandBuildError("GT06", "fuel cut");
+        }
+    }
+    
+    @Override
+    public byte[] buildEngineOnCommand(String deviceId) {
+        try {
+            // GT06 fuel restore command: *XX,IMEI,S20,HHMMSS,1,0#
+            
+            String timeStr = getCurrentTimeString();
+            String command = String.format("*HQ,%s,S20,%s,1,0#", deviceId, timeStr);
+            return command.getBytes();
+            
+        } catch (Exception e) {
+            throw ProtocolException.commandBuildError("GT06", "engine on");
+        }
+    }
+    
+    private String getCurrentTimeString() {
+        return String.format("%02d%02d%02d", 
+            java.time.LocalTime.now().getHour(),
+            java.time.LocalTime.now().getMinute(),
+            java.time.LocalTime.now().getSecond());
+    }
+    
+    @Override
+    public String getProtocolName() {
+        return "GT06";
+    }
+    
+    // Additional utility method to parse vehicle status bits
+    public Map<String, Boolean> parseStatusBits(String statusHex) {
+        Map<String, Boolean> statusMap = new HashMap<>();
+        
+        try {
+            if (statusHex == null || statusHex.length() != 8) {
+                return statusMap;
+            }
+            
+            // Convert hex to binary (32 bits)
+            long value = Long.parseLong(statusHex, 16);
+            String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
+            
+            // Parse bits according to protocol (LSB first, 0 = active)
+            // Byte 4 bits (bits 24-31)
+            statusMap.put("door_open", binary.charAt(31) == '0');          // bit 0
+            statusMap.put("overspeed_alarm", binary.charAt(30) == '0');    // bit 2
+            statusMap.put("fence_in_alarm", binary.charAt(28) == '0');     // bit 4
+            statusMap.put("fence_out_alarm", binary.charAt(25) == '0');    // bit 7
+            
+            // Byte 3 bits (bits 16-23)
+            statusMap.put("gps_status", binary.charAt(22) == '0');         // bit 2
+            statusMap.put("acc_off", binary.charAt(22) == '0');           // bit 2 (same as GPS status?)
+            statusMap.put("sos_alarm", binary.charAt(21) == '0');         // bit 11
+            statusMap.put("vibration_alarm", binary.charAt(19) == '0');   // bit 13
+            statusMap.put("low_battery_alarm", binary.charAt(18) == '0'); // bit 14
+            
+            // Byte 2 bits (bits 8-15)
+            statusMap.put("power_cut_alarm", binary.charAt(12) == '0');   // bit 20
+            
+            // Byte 1 bits (bits 0-7)
+            statusMap.put("vehicle_battery_remove_alarm", binary.charAt(4) == '0');  // bit 4
+            statusMap.put("anti_tamper_alarm", binary.charAt(3) == '0');             // bit 5
+            statusMap.put("cut_off_oil", binary.charAt(2) == '0');                   // bit 6
+            
+        } catch (Exception e) {
+            // Log error but don't throw
+            System.err.println("Error parsing status bits: " + e.getMessage());
+        }
+        
+        return statusMap;
+    }
+}```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/infrastructure/VehicleStatusParser.java ===
+```.java
+package com.jjenus.tracker.devicecomm.infrastructure;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class VehicleStatusParser {
+    
+    public static Map<String, Object> parseGT06Status(String statusHex) {
+        Map<String, Object> status = new HashMap<>();
+        
+        if (statusHex == null || statusHex.length() != 8) {
+            return status;
+        }
+        
+        try {
+            // Parse 4-byte status field
+            long value = Long.parseLong(statusHex, 16);
+            String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
+            
+            // Byte 4 (bits 24-31)
+            parseByte4(status, binary.substring(24, 32));
+            
+            // Byte 3 (bits 16-23)
+            parseByte3(status, binary.substring(16, 24));
+            
+            // Byte 2 (bits 8-15)
+            parseByte2(status, binary.substring(8, 16));
+            
+            // Byte 1 (bits 0-7)
+            parseByte1(status, binary.substring(0, 8));
+            
+        } catch (Exception e) {
+            status.put("parse_error", e.getMessage());
+        }
+        
+        return status;
+    }
+    
+    private static void parseByte1(Map<String, Object> status, String byteStr) {
+        // Bit 0: GPS Status (0=located, 1=not located)
+        boolean gpsLocated = byteStr.charAt(7) == '0';
+        status.put("gps_located", gpsLocated);
+        
+        // Bit 1: Vehicle security condition
+        boolean securityActive = byteStr.charAt(6) == '0';
+        status.put("security_active", securityActive);
+        
+        // Bit 2: ACC off
+        boolean accOff = byteStr.charAt(5) == '0';
+        status.put("acc_off", accOff);
+        
+        // Bit 3: SOS Alarm
+        boolean sosAlarm = byteStr.charAt(4) == '0';
+        status.put("sos_alarm", sosAlarm);
+        
+        // Bit 4: Vibration Alarm
+        boolean vibrationAlarm = byteStr.charAt(3) == '0';
+        status.put("vibration_alarm", vibrationAlarm);
+        
+        // Bit 5: Low Battery Alarm
+        boolean lowBatteryAlarm = byteStr.charAt(2) == '0';
+        status.put("low_battery_alarm", lowBatteryAlarm);
+    }
+    
+    private static void parseByte2(Map<String, Object> status, String byteStr) {
+        // Bit 0: Power cut-off alarm
+        boolean powerCutAlarm = byteStr.charAt(7) == '0';
+        status.put("power_cut_alarm", powerCutAlarm);
+        
+        // Bit 1: Device powered by backup battery
+        boolean backupBattery = byteStr.charAt(6) == '0';
+        status.put("backup_battery", backupBattery);
+    }
+    
+    private static void parseByte3(Map<String, Object> status, String byteStr) {
+        // Bit 0: Anti-tamper alarm
+        boolean antiTamperAlarm = byteStr.charAt(7) == '0';
+        status.put("anti_tamper_alarm", antiTamperAlarm);
+        
+        // Bit 1: Cut off oil condition
+        boolean oilCutOff = byteStr.charAt(6) == '0';
+        status.put("oil_cut_off", oilCutOff);
+        
+        // Bit 2: Vehicle battery remove condition alarm
+        boolean batteryRemoved = byteStr.charAt(5) == '0';
+        status.put("battery_removed", batteryRemoved);
+    }
+    
+    private static void parseByte4(Map<String, Object> status, String byteStr) {
+        // Bit 0: Door open
+        boolean doorOpen = byteStr.charAt(7) == '0';
+        status.put("door_open", doorOpen);
+        
+        // Bit 2: Overspeeding alarm
+        boolean overspeedAlarm = byteStr.charAt(5) == '0';
+        status.put("overspeed_alarm", overspeedAlarm);
+        
+        // Bit 4: Fence-in alarm
+        boolean fenceInAlarm = byteStr.charAt(3) == '0';
+        status.put("fence_in_alarm", fenceInAlarm);
+        
+        // Bit 7: Fence-out alarm
+        boolean fenceOutAlarm = byteStr.charAt(0) == '0';
+        status.put("fence_out_alarm", fenceOutAlarm);
+    }
+    
+    public static boolean isAlarmActive(Map<String, Object> status) {
+        return (boolean) status.getOrDefault("sos_alarm", false) ||
+               (boolean) status.getOrDefault("vibration_alarm", false) ||
+               (boolean) status.getOrDefault("low_battery_alarm", false) ||
+               (boolean) status.getOrDefault("power_cut_alarm", false) ||
+               (boolean) status.getOrDefault("anti_tamper_alarm", false) ||
+               (boolean) status.getOrDefault("overspeed_alarm", false) ||
+               (boolean) status.getOrDefault("fence_in_alarm", false) ||
+               (boolean) status.getOrDefault("fence_out_alarm", false);
+    }
+}```
 
 === ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/service/ReactiveTcpServer.java ===
 ```.java
@@ -1741,6 +2196,7 @@ package com.jjenus.tracker.devicecomm.service;
 
 import com.jjenus.tracker.devicecomm.application.DeviceDataProcessor;
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
+import com.jjenus.tracker.shared.domain.ConnectionInfo;
 import com.jjenus.tracker.shared.redis.RedisConnectionTracker;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
@@ -1753,9 +2209,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
+import reactor.netty.DisposableServer;
 import reactor.netty.tcp.TcpServer;
 
 import java.net.InetSocketAddress;
@@ -1771,24 +2227,24 @@ public class ReactiveTcpServer {
 
     private final DeviceDataProcessor deviceDataProcessor;
     private final RedisConnectionTracker connectionTracker;
-    
-    @Value("${tracking.tcp.server.port:8080}")
+
+    @Value("${tracking.tcp.server.port:8888}")
     private int tcpPort;
-    
+
     @Value("${tracking.tcp.server.message-delimiter:#}")
     private String messageDelimiter;
-    
+
     @Value("${tracking.tcp.server.max-message-length:1024}")
     private int maxMessageLength;
-    
+
     @Value("${tracking.tcp.server.read-timeout:300}")
     private int readTimeoutSeconds;
-    
-    private Connection serverConnection;
+
+    private DisposableServer server;
     private volatile boolean running = false;
 
     public ReactiveTcpServer(DeviceDataProcessor deviceDataProcessor,
-                            RedisConnectionTracker connectionTracker) {
+                             RedisConnectionTracker connectionTracker) {
         this.deviceDataProcessor = deviceDataProcessor;
         this.connectionTracker = connectionTracker;
     }
@@ -1799,11 +2255,11 @@ public class ReactiveTcpServer {
             logger.warn("TCP Server is already running");
             return;
         }
-        
+
         logger.info("Starting Reactive TCP Server on port {}", tcpPort);
-        
+
         try {
-            serverConnection = TcpServer.create()
+            server = TcpServer.create()
                     .port(tcpPort)
                     .option(ChannelOption.SO_BACKLOG, 100)
                     .option(ChannelOption.SO_REUSEADDR, true)
@@ -1816,34 +2272,44 @@ public class ReactiveTcpServer {
                     .wiretap("reactor.netty.tcp.TcpServer", LogLevel.DEBUG)
                     .handle((inbound, outbound) -> {
                         String connectionId = "conn-" + CONNECTION_COUNTER.incrementAndGet();
-                        InetSocketAddress remoteAddress = (InetSocketAddress) inbound.address();
-                        String clientIp = remoteAddress != null ? 
-                            remoteAddress.getAddress().getHostAddress() : "unknown";
-                        
-                        // Get the Netty Connection object
-                        Connection nettyConnection = inbound.context().channel().attr(Connection.class).get();
-                        
-                        // Initially deviceId is unknown - will be updated when we parse first message
-                        String initialDeviceId = "unknown";
-                        connectionTracker.registerConnection(connectionId, initialDeviceId, clientIp, nettyConnection);
-                        
-                        // Add timeout handler
-                        inbound.withConnection(conn ->
-                                conn.addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS)));
-                        
+
+                        final String[] clientIp = new String[]{"unknown"};
+                        final Connection[] nettyConnection = new Connection[1];
+
+                        // CORRECT: Use withConnection (one of the 3 methods) to get the Connection
+                        inbound.withConnection(conn -> {
+                            nettyConnection[0] = conn;
+
+                            // Get client IP from the Connection, not from inbound
+                            InetSocketAddress remoteAddress = (InetSocketAddress) conn.address();
+                            clientIp[0] = remoteAddress != null ?
+                                    remoteAddress.getAddress().getHostAddress() : "unknown";
+
+                            // Register connection in tracker
+                            String initialDeviceId = "unknown";
+                            connectionTracker.registerConnection(connectionId, initialDeviceId, clientIp[0], conn);
+
+                            // Add timeout handler
+                            conn.addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS));
+
+                            logger.debug("Connection {} established from {}", connectionId, clientIp[0]);
+                        });
+
+                        // CORRECT: Simplified message framing using bufferUntil
+                        // Alternative: Use receive().asString().transform() with custom framing
                         return inbound.receive()
                                 .asString()
-                                .transform(this::frameMessages)
-                                .doOnNext(message -> processRawMessage(message, connectionId, clientIp))
+                                .transform(this::frameMessagesWithDelimiter)
+                                .doOnNext(message -> processRawMessage(message, connectionId, clientIp[0]))
                                 .doOnError(error -> handleConnectionError(error, connectionId))
                                 .doFinally(signal -> cleanupConnection(connectionId))
                                 .then();
                     })
-                    .bindNow(Duration.ofSeconds(30));
-            
+                    .bindNow();
+
             running = true;
             logger.info("TCP Server started successfully on port {}", tcpPort);
-            
+
         } catch (Exception e) {
             logger.error("Failed to start TCP Server on port {}", tcpPort, e);
             throw new RuntimeException("Failed to start TCP Server", e);
@@ -1854,84 +2320,66 @@ public class ReactiveTcpServer {
         InetSocketAddress remoteAddress = (InetSocketAddress) connection.address();
         String clientIp = remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "unknown";
         int clientPort = remoteAddress != null ? remoteAddress.getPort() : 0;
-        
+
         logger.info("New TCP connection from {}:{}", clientIp, clientPort);
-        
+
         connection.onDispose(() -> {
             logger.info("Connection from {}:{} closed", clientIp, clientPort);
         });
     }
 
-    private Flux<String> frameMessages(Flux<String> dataStream) {
-        return Flux.create(sink -> {
-            StringBuilder buffer = new StringBuilder();
-            
-            dataStream.subscribe(
-                chunk -> {
-                    buffer.append(chunk);
-                    splitByDelimiter(buffer, sink);
-                },
-                sink::error,
-                () -> {
-                    if (buffer.length() > 0) {
-                        sink.next(buffer.toString());
+    /**
+     * Correct framing implementation using only Flux operators
+     * No manual Flux.create needed
+     */
+    private Flux<String> frameMessagesWithDelimiter(Flux<String> dataStream) {
+        return dataStream
+                .windowUntil(s -> s.contains(messageDelimiter), true)
+                .flatMap(window -> window.reduce(String::concat))
+                .map(combined -> {
+                    // Remove the delimiter for processing
+                    if (combined.endsWith(messageDelimiter)) {
+                        return combined.substring(0, combined.length() - 1);
                     }
-                    sink.complete();
-                }
-            );
-        });
-    }
-
-    private void splitByDelimiter(StringBuilder buffer, Sinks.Many<String> sink) {
-        int delimiterIndex;
-        while ((delimiterIndex = buffer.indexOf(messageDelimiter)) != -1) {
-            String completeMessage = buffer.substring(0, delimiterIndex + 1);
-            buffer.delete(0, delimiterIndex + 1);
-            sink.tryEmitNext(completeMessage);
-        }
-        
-        if (buffer.length() > maxMessageLength) {
-            logger.warn("Message buffer overflow ({} > {}), clearing buffer", 
-                       buffer.length(), maxMessageLength);
-            buffer.setLength(0);
-        }
+                    return combined;
+                });
     }
 
     private void processRawMessage(String rawMessage, String connectionId, String clientIp) {
         try {
             logger.debug("Received message ({} chars) from connection {}", rawMessage.length(), connectionId);
-            
+
             // Extract device ID from the raw message
             String deviceId = extractDeviceIdFromRawMessage(rawMessage);
-            
+
             // Update connection tracker with actual device ID if we extracted it
             if (!"unknown".equals(deviceId)) {
                 connectionTracker.updateConnectionDevice(connectionId, deviceId);
             }
-            
+
             DeviceDataPacket packet = new DeviceDataPacket(
-                deviceId,
-                rawMessage,
-                Instant.now(),
-                clientIp
+                    deviceId,
+                    rawMessage,
+                    Instant.now(),
+                    clientIp
             );
-            
+
             // Process asynchronously
             Mono.fromRunnable(() -> deviceDataProcessor.processDeviceData(packet))
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(
-                    null,
-                    error -> logger.error("Error processing device data for connection {}", connectionId, error)
-                );
-            
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(
+                            null,
+                            error -> logger.error("Error processing device data for connection {}", connectionId, error)
+                    );
+
             // Update last seen in connection tracker
             connectionTracker.updateLastSeen(connectionId);
-            
+
         } catch (Exception e) {
             logger.error("Error processing raw message from connection {}", connectionId, e);
         }
     }
-    
+
     private String extractDeviceIdFromRawMessage(String rawMessage) {
         // Simple extraction - assumes format: *XX,DEVICE_ID,...
         try {
@@ -1942,8 +2390,8 @@ public class ReactiveTcpServer {
                 }
             }
         } catch (Exception e) {
-            logger.warn("Failed to extract device ID from message: {}", 
-                       rawMessage.substring(0, Math.min(rawMessage.length(), 50)));
+            logger.warn("Failed to extract device ID from message: {}",
+                    rawMessage.substring(0, Math.min(rawMessage.length(), 50)));
         }
         return "unknown";
     }
@@ -1962,13 +2410,13 @@ public class ReactiveTcpServer {
             logger.warn("TCP Server is not running");
             return;
         }
-        
+
         logger.info("Stopping TCP Server...");
-        
-        if (serverConnection != null && !serverConnection.isDisposed()) {
-            serverConnection.disposeNow();
+
+        if (server != null && !server.isDisposed()) {
+            server.disposeNow();
         }
-        
+
         running = false;
         logger.info("TCP Server stopped");
     }
@@ -1981,35 +2429,32 @@ public class ReactiveTcpServer {
         return Mono.fromCallable(() -> {
             try {
                 // Get connection from Redis
-                RedisConnectionTracker.ConnectionInfo connectionInfo = 
-                    connectionTracker.getConnectionByDeviceId(deviceId);
-                
+                ConnectionInfo connectionInfo =
+                        connectionTracker.getConnectionByDeviceId(deviceId);
+
                 if (connectionInfo == null) {
                     logger.warn("No active connection found for device {}", deviceId);
                     return false;
                 }
-                
+
                 // Get Netty connection
-                reactor.netty.Connection nettyConnection = connectionInfo.getNettyConnection();
+                Connection nettyConnection = connectionInfo.getNettyConnection();
                 if (nettyConnection == null || nettyConnection.isDisposed()) {
                     logger.warn("Connection for device {} is not available", deviceId);
                     // Clean up stale connection
                     connectionTracker.removeConnection(connectionInfo.getConnectionId());
                     return false;
                 }
-                
+
                 // Send command through the connection
-                return nettyConnection.outbound()
-                    .sendString(Mono.just(command + messageDelimiter))
-                    .then()
-                    .timeout(Duration.ofSeconds(10))
-                    .thenReturn(true)
-                    .onErrorResume(e -> {
-                        logger.warn("Failed to send command to device {}: {}", deviceId, e.getMessage());
-                        return Mono.just(false);
-                    })
-                    .block(); // This is okay in fromCallable as it runs on boundedElastic
-                    
+                nettyConnection.outbound()
+                        .sendString(Mono.just(command + messageDelimiter))
+                        .then()
+                        .block(Duration.ofSeconds(10));
+
+                logger.debug("Command sent to device {}: {}", deviceId, command);
+                return true;
+
             } catch (Exception e) {
                 logger.error("Error sending command to device {}", deviceId, e);
                 return false;
@@ -2041,7 +2486,7 @@ package com.jjenus.tracker.main.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.jjenus.tracker.shared.redis.RedisConnectionTracker.ConnectionInfo;
+import com.jjenus.tracker.shared.domain.ConnectionInfo;
 import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -2127,6 +2572,144 @@ public class AppConfig {
         return converter;
     }
 }```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/domain/ConnectionInfo.java ===
+```.java
+package com.jjenus.tracker.shared.domain;
+
+import java.time.Instant;
+
+public class ConnectionInfo {
+    private String connectionId;
+    private String deviceId;
+    private String clientIp;
+    private Instant connectedAt;
+    private Instant lastSeen;
+    private transient reactor.netty.Connection nettyConnection; // Transient = not serialized
+
+    // Default constructor for Jackson
+    public ConnectionInfo() {}
+
+    public ConnectionInfo(String connectionId, String deviceId, String clientIp,
+                          reactor.netty.Connection nettyConnection) {
+        this.connectionId = connectionId;
+        this.deviceId = deviceId;
+        this.clientIp = clientIp;
+        this.nettyConnection = nettyConnection;
+        this.connectedAt = Instant.now();
+        this.lastSeen = this.connectedAt;
+    }
+
+    public void updateLastSeen() {
+        this.lastSeen = Instant.now();
+    }
+
+    // Getters and Setters (required for Jackson)
+    public String getConnectionId() { return connectionId; }
+    public void setConnectionId(String connectionId) { this.connectionId = connectionId; }
+
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+    public String getClientIp() { return clientIp; }
+    public void setClientIp(String clientIp) { this.clientIp = clientIp; }
+
+    public Instant getConnectedAt() { return connectedAt; }
+    public void setConnectedAt(Instant connectedAt) { this.connectedAt = connectedAt; }
+
+    public Instant getLastSeen() { return lastSeen; }
+    public void setLastSeen(Instant lastSeen) { this.lastSeen = lastSeen; }
+
+    public reactor.netty.Connection getNettyConnection() { return nettyConnection; }
+    public void setNettyConnection(reactor.netty.Connection nettyConnection) {
+        this.nettyConnection = nettyConnection;
+    }
+
+    @Override
+    public String toString() {
+        return "ConnectionInfo{" +
+                "connectionId='" + connectionId + '\'' +
+                ", deviceId='" + deviceId + '\'' +
+                ", clientIp='" + clientIp + '\'' +
+                ", connectedAt=" + connectedAt +
+                ", lastSeen=" + lastSeen +
+                '}';
+    }
+}
+
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/domain/LocationDataEvent.java ===
+```.java
+package com.jjenus.tracker.shared.domain;
+
+import com.jjenus.tracker.shared.pubsub.DomainEvent;
+import java.util.Map;
+import java.util.HashMap;
+
+public class LocationDataEvent extends DomainEvent {
+    private final String deviceId;
+    private final LocationPoint location;
+    private final String protocol;
+    private final Map<String, Object> metaData;
+    
+    public LocationDataEvent(String deviceId, LocationPoint location, String protocol) {
+        this.deviceId = deviceId;
+        this.location = location;
+        this.protocol = protocol;
+        this.metaData = new HashMap<>();
+    }
+    
+    public LocationDataEvent(String deviceId, LocationPoint location, String protocol, private final Map<String, Object> metaData) {
+        this.deviceId = deviceId;
+        this.location = location;
+        this.protocol = protocol;
+        this.metaData = metaData;
+    }
+
+    public String getDeviceId() { return deviceId; }
+    public LocationPoint getLocation() { return location; }
+    public String getProtocol() { return protocol; }
+    public String getMetaData() { return protocol; }
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/domain/LocationPoint.java ===
+```.java
+package com.jjenus.tracker.shared.domain;
+
+import java.time.Instant;
+
+public record LocationPoint(
+    double latitude,
+    double longitude,
+    float speedKmh,
+    Instant timestamp
+) {
+    public boolean isValid() {
+        return latitude >= -90 && latitude <= 90 &&
+               longitude >= -180 && longitude <= 180 &&
+               speedKmh >= 0 &&
+               timestamp != null;
+    }
+
+    public double distanceTo(LocationPoint other) {
+        final int R = 6371;
+
+        double latDistance = Math.toRadians(other.latitude() - this.latitude());
+        double lonDistance = Math.toRadians(other.longitude() - this.longitude());
+
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                 + Math.cos(Math.toRadians(this.latitude()))
+                 * Math.cos(Math.toRadians(other.latitude()))
+                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+}
+```
 
 === ./shared/src/main/java/com/jjenus/tracker/shared/exception/BusinessRuleException.java ===
 ```.java
@@ -2232,101 +2815,6 @@ public class ArtemisEventPublisher implements EventPublisher {
             logger.error("Failed to publish event {}", event.getEventId(), e);
             throw new RuntimeException("Failed to publish event", e);
         }
-    }
-}```
-
-=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/ArtemisEventSubscriber.java ===
-```.java
-package com.jjenus.tracker.shared.pubsub;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.jms.Message;
-import jakarta.jms.TextMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.stereotype.Component;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-@Component
-public class ArtemisEventSubscriber implements EventSubscriber {
-    private static final Logger logger = LoggerFactory.getLogger(ArtemisEventSubscriber.class);
-    
-    private final ObjectMapper objectMapper;
-    private final Map<Class<?>, CopyOnWriteArrayList<EventHandler<?>>> handlers;
-    
-    public ArtemisEventSubscriber(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-        this.handlers = new ConcurrentHashMap<>();
-    }
-    
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T extends DomainEvent> void subscribe(Class<T> eventType, EventHandler<T> handler) {
-        if (eventType == null || handler == null) {
-            throw new IllegalArgumentException("Event type and handler cannot be null");
-        }
-        
-        handlers.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(handler);
-        logger.debug("Registered handler for event type {}", eventType.getSimpleName());
-    }
-    
-    @Override
-    public void unsubscribe(Class<? extends DomainEvent> eventType, EventHandler<?> handler) {
-        if (eventType == null || handler == null) {
-            return;
-        }
-        
-        CopyOnWriteArrayList<EventHandler<?>> eventHandlers = handlers.get(eventType);
-        if (eventHandlers != null) {
-            eventHandlers.remove(handler);
-            logger.debug("Unregistered handler for event type {}", eventType.getSimpleName());
-        }
-    }
-    
-    @JmsListener(destination = "tracking.events.*", containerFactory = "jmsListenerContainerFactory")
-    public void handleEvent(Message message) {
-        try {
-            if (!(message instanceof TextMessage textMessage)) {
-                logger.warn("Received non-text JMS message");
-                return;
-            }
-            
-            String eventJson = textMessage.getText();
-            String destination = message.getJMSDestination().toString();
-            
-            // Extract event type from destination
-            String eventTypeName = destination.substring(destination.lastIndexOf('.') + 1);
-            eventTypeName = Character.toUpperCase(eventTypeName.charAt(0)) + eventTypeName.substring(1);
-            
-            // Parse the event
-            Class<?> eventClass = Class.forName("com.jjenus.tracker." + eventTypeName);
-            DomainEvent event = (DomainEvent) objectMapper.readValue(eventJson, eventClass);
-            
-            // Get handlers for this event type
-            CopyOnWriteArrayList<EventHandler<?>> eventHandlers = handlers.get(eventClass);
-            if (eventHandlers != null && !eventHandlers.isEmpty()) {
-                for (EventHandler handler : eventHandlers) {
-                    try {
-                        handler.handle(event);
-                    } catch (Exception e) {
-                        logger.error("Error in event handler for event {}", event.getEventId(), e);
-                    }
-                }
-            }
-            
-            logger.debug("Processed event {} from destination {}", event.getEventId(), destination);
-            
-        } catch (Exception e) {
-            logger.error("Failed to process JMS message", e);
-        }
-    }
-    
-    public Map<Class<?>, CopyOnWriteArrayList<EventHandler<?>>> getHandlers() {
-        return Map.copyOf(handlers);
     }
 }```
 
@@ -2457,6 +2945,7 @@ public class SimpleEventBus implements EventPublisher, EventSubscriber {
 package com.jjenus.tracker.shared.redis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jjenus.tracker.shared.domain.ConnectionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -2465,211 +2954,132 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class RedisConnectionTracker {
     private static final Logger logger = LoggerFactory.getLogger(RedisConnectionTracker.class);
-    
-    private final RedisTemplate<String, ConnectionInfo> redisTemplate;
-    private final ValueOperations<String, ConnectionInfo> valueOps;
-    private final ObjectMapper objectMapper;
-    
-    // Local cache for fast access (optional, Redis is already fast)
-    private final Map<String, ConnectionInfo> localConnectionCache = new ConcurrentHashMap<>();
-    
-    public RedisConnectionTracker(RedisTemplate<String, ConnectionInfo> redisTemplate, 
-                                 ObjectMapper objectMapper) {
+
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ValueOperations<String, Object> valueOps;
+
+    public RedisConnectionTracker(RedisTemplate<String, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
         this.valueOps = redisTemplate.opsForValue();
-        this.objectMapper = objectMapper;
     }
-    
-    public void registerConnection(String connectionId, String deviceId, String clientIp, 
-                                  reactor.netty.Connection nettyConnection) {
+
+    public void registerConnection(String connectionId, String deviceId, String clientIp,
+                                   reactor.netty.Connection nettyConnection) {
         ConnectionInfo info = new ConnectionInfo(connectionId, deviceId, clientIp, nettyConnection);
-        
+
         // Store in Redis with TTL
         String key = getConnectionKey(connectionId);
         valueOps.set(key, info, Duration.ofHours(1));
-        
+
         // Also store reverse lookup: deviceId -> connectionId
         if (!"unknown".equals(deviceId)) {
             String deviceKey = getDeviceConnectionKey(deviceId);
-            redisTemplate.opsForValue().set(deviceKey, connectionId, Duration.ofHours(1));
+            valueOps.set(deviceKey, connectionId, Duration.ofHours(1));
         }
-        
-        // Update local cache
-        localConnectionCache.put(connectionId, info);
-        
+
         logger.info("Registered connection {} for device {}", connectionId, deviceId);
     }
-    
+
     public void updateConnectionDevice(String connectionId, String deviceId) {
         ConnectionInfo info = getConnectionInfo(connectionId);
         if (info != null) {
             info.setDeviceId(deviceId);
-            
+
             // Update Redis
             String key = getConnectionKey(connectionId);
             valueOps.set(key, info, Duration.ofHours(1));
-            
+
             // Update reverse lookup
             String deviceKey = getDeviceConnectionKey(deviceId);
-            redisTemplate.opsForValue().set(deviceKey, connectionId, Duration.ofHours(1));
-            
+            valueOps.set(deviceKey, connectionId, Duration.ofHours(1));
+
             logger.info("Updated connection {} with device ID {}", connectionId, deviceId);
         }
     }
-    
+
     public void updateLastSeen(String connectionId) {
         ConnectionInfo info = getConnectionInfo(connectionId);
         if (info != null) {
             info.updateLastSeen();
-            
+
             // Update Redis
             String key = getConnectionKey(connectionId);
             valueOps.set(key, info, Duration.ofHours(1));
         }
     }
-    
+
     public void removeConnection(String connectionId) {
         // Get info before removing
         ConnectionInfo info = getConnectionInfo(connectionId);
-        
+
         // Remove from Redis
         String key = getConnectionKey(connectionId);
         redisTemplate.delete(key);
-        
+
         // Remove reverse lookup if we have device ID
         if (info != null && info.getDeviceId() != null && !"unknown".equals(info.getDeviceId())) {
             String deviceKey = getDeviceConnectionKey(info.getDeviceId());
             redisTemplate.delete(deviceKey);
         }
-        
-        // Remove from local cache
-        localConnectionCache.remove(connectionId);
-        
+
         logger.info("Removed connection {}", connectionId);
     }
-    
+
     public ConnectionInfo getConnectionInfo(String connectionId) {
-        // Try local cache first
-        ConnectionInfo info = localConnectionCache.get(connectionId);
-        if (info != null) {
-            return info;
-        }
-        
-        // Fall back to Redis
         String key = getConnectionKey(connectionId);
-        info = valueOps.get(key);
-        
-        if (info != null) {
-            localConnectionCache.put(connectionId, info);
+        Object value = valueOps.get(key);
+
+        if (value instanceof ConnectionInfo) {
+            return (ConnectionInfo) value;
         }
-        
-        return info;
+        return null;
     }
-    
+
     public ConnectionInfo getConnectionByDeviceId(String deviceId) {
         // First get connectionId from reverse lookup
         String deviceKey = getDeviceConnectionKey(deviceId);
-        String connectionId = redisTemplate.opsForValue().get(deviceKey);
-        
-        if (connectionId != null) {
-            return getConnectionInfo(connectionId);
+        Object value = valueOps.get(deviceKey);
+
+        if (value instanceof String) {
+            return getConnectionInfo((String) value);
         }
-        
+
         return null;
     }
-    
+
     public int getActiveConnectionCount() {
         // Count from Redis for accuracy across instances
         String pattern = getConnectionKey("*");
         Long count = redisTemplate.countExistingKeys(redisTemplate.keys(pattern));
-        return count != null ? count.intValue() : localConnectionCache.size();
+        return count != null ? count.intValue() : 0;
     }
-    
+
     public Map<String, ConnectionInfo> getAllConnections() {
-        // Refresh local cache from Redis
-        localConnectionCache.clear();
-        
+        Map<String, ConnectionInfo> connections = new HashMap<>();
+
         String pattern = getConnectionKey("*");
         redisTemplate.keys(pattern).forEach(key -> {
-            ConnectionInfo info = valueOps.get(key);
-            if (info != null) {
-                localConnectionCache.put(info.getConnectionId(), info);
+            Object value = valueOps.get(key);
+            if (value instanceof ConnectionInfo info) {
+                connections.put(info.getConnectionId(), info);
             }
         });
-        
-        return Map.copyOf(localConnectionCache);
+
+        return connections;
     }
-    
+
     private String getConnectionKey(String connectionId) {
         return "tracker:connection:" + connectionId;
     }
-    
+
     private String getDeviceConnectionKey(String deviceId) {
         return "tracker:device:connection:" + deviceId;
     }
-    
-    // ConnectionInfo is now a proper class, not JSON string
-    public static class ConnectionInfo {
-        private String connectionId;
-        private String deviceId;
-        private String clientIp;
-        private Instant connectedAt;
-        private Instant lastSeen;
-        private transient reactor.netty.Connection nettyConnection; // Transient = not serialized
-        
-        // Default constructor for Jackson
-        public ConnectionInfo() {}
-        
-        public ConnectionInfo(String connectionId, String deviceId, String clientIp, 
-                             reactor.netty.Connection nettyConnection) {
-            this.connectionId = connectionId;
-            this.deviceId = deviceId;
-            this.clientIp = clientIp;
-            this.nettyConnection = nettyConnection;
-            this.connectedAt = Instant.now();
-            this.lastSeen = this.connectedAt;
-        }
-        
-        public void updateLastSeen() {
-            this.lastSeen = Instant.now();
-        }
-        
-        // Getters and Setters (required for Jackson)
-        public String getConnectionId() { return connectionId; }
-        public void setConnectionId(String connectionId) { this.connectionId = connectionId; }
-        
-        public String getDeviceId() { return deviceId; }
-        public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
-        
-        public String getClientIp() { return clientIp; }
-        public void setClientIp(String clientIp) { this.clientIp = clientIp; }
-        
-        public Instant getConnectedAt() { return connectedAt; }
-        public void setConnectedAt(Instant connectedAt) { this.connectedAt = connectedAt; }
-        
-        public Instant getLastSeen() { return lastSeen; }
-        public void setLastSeen(Instant lastSeen) { this.lastSeen = lastSeen; }
-        
-        public reactor.netty.Connection getNettyConnection() { return nettyConnection; }
-        public void setNettyConnection(reactor.netty.Connection nettyConnection) { 
-            this.nettyConnection = nettyConnection; 
-        }
-        
-        @Override
-        public String toString() {
-            return "ConnectionInfo{" +
-                    "connectionId='" + connectionId + '\'' +
-                    ", deviceId='" + deviceId + '\'' +
-                    ", clientIp='" + clientIp + '\'' +
-                    ", connectedAt=" + connectedAt +
-                    ", lastSeen=" + lastSeen +
-                    '}';
-        }
-    }
 }```
+

@@ -18,10 +18,8 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         DateTimeFormatter.ofPattern("ddMMyyHHmmss");
     
     @Override
-    public LocationPoint parse(byte[] rawData) throws ProtocolParseException {
+    public LocationPoint parse(String data) throws ProtocolParseException {
         try {
-            String data = new String(rawData).trim();
-            
             if (!canParse(data)) {
                 throw new ProtocolParseException("Not a valid GT06 protocol message");
             }
