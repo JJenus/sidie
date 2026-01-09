@@ -1,6 +1,2675 @@
-git init
-git add .
-git commit -m "first commit"
-git branch -M main
-git remote add origin https://github.com/JJenus/sidie.git
-git push -u origin main
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/application/AlertEventHandler.java ===
+```.java
+package com.jjenus.tracker.alerting.application;
+
+import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AlertEventHandler {
+    private static final Logger logger = LoggerFactory.getLogger(AlertEventHandler.class);
+    
+    private final AlertingEngine alertingEngine;
+    
+    public AlertEventHandler(AlertingEngine alertingEngine) {
+        this.alertingEngine = alertingEngine;
+    }
+    
+    @JmsListener(destination = "tracking.events.vehicleupdatedevent",
+                containerFactory = "jmsListenerContainerFactory",
+                subscription = "alert-processing")
+    public void handleVehicleUpdate(VehicleUpdatedEvent event) {
+        try {
+            logger.debug("Processing vehicle update for {}", event.getVehicle().getVehicleId());
+            
+            alertingEngine.processVehicleUpdate(event.getVehicle(), event.getNewLocation());
+            
+        } catch (Exception e) {
+            logger.error("Failed to process vehicle update for {}", 
+                        event.getVehicle().getVehicleId(), e);
+            throw e;
+        }
+    }
+}```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/application/AlertRuleEvaluationService.java ===
+```.java
+package com.jjenus.tracker.alerting.application;
+
+import com.jjenus.tracker.alerting.domain.IAlertRule;
+import com.jjenus.tracker.alerting.domain.AlertEvent;
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+
+public class AlertRuleEvaluationService {
+
+    public AlertEvent evaluateRule(IAlertRule rule, Vehicle vehicle, LocationPoint location) {
+        // Handle null parameters
+        if (rule == null || vehicle == null || location == null) {
+            return null;
+        }
+        return rule.evaluate(vehicle, location);
+    }
+
+    public boolean validateRuleConfiguration(IAlertRule rule) {
+        if (rule == null) return false;
+
+        String ruleKey = rule.getRuleKey();
+        String ruleName = rule.getRuleName();
+
+        // More comprehensive validation
+        if (ruleKey == null || ruleKey.trim().isEmpty()) return false;
+        if (ruleName == null || ruleName.trim().isEmpty()) return false;
+
+        // Validate that ruleKey doesn't contain invalid characters
+        if (!ruleKey.matches("^[a-zA-Z0-9_]+$")) return false;
+
+        // Validate priority is reasonable
+        int priority = rule.getPriority();
+        return priority >= 1 && priority <= 100;
+    }
+}```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/application/AlertingEngine.java ===
+```.java
+package com.jjenus.tracker.alerting.application;
+
+import com.jjenus.tracker.alerting.domain.IAlertRule;
+import com.jjenus.tracker.alerting.domain.AlertEvent;
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.alerting.exception.AlertException;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Comparator;
+
+public class AlertingEngine {
+    private final List<IAlertRule> activeRules;
+    private final EventPublisher eventPublisher;
+    private final AlertRuleEvaluationService evaluationService;
+
+    public AlertingEngine(EventPublisher eventPublisher,
+                         AlertRuleEvaluationService evaluationService) {
+        this.activeRules = new CopyOnWriteArrayList<>();
+        this.eventPublisher = eventPublisher;
+        this.evaluationService = evaluationService;
+    }
+
+    public void processVehicleUpdate(Vehicle vehicle, LocationPoint newLocation) {
+        if (vehicle == null || newLocation == null) {
+            throw new com.jjenus.tracker.shared.exception.ValidationException(
+                "ALERT_INVALID_INPUT",
+                "Vehicle and location cannot be null"
+            );
+        }
+
+        List<IAlertRule> sortedRules = activeRules.stream()
+            .filter(IAlertRule::isEnabled)
+            .sorted(Comparator.comparingInt(IAlertRule::getPriority).reversed())
+            .toList();
+
+        for (IAlertRule rule : sortedRules) {
+            try {
+                AlertEvent alert = evaluationService.evaluateRule(rule, vehicle, newLocation);
+
+                if (alert != null) {
+                    System.out.println("Alert triggered: " + alert.getRuleKey() +
+                                     " for vehicle " + vehicle.getVehicleId());
+
+                    eventPublisher.publish(alert);
+
+                    vehicle.addAlert(alert.getMessage());
+                }
+            } catch (AlertException e) {
+                System.err.println("Alert evaluation error for rule " + rule.getRuleKey() + ": " + e.getMessage());
+                throw e;
+            } catch (Exception e) {
+                System.err.println("Unexpected error evaluating rule " + rule.getRuleKey() + ": " + e.getMessage());
+                throw AlertException.evaluationError(rule.getRuleKey(), e.getMessage());
+            }
+        }
+    }
+
+    public void registerRule(IAlertRule rule) {
+        if (rule == null) {
+            throw new ValidationException(
+                "ALERT_RULE_NULL",
+                "Alert rule cannot be null"
+            );
+        }
+
+        boolean ruleExists = activeRules.stream()
+            .anyMatch(r -> r.getRuleKey().equals(rule.getRuleKey()));
+
+        if (ruleExists) {
+            throw AlertException.ruleAlreadyExists(rule.getRuleKey());
+        }
+
+        if (!evaluationService.validateRuleConfiguration(rule)) {
+            throw AlertException.invalidConfiguration(rule.getRuleKey(), "Invalid configuration");
+        }
+
+        activeRules.add(rule);
+        System.out.println("Registered rule: " + rule.getRuleName());
+    }
+
+    public void unregisterRule(String ruleKey) {
+        boolean removed = activeRules.removeIf(rule -> rule.getRuleKey().equals(ruleKey));
+        if (!removed) {
+            throw AlertException.ruleNotFound(ruleKey);
+        }
+        System.out.println("Unregistered rule: " + ruleKey);
+    }
+
+    public List<IAlertRule> getActiveRules() {
+        return List.copyOf(activeRules);
+    }
+
+    public void clearRules() {
+        activeRules.clear();
+        System.out.println("Cleared all alert rules");
+    }
+}
+```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/domain/AlertEvent.java ===
+```.java
+package com.jjenus.tracker.alerting.domain;
+
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.pubsub.DomainEvent;
+import java.time.Instant;
+
+public class AlertEvent extends DomainEvent {
+    private final String ruleKey;
+    private final String vehicleId;
+    private final String message;
+    private final AlertSeverity severity;
+    private final Instant alertTimestamp;
+    private final LocationPoint location;
+    
+    public AlertEvent(String ruleKey, String vehicleId, String message, 
+                     AlertSeverity severity, LocationPoint location) {
+        this.ruleKey = ruleKey;
+        this.vehicleId = vehicleId;
+        this.message = message;
+        this.severity = severity;
+        this.alertTimestamp = Instant.now();
+        this.location = location;
+    }
+    
+    public String getRuleKey() { return ruleKey; }
+    public String getVehicleId() { return vehicleId; }
+    public String getMessage() { return message; }
+    public AlertSeverity getSeverity() { return severity; }
+    public Instant getAlertTimestamp() { return alertTimestamp; }
+    public LocationPoint getLocation() { return location; }
+}
+```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/domain/AlertSeverity.java ===
+```.java
+package com.jjenus.tracker.alerting.domain;
+
+public enum AlertSeverity {
+    INFO,
+    WARNING,
+    CRITICAL
+}
+```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/domain/GeofenceExitRule.java ===
+```.java
+package com.jjenus.tracker.alerting.domain;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import java.awt.geom.Path2D;
+import java.util.List;
+
+public class GeofenceExitRule implements IAlertRule {
+    private final String ruleKey;
+    private final String ruleName;
+    private final String geofenceId;
+    private final List<LocationPoint> boundaryPoints;
+    private boolean enabled;
+    private final int priority;
+    private boolean wasInside;
+    
+    public GeofenceExitRule(String ruleKey, String geofenceId, 
+                           List<LocationPoint> boundaryPoints) {
+        this.ruleKey = ruleKey;
+        this.ruleName = "Geofence Exit Rule";
+        this.geofenceId = geofenceId;
+        this.boundaryPoints = boundaryPoints;
+        this.enabled = true;
+        this.priority = 3;
+        this.wasInside = false;
+    }
+    
+    @Override
+    public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+        if (!enabled) return null;
+        
+        boolean isInside = isPointInPolygon(newLocation);
+        AlertEvent alert = null;
+        
+        if (wasInside && !isInside) {
+            String message = String.format(
+                "Vehicle %s exited geofence %s",
+                vehicle.getVehicleId(),
+                geofenceId
+            );
+            
+            alert = new AlertEvent(
+                ruleKey,
+                vehicle.getVehicleId(),
+                message,
+                AlertSeverity.WARNING,
+                newLocation
+            );
+        }
+        
+        wasInside = isInside;
+        return alert;
+    }
+    
+    private boolean isPointInPolygon(LocationPoint point) {
+        if (boundaryPoints.size() < 3) return false;
+        
+        Path2D polygon = new Path2D.Double();
+        polygon.moveTo(boundaryPoints.get(0).longitude(), 
+                      boundaryPoints.get(0).latitude());
+        
+        for (int i = 1; i < boundaryPoints.size(); i++) {
+            polygon.lineTo(boundaryPoints.get(i).longitude(), 
+                          boundaryPoints.get(i).latitude());
+        }
+        polygon.closePath();
+        
+        return polygon.contains(point.longitude(), point.latitude());
+    }
+    
+    @Override
+    public String getRuleKey() { return ruleKey; }
+    
+    @Override
+    public String getRuleName() { return ruleName; }
+    
+    @Override
+    public boolean isEnabled() { return enabled; }
+    
+    @Override
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    
+    @Override
+    public int getPriority() { return priority; }
+    
+    public String getGeofenceId() { return geofenceId; }
+}
+```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/domain/IAlertRule.java ===
+```.java
+package com.jjenus.tracker.alerting.domain;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+
+public interface IAlertRule {
+    AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation);
+    String getRuleKey();
+    String getRuleName();
+    boolean isEnabled();
+    void setEnabled(boolean enabled);
+    int getPriority();
+}
+
+```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/domain/IdleTimeRule.java ===
+```.java
+package com.jjenus.tracker.alerting.domain;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import java.time.Duration;
+
+public class IdleTimeRule implements IAlertRule {
+    private final String ruleKey;
+    private final String ruleName;
+    private final Duration maxIdleTime;
+    private boolean enabled;
+    private final int priority;
+    
+    public IdleTimeRule(String ruleKey, Duration maxIdleTime) {
+        this.ruleKey = ruleKey;
+        this.ruleName = "Idle Time Rule";
+        this.maxIdleTime = maxIdleTime;
+        this.enabled = true;
+        this.priority = 1;
+    }
+    
+    @Override
+    public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+        if (!enabled) return null;
+        
+        Duration idleDuration = vehicle.getIdleDuration();
+        
+        if (idleDuration.compareTo(maxIdleTime) > 0) {
+            String message = String.format(
+                "Vehicle %s has been idle for %d minutes (max allowed: %d minutes)",
+                vehicle.getVehicleId(),
+                idleDuration.toMinutes(),
+                maxIdleTime.toMinutes()
+            );
+            
+            return new AlertEvent(
+                ruleKey,
+                vehicle.getVehicleId(),
+                message,
+                AlertSeverity.INFO,
+                newLocation
+            );
+        }
+        return null;
+    }
+    
+    @Override
+    public String getRuleKey() { return ruleKey; }
+    
+    @Override
+    public String getRuleName() { return ruleName; }
+    
+    @Override
+    public boolean isEnabled() { return enabled; }
+    
+    @Override
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    
+    @Override
+    public int getPriority() { return priority; }
+    
+    public Duration getMaxIdleTime() { return maxIdleTime; }
+}
+```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/domain/MaxSpeedRule.java ===
+```.java
+package com.jjenus.tracker.alerting.domain;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+
+public class MaxSpeedRule implements IAlertRule {
+    private final String ruleKey;
+    private final String ruleName;
+    private final float thresholdSpeed;
+    private boolean enabled;
+    private final int priority;
+
+    public MaxSpeedRule(String ruleKey, float thresholdSpeed) {
+        this.ruleKey = ruleKey;
+        this.ruleName = "Maximum Speed Rule";
+        this.thresholdSpeed = thresholdSpeed;
+        this.enabled = true;
+        this.priority = 2;
+    }
+
+    @Override
+    public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+        // Handle null parameters
+        if (!enabled || vehicle == null || newLocation == null) {
+            return null;
+        }
+
+        // Handle potential null speed
+        float speed = newLocation.speedKmh();
+
+        if (speed > thresholdSpeed) {
+            String message = String.format(
+                    "Vehicle %s exceeded speed limit of %.1f km/h. Current speed: %.1f km/h",
+                    vehicle.getVehicleId(),
+                    thresholdSpeed,
+                    speed
+            );
+
+            AlertSeverity severity = speed > thresholdSpeed * 1.5 ?
+                    AlertSeverity.CRITICAL : AlertSeverity.WARNING;
+
+            return new AlertEvent(
+                    ruleKey,
+                    vehicle.getVehicleId(),
+                    message,
+                    severity,
+                    newLocation
+            );
+        }
+        return null;
+    }
+
+    @Override
+    public String getRuleKey() { return ruleKey; }
+
+    @Override
+    public String getRuleName() { return ruleName; }
+
+    @Override
+    public boolean isEnabled() { return enabled; }
+
+    @Override
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    @Override
+    public int getPriority() { return priority; }
+
+    public float getThresholdSpeed() { return thresholdSpeed; }
+}```
+
+=== ./alerting/src/main/java/com/jjenus/tracker/alerting/exception/AlertException.java ===
+```.java
+package com.jjenus.tracker.alerting.exception;
+
+import com.jjenus.tracker.shared.exception.BusinessRuleException;
+
+public class AlertException extends BusinessRuleException {
+
+    public AlertException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public AlertException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+
+    public static AlertException ruleNotFound(String ruleKey) {
+        return new AlertException(
+            "ALERT_RULE_NOT_FOUND",
+            String.format("Alert rule with key '%s' not found", ruleKey)
+        );
+    }
+
+    public static AlertException ruleAlreadyExists(String ruleKey) {
+        return new AlertException(
+            "ALERT_RULE_EXISTS",
+            String.format("Alert rule with key '%s' already exists", ruleKey)
+        );
+    }
+
+    public static AlertException invalidConfiguration(String ruleKey, String detail) {
+        return new AlertException(
+            "ALERT_INVALID_CONFIG",
+            String.format("Invalid configuration for rule '%s': %s", ruleKey, detail)
+        );
+    }
+
+    public static AlertException geofenceNotFound(String geofenceId) {
+        return new AlertException(
+            "ALERT_GEOFENCE_NOT_FOUND",
+            String.format("Geofence with ID '%s' not found", geofenceId)
+        );
+    }
+
+    public static AlertException evaluationError(String ruleKey, String detail) {
+        return new AlertException(
+            "ALERT_EVALUATION_ERROR",
+            String.format("Error evaluating rule '%s': %s", ruleKey, detail)
+        );
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/application/ITripService.java ===
+```.java
+package com.jjenus.tracker.core.application;
+
+import com.jjenus.tracker.core.domain.Trip;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+public interface ITripService {
+    Optional<Trip> getActiveTrip(String vehicleId);
+    List<Trip> getVehicleTrips(String vehicleId, Instant from, Instant to);
+    float calculateTripDistance(String tripId);
+    float calculateFuelConsumption(String tripId);
+    void detectTripStart(LocationPoint location);
+    void detectTripEnd(LocationPoint location);
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/application/VehicleCommandService.java ===
+```.java
+package com.jjenus.tracker.core.application;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
+import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
+import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.core.exception.VehicleException;
+import com.jjenus.tracker.shared.exception.ValidationException;
+
+public class VehicleCommandService {
+    private final IVehicleRepository vehicleRepository;
+    private final EventPublisher eventPublisher;
+
+    public VehicleCommandService(IVehicleRepository vehicleRepository,
+                                 EventPublisher eventPublisher) {
+        this.vehicleRepository = vehicleRepository;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public void handleFuelCutRequest(String vehicleId) {
+        try {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> VehicleException.notFound(vehicleId));
+
+            vehicle.issueFuelCutOffCommand();
+            vehicleRepository.save(vehicle);
+
+            // Publish DOMAIN EVENT, not device command
+            FuelCutRequestedEvent event = new FuelCutRequestedEvent(
+                vehicle.getVehicleId(),
+                vehicle.getDeviceId()
+            );
+            eventPublisher.publish(event);
+
+            System.out.println("Fuel cut command processed for vehicle " + vehicleId);
+
+        } catch (VehicleException e) {
+            System.err.println("Fuel cut validation failed for vehicle " + vehicleId + ": " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Failed to process fuel cut for vehicle " + vehicleId + ": " + e.getMessage());
+            throw new ValidationException("FUEL_CUT_PROCESS_ERROR",
+                "Failed to process fuel cut for vehicle " + vehicleId, e);
+        }
+    }
+
+    public void handleFuelRestoreRequest(String vehicleId) {
+        try {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> VehicleException.notFound(vehicleId));
+
+            vehicle.issueFuelRestoreCommand();
+            vehicleRepository.save(vehicle);
+
+            System.out.println("Fuel restore command processed for vehicle " + vehicleId);
+
+        } catch (VehicleException e) {
+            System.err.println("Fuel restore failed for vehicle " + vehicleId + ": " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Failed to restore fuel for vehicle " + vehicleId + ": " + e.getMessage());
+            throw new ValidationException("FUEL_RESTORE_PROCESS_ERROR",
+                "Failed to restore fuel for vehicle " + vehicleId, e);
+        }
+    }
+
+    public void updateVehicleLocation(String vehicleId, LocationPoint location) {
+        try {
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> VehicleException.notFound(vehicleId));
+
+            vehicle.processNewTelemetry(location);
+            vehicleRepository.save(vehicle);
+
+            VehicleUpdatedEvent event = new VehicleUpdatedEvent(vehicle, location);
+            eventPublisher.publish(event);
+
+            System.out.println("Updated location for vehicle " + vehicleId + ": " +
+                             location.latitude() + ", " + location.longitude());
+
+        } catch (VehicleException e) {
+            System.err.println("Location update failed for vehicle " + vehicleId + ": " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Failed to update location for vehicle " + vehicleId + ": " + e.getMessage());
+            throw new ValidationException("LOCATION_UPDATE_ERROR",
+                "Failed to update location for vehicle " + vehicleId, e);
+        }
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/application/VehicleEventHandler.java ===
+```.java
+package com.jjenus.tracker.core.application;
+
+import com.jjenus.tracker.devicecomm.domain.LocationDataEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class VehicleEventHandler {
+    private static final Logger logger = LoggerFactory.getLogger(VehicleEventHandler.class);
+    
+    private final VehicleCommandService vehicleCommandService;
+    
+    public VehicleEventHandler(VehicleCommandService vehicleCommandService) {
+        this.vehicleCommandService = vehicleCommandService;
+    }
+    
+    @JmsListener(destination = "tracking.events.locationdataevent", 
+                containerFactory = "jmsListenerContainerFactory",
+                subscription = "vehicle-location-updates")
+    public void handleLocationUpdate(LocationDataEvent event) {
+        try {
+            logger.debug("Processing location update for device {}", event.getDeviceId());
+            
+            // Map device to vehicle (in production, this would come from a repository)
+            String vehicleId = "VEH_" + event.getDeviceId();
+            
+            vehicleCommandService.updateVehicleLocation(vehicleId, event.getLocation());
+            
+        } catch (Exception e) {
+            logger.error("Failed to process location update for device {}", event.getDeviceId(), e);
+            throw e; // Let JMS handle retry/DLQ
+        }
+    }
+}```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/application/VehicleQueryService.java ===
+```.java
+package com.jjenus.tracker.core.application;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
+import java.util.List;
+import java.util.Optional;
+
+public class VehicleQueryService {
+    private final IVehicleRepository vehicleRepository;
+    
+    public VehicleQueryService(IVehicleRepository vehicleRepository) {
+        this.vehicleRepository = vehicleRepository;
+    }
+    
+    public Optional<Vehicle> getVehicleById(String vehicleId) {
+        return vehicleRepository.findById(vehicleId);
+    }
+    
+    public List<Vehicle> getAllVehicles() {
+        return vehicleRepository.findAll();
+    }
+    
+    public Optional<LocationPoint> getCurrentLocation(String vehicleId) {
+        return vehicleRepository.findById(vehicleId)
+            .map(Vehicle::getCurrentLocation);
+    }
+    
+    public boolean isVehicleMoving(String vehicleId) {
+        return vehicleRepository.findById(vehicleId)
+            .map(vehicle -> vehicle.getCurrentLocation().speedKmh() > 0)
+            .orElse(false);
+    }
+    
+    public Optional<Float> getVehicleSpeed(String vehicleId) {
+        return vehicleRepository.findById(vehicleId)
+            .map(vehicle -> vehicle.getCurrentLocation().speedKmh());
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/EngineState.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+public enum EngineState {
+    OFF,
+    ON,
+    IDLE,
+    MOVING,
+    AWAITING_CUTOFF,
+    FUEL_CUT_ACTIVE
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/FuelCutRequestedEvent.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+import com.jjenus.tracker.shared.pubsub.DomainEvent;
+
+public class FuelCutRequestedEvent extends DomainEvent {
+    private final String vehicleId;
+    private final String deviceId;
+
+    public FuelCutRequestedEvent(String vehicleId, String deviceId) {
+        this.vehicleId = vehicleId;
+        this.deviceId = deviceId;
+    }
+
+    public String getVehicleId() { return vehicleId; }
+    public String getDeviceId() { return deviceId; }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/FuelStatus.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+import java.time.Instant;
+
+public record FuelStatus(
+    float currentLevel,
+    float lastConsumption,
+    Instant lastUpdated
+) {
+    public boolean isLow() {
+        return currentLevel < 15.0f;
+    }
+    
+    public boolean isEmpty() {
+        return currentLevel < 5.0f;
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/LocationPoint.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+import java.time.Instant;
+
+public record LocationPoint(
+    double latitude,
+    double longitude,
+    float speedKmh,
+    Instant timestamp
+) {
+    public boolean isValid() {
+        return latitude >= -90 && latitude <= 90 &&
+               longitude >= -180 && longitude <= 180 &&
+               speedKmh >= 0 &&
+               timestamp != null;
+    }
+
+    public double distanceTo(LocationPoint other) {
+        final int R = 6371;
+
+        double latDistance = Math.toRadians(other.latitude() - this.latitude());
+        double lonDistance = Math.toRadians(other.longitude() - this.longitude());
+
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                 + Math.cos(Math.toRadians(this.latitude()))
+                 * Math.cos(Math.toRadians(other.latitude()))
+                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/Trip.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+
+public class Trip {
+    private final String tripId;
+    private final String vehicleId;
+    private final Instant startTime;
+    private Instant endTime;
+    private LocationPoint startLocation;
+    private LocationPoint endLocation;
+    private final List<LocationPoint> routePoints;
+    private float totalDistance;
+
+    public Trip(String vehicleId, LocationPoint startLocation) {
+        this.tripId = "TRIP_" + vehicleId + "_" + UUID.randomUUID().toString().substring(0, 8);
+        this.vehicleId = vehicleId;
+        this.startTime = startLocation.timestamp();
+        this.startLocation = startLocation;
+        this.routePoints = new ArrayList<>();
+        this.routePoints.add(startLocation);
+        this.totalDistance = 0.0f;
+    }
+
+    public void addLocation(LocationPoint location) {
+        if (!routePoints.isEmpty()) {
+            LocationPoint lastPoint = routePoints.get(routePoints.size() - 1);
+            totalDistance += lastPoint.distanceTo(location);
+        }
+        routePoints.add(location);
+    }
+
+    public void end(LocationPoint endLocation) {
+        this.endTime = endLocation.timestamp(); // Use the location's timestamp!
+        this.endLocation = endLocation;
+        addLocation(endLocation);
+    }
+
+    public Duration getDuration() {
+        if (endTime == null) {
+            // Active trip - duration from start to now
+            return Duration.between(startTime, Instant.now());
+        } else {
+            // Ended trip - fixed duration between start and end timestamps
+            return Duration.between(startTime, endTime);
+        }
+    }
+
+    public float getAverageSpeed() {
+        Duration duration = getDuration();
+        long seconds = duration.getSeconds();
+        if (seconds == 0) return 0.0f;
+
+        // Speed = distance / time (convert seconds to hours)
+        return totalDistance / (seconds / 3600.0f);
+    }
+
+    // Getters
+    public String getTripId() { return tripId; }
+    public String getVehicleId() { return vehicleId; }
+    public Instant getStartTime() { return startTime; }
+    public Instant getEndTime() { return endTime; }
+    public LocationPoint getStartLocation() { return startLocation; }
+    public LocationPoint getEndLocation() { return endLocation; }
+    public List<LocationPoint> getRoutePoints() {
+        return Collections.unmodifiableList(routePoints);
+    }
+    public float getTotalDistance() { return totalDistance; }
+    public boolean isActive() { return endTime == null; }
+
+    @Override
+    public String toString() {
+        return "Trip{" +
+                "tripId='" + tripId + '\'' +
+                ", vehicleId='" + vehicleId + '\'' +
+                ", startTime=" + startTime +
+                ", endTime=" + endTime +
+                ", totalDistance=" + totalDistance +
+                ", isActive=" + isActive() +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Trip trip = (Trip) o;
+        return Objects.equals(tripId, trip.tripId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(tripId);
+    }
+}```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/Vehicle.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+import com.jjenus.tracker.core.exception.TripException;
+import com.jjenus.tracker.core.exception.VehicleException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Vehicle {
+    private final String vehicleId;
+    private String deviceId;
+    private LocationPoint currentLocation;
+    private EngineState engineState;
+    private FuelStatus fuelStatus;
+    private boolean isFuelCutActive;
+    private Instant lastMovementTime;
+    private Trip activeTrip;
+    private final List<String> recentAlerts;
+
+    public Vehicle(String vehicleId) {
+        this.vehicleId = vehicleId;
+        this.engineState = EngineState.OFF;
+        this.isFuelCutActive = false;
+        this.currentLocation = new LocationPoint(0.0, 0.0, 0.0f, Instant.now());
+        this.fuelStatus = new FuelStatus(100.0f, 0.0f, Instant.now());
+        this.recentAlerts = new ArrayList<>();
+    }
+
+    public void processNewTelemetry(LocationPoint newLocation) {
+        if (!newLocation.isValid()) {
+            throw VehicleException.invalidLocationData();
+        }
+
+        this.currentLocation = newLocation;
+
+        if (newLocation.speedKmh() > 0) {
+            this.engineState = EngineState.MOVING;
+            this.lastMovementTime = Instant.now();
+
+            if (this.activeTrip == null) {
+                startTrip(newLocation);
+            }
+        } else if (this.engineState == EngineState.MOVING) {
+            this.engineState = EngineState.IDLE;
+            this.lastMovementTime = Instant.now();
+        }
+
+        if (this.engineState == EngineState.MOVING && this.activeTrip != null) {
+            this.activeTrip.addLocation(newLocation);
+        }
+    }
+
+    private void startTrip(LocationPoint startLocation) {
+        if (this.activeTrip != null) {
+            throw com.jjenus.tracker.core.exception.TripException.alreadyActive(vehicleId);
+        }
+        this.activeTrip = new Trip(this.vehicleId, startLocation);
+        System.out.println("DOMAIN EVENT: Trip started for vehicle " + vehicleId);
+    }
+
+    public void endTrip(LocationPoint endLocation) {
+        if (this.activeTrip == null) {
+            throw TripException.notActive(vehicleId);
+        }
+        this.activeTrip.end(endLocation);
+        System.out.println("DOMAIN EVENT: Trip ended for vehicle " + vehicleId);
+        this.activeTrip = null;
+    }
+
+    public void issueFuelCutOffCommand() {
+        if (this.currentLocation.speedKmh() > 10) {
+            throw VehicleException.fuelCutNotAllowedWhileMoving(this.currentLocation.speedKmh());
+        }
+
+        if (this.isFuelCutActive) {
+            throw VehicleException.fuelCutAlreadyActive();
+        }
+
+        this.isFuelCutActive = true;
+        this.engineState = EngineState.FUEL_CUT_ACTIVE;
+
+        System.out.println("DOMAIN EVENT: Fuel cut requested for vehicle " + vehicleId);
+    }
+
+    public void issueFuelRestoreCommand() {
+        this.isFuelCutActive = false;
+
+        if (this.currentLocation.speedKmh() > 0) {
+            this.engineState = EngineState.MOVING;
+        } else {
+            this.engineState = EngineState.ON;
+        }
+
+        System.out.println("DOMAIN EVENT: Fuel restore requested for vehicle " + vehicleId);
+    }
+
+    public Duration getIdleDuration() {
+        if (this.lastMovementTime == null || this.engineState != EngineState.IDLE) {
+            return Duration.ZERO;
+        }
+        return Duration.between(this.lastMovementTime, Instant.now());
+    }
+
+    public void addAlert(String alertMessage) {
+        this.recentAlerts.add(Instant.now() + ": " + alertMessage);
+        if (this.recentAlerts.size() > 100) {
+            this.recentAlerts.remove(0);
+        }
+    }
+
+    public String getVehicleId() { return vehicleId; }
+    public String getDeviceId() { return deviceId; }
+    public LocationPoint getCurrentLocation() { return currentLocation; }
+    public EngineState getEngineState() { return engineState; }
+    public FuelStatus getFuelStatus() { return fuelStatus; }
+    public boolean isFuelCutActive() { return isFuelCutActive; }
+    public Trip getActiveTrip() { return activeTrip; }
+    public List<String> getRecentAlerts() { return new ArrayList<>(recentAlerts); }
+
+    protected void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+    protected void setFuelStatus(FuelStatus fuelStatus) { this.fuelStatus = fuelStatus; }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/domain/VehicleUpdatedEvent.java ===
+```.java
+package com.jjenus.tracker.core.domain;
+
+import com.jjenus.tracker.shared.pubsub.DomainEvent;
+
+public class VehicleUpdatedEvent extends DomainEvent {
+    private final Vehicle vehicle;
+    private final LocationPoint newLocation;
+
+    public VehicleUpdatedEvent(Vehicle vehicle, LocationPoint newLocation) {
+        this.vehicle = vehicle;
+        this.newLocation = newLocation;
+    }
+
+    public Vehicle getVehicle() { return vehicle; }
+    public LocationPoint getNewLocation() { return newLocation; }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/exception/TripException.java ===
+```.java
+package com.jjenus.tracker.core.exception;
+
+import com.jjenus.tracker.shared.exception.BusinessRuleException;
+
+public class TripException extends BusinessRuleException {
+
+    public TripException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public TripException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+
+    public static TripException alreadyActive(String vehicleId) {
+        return new TripException(
+            "TRIP_ALREADY_ACTIVE",
+            String.format("Vehicle '%s' already has an active trip", vehicleId)
+        );
+    }
+
+    public static TripException notActive(String vehicleId) {
+        return new TripException(
+            "TRIP_NOT_ACTIVE",
+            String.format("Vehicle '%s' does not have an active trip", vehicleId)
+        );
+    }
+
+    public static TripException notFound(String tripId) {
+        return new TripException(
+            "TRIP_NOT_FOUND",
+            String.format("Trip with ID '%s' not found", tripId)
+        );
+    }
+
+    public static TripException invalidDuration() {
+        return new TripException(
+            "TRIP_INVALID_DURATION",
+            "Trip duration cannot be negative"
+        );
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/exception/VehicleException.java ===
+```.java
+package com.jjenus.tracker.core.exception;
+
+import com.jjenus.tracker.shared.exception.BusinessRuleException;
+
+public class VehicleException extends BusinessRuleException {
+
+    public VehicleException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public VehicleException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+
+    // Specific vehicle exceptions
+    public static VehicleException fuelCutNotAllowedWhileMoving(float speed) {
+        return new VehicleException(
+            "VEHICLE_FUEL_CUT_MOVING",
+            String.format("Cannot cut fuel while moving at %.1f km/h. Maximum allowed: 10 km/h", speed)
+        );
+    }
+
+    public static VehicleException fuelCutAlreadyActive() {
+        return new VehicleException(
+            "VEHICLE_FUEL_CUT_ACTIVE",
+            "Fuel cut is already active for this vehicle"
+        );
+    }
+
+    public static VehicleException invalidLocationData() {
+        return new VehicleException(
+            "VEHICLE_INVALID_LOCATION",
+            "Invalid location data provided"
+        );
+    }
+
+    public static VehicleException notFound(String vehicleId) {
+        return new VehicleException(
+            "VEHICLE_NOT_FOUND",
+            String.format("Vehicle with ID '%s' not found", vehicleId)
+        );
+    }
+
+    public static VehicleException deviceAlreadyAssigned(String deviceId) {
+        return new VehicleException(
+            "VEHICLE_DEVICE_ASSIGNED",
+            String.format("Device with ID '%s' is already assigned to another vehicle", deviceId)
+        );
+    }
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/infrastructure/IVehicleRepository.java ===
+```.java
+package com.jjenus.tracker.core.infrastructure;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import java.util.List;
+import java.util.Optional;
+
+public interface IVehicleRepository {
+    Optional<Vehicle> findById(String vehicleId);
+    List<Vehicle> findAll();
+    void save(Vehicle vehicle);
+    void delete(String vehicleId);
+    boolean exists(String vehicleId);
+}
+```
+
+=== ./core-tracking/src/main/java/com/jjenus/tracker/core/infrastructure/InMemoryVehicleRepository.java ===
+```.java
+package com.jjenus.tracker.core.infrastructure;
+
+import com.jjenus.tracker.core.domain.Vehicle;
+import java.util.Map;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class InMemoryVehicleRepository implements IVehicleRepository {
+    private final Map<String, Vehicle> vehicles = new ConcurrentHashMap<>();
+    
+    @Override
+    public Optional<Vehicle> findById(String vehicleId) {
+        return Optional.ofNullable(vehicles.get(vehicleId));
+    }
+    
+    @Override
+    public List<Vehicle> findAll() {
+        return List.copyOf(vehicles.values());
+    }
+    
+    @Override
+    public void save(Vehicle vehicle) {
+        if (vehicle != null) {
+            vehicles.put(vehicle.getVehicleId(), vehicle);
+        }
+    }
+    
+    @Override
+    public void delete(String vehicleId) {
+        vehicles.remove(vehicleId);
+    }
+    
+    @Override
+    public boolean exists(String vehicleId) {
+        return vehicles.containsKey(vehicleId);
+    }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/application/DeviceDataProcessor.java ===
+```.java
+package com.jjenus.tracker.devicecomm.application;
+
+import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
+import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
+import com.jjenus.tracker.devicecomm.domain.LocationDataEvent;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import com.jjenus.tracker.devicecomm.exception.DeviceException;
+import org.springframework.stereotype.Service;
+
+@Service
+public class DeviceDataProcessor {
+    private final ParserFactory parserFactory;
+    private final EventPublisher eventPublisher;
+
+    public DeviceDataProcessor(ParserFactory parserFactory, EventPublisher eventPublisher) {
+        this.parserFactory = parserFactory;
+        this.eventPublisher = eventPublisher;
+    }
+
+    public void processDeviceData(DeviceDataPacket packet) {
+        try {
+            ITrackerProtocolParser parser = parserFactory.getParser(packet.rawData());
+            LocationPoint location = parser.parse(packet.rawData());
+
+            LocationDataEvent event = new LocationDataEvent(
+                packet.deviceId(),
+                location,
+                parser.getProtocolName()
+            );
+
+            eventPublisher.publish(event);
+            
+        } catch (ProtocolException e) {
+            throw e;
+        } catch (DeviceException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new com.jjenus.tracker.shared.exception.InfrastructureException(
+                "DEVICE_DATA_PROCESS_ERROR",
+                "Failed to process device data for " + packet.deviceId(),
+                e
+            );
+        }
+    }
+}```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/application/ParserFactory.java ===
+```.java
+package com.jjenus.tracker.devicecomm.application;
+
+import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
+import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import java.util.List;
+import java.util.Optional;
+
+public class ParserFactory {
+    private final List<ITrackerProtocolParser> parsers;
+
+    public ParserFactory(List<ITrackerProtocolParser> parsers) {
+        this.parsers = parsers;
+    }
+
+    public ITrackerProtocolParser getParser(byte[] rawData) {
+        return parsers.stream()
+            .filter(parser -> parser.canParse(rawData))
+            .findFirst()
+            .orElseThrow(() -> ProtocolException.parserNotFound(rawData));
+    }
+
+    public Optional<ITrackerProtocolParser> getParserByName(String protocolName) {
+        return parsers.stream()
+            .filter(parser -> parser.getProtocolName().equalsIgnoreCase(protocolName))
+            .findFirst();
+    }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/config/TcpServerConfig.java ===
+```.java
+package com.jjenus.tracker.devicecomm.config;
+
+import com.jjenus.tracker.devicecomm.service.ReactiveTcpServer;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
+
+@Configuration
+public class TcpServerConfig {
+    private static final Logger logger = LoggerFactory.getLogger(TcpServerConfig.class);
+
+    @Bean
+    public ReactiveTcpServer reactiveTcpServer() {
+        return new ReactiveTcpServer(deviceDataProcessor);
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void startTcpServerOnStartup(ApplicationReadyEvent event) {
+        // Delay startup to ensure all beans are ready
+        ReactiveTcpServer server = event.getApplicationContext()
+                .getBean(ReactiveTcpServer.class);
+
+        // Start in a separate thread to not block main thread
+        new Thread(() -> {
+            try {
+                Thread.sleep(3000); // Wait for Spring to fully initialize
+                server.start();
+            } catch (Exception e) {
+                logger.error("Failed to start TCP server", e);
+                // Don't crash the app, just log error
+            }
+        }, "tcp-server-starter").start();
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        ReactiveTcpServer server = applicationContext.getBean(ReactiveTcpServer.class);
+        server.stop();
+    }
+}```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/domain/DeviceDataPacket.java ===
+```.java
+package com.jjenus.tracker.devicecomm.domain;
+
+import java.time.Instant;
+
+public record DeviceDataPacket(
+    String deviceId,
+    String rawData,
+    Instant receivedAt,
+    String sourceIp
+) {}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/domain/FuelCutCommand.java ===
+```.java
+package com.jjenus.tracker.devicecomm.domain;
+
+import com.jjenus.tracker.shared.pubsub.DomainEvent;
+
+public class FuelCutCommand extends DomainEvent {
+    private final String vehicleId;
+    private final String deviceId;
+    
+    public FuelCutCommand(String vehicleId, String deviceId) {
+        this.vehicleId = vehicleId;
+        this.deviceId = deviceId;
+    }
+    
+    public String getVehicleId() { return vehicleId; }
+    public String getDeviceId() { return deviceId; }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/domain/ITrackerProtocolParser.java ===
+```.java
+package com.jjenus.tracker.devicecomm.domain;
+
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
+
+public interface ITrackerProtocolParser {
+    LocationPoint parse(byte[] rawData) throws ProtocolParseException;
+    boolean canParse(byte[] rawData);
+    byte[] buildFuelCutCommand(String deviceId);
+    byte[] buildEngineOnCommand(String deviceId);
+    String getProtocolName();
+}
+
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/domain/LocationDataEvent.java ===
+```.java
+package com.jjenus.tracker.devicecomm.domain;
+
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.shared.pubsub.DomainEvent;
+
+public class LocationDataEvent extends DomainEvent {
+    private final String deviceId;
+    private final LocationPoint location;
+    private final String protocol;
+    
+    public LocationDataEvent(String deviceId, LocationPoint location, String protocol) {
+        this.deviceId = deviceId;
+        this.location = location;
+        this.protocol = protocol;
+    }
+    
+    public String getDeviceId() { return deviceId; }
+    public LocationPoint getLocation() { return location; }
+    public String getProtocol() { return protocol; }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/exception/DeviceException.java ===
+```.java
+package com.jjenus.tracker.devicecomm.exception;
+
+import com.jjenus.tracker.shared.exception.BusinessRuleException;
+
+public class DeviceException extends BusinessRuleException {
+
+    public DeviceException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public DeviceException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+
+    public static DeviceException notFound(String deviceId) {
+        return new DeviceException(
+            "DEVICE_NOT_FOUND",
+            String.format("Device with ID '%s' not found", deviceId)
+        );
+    }
+
+    public static DeviceException offline(String deviceId) {
+        return new DeviceException(
+            "DEVICE_OFFLINE",
+            String.format("Device with ID '%s' is offline", deviceId)
+        );
+    }
+
+    public static DeviceException communicationError(String deviceId) {
+        return new DeviceException(
+            "DEVICE_COMMUNICATION_ERROR",
+            String.format("Communication error with device '%s'", deviceId)
+        );
+    }
+
+    public static DeviceException commandTimeout(String deviceId, String commandType) {
+        return new DeviceException(
+            "DEVICE_COMMAND_TIMEOUT",
+            String.format("Command '%s' timeout for device '%s'", commandType, deviceId)
+        );
+    }
+
+    public static DeviceException invalidResponse(String deviceId, String expected, String received) {
+        return new DeviceException(
+            "DEVICE_INVALID_RESPONSE",
+            String.format("Invalid response from device '%s'. Expected: %s, Received: %s",
+                         deviceId, expected, received)
+        );
+    }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/exception/ProtocolException.java ===
+```.java
+package com.jjenus.tracker.devicecomm.exception;
+
+import com.jjenus.tracker.shared.exception.InfrastructureException;
+
+public class ProtocolException extends InfrastructureException {
+
+    public ProtocolException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public ProtocolException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+
+    public static ProtocolException parserNotFound(byte[] data) {
+        String dataPreview = data != null && data.length > 0 ?
+            String.format(" (first byte: 0x%02x)", data[0]) : "";
+        return new ProtocolException(
+            "PROTOCOL_PARSER_NOT_FOUND",
+            String.format("No parser found for the provided data%s", dataPreview)
+        );
+    }
+
+    public static ProtocolException invalidHeader(String protocolName) {
+        return new ProtocolException(
+            "PROTOCOL_INVALID_HEADER",
+            String.format("Invalid header for %s protocol", protocolName)
+        );
+    }
+
+    public static ProtocolException parseError(String protocolName, String detail) {
+        return new ProtocolException(
+            "PROTOCOL_PARSE_ERROR",
+            String.format("Failed to parse %s data: %s", protocolName, detail)
+        );
+    }
+
+    public static ProtocolException unsupportedProtocol(int protocolNumber) {
+        return new ProtocolException(
+            "PROTOCOL_UNSUPPORTED",
+            String.format("Unsupported protocol number: 0x%02x", protocolNumber)
+        );
+    }
+
+    public static ProtocolException commandBuildError(String protocolName, String commandType) {
+        return new ProtocolException(
+            "PROTOCOL_COMMAND_BUILD_ERROR",
+            String.format("Failed to build %s command for %s protocol", commandType, protocolName)
+        );
+    }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/exception/ProtocolParseException.java ===
+```.java
+package com.jjenus.tracker.devicecomm.exception;
+
+public class ProtocolParseException extends Exception {
+    public ProtocolParseException(String message) {
+        super(message);
+    }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/infrastructure/AutoseekerProtocolParser.java ===
+```.java
+package com.jjenus.tracker.devicecomm.infrastructure;
+
+import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
+import com.jjenus.tracker.core.domain.LocationPoint;
+import com.jjenus.tracker.devicecomm.exception.ProtocolException;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
+public class AutoseekerProtocolParser implements ITrackerProtocolParser {
+
+    @Override
+    public LocationPoint parse(String rawData) throws ProtocolException { // Changed from byte[] to String
+        try {
+            if (!canParse(rawData)) {
+                throw ProtocolException.invalidHeader("Autoseeker");
+            }
+            
+            // Parse the example format: *XX,YYYYYYYYYY,V1,HHMMSS,S,latitude,D,longitude,G,speed,direction,DDMMYY,vehicle_status,...
+            String[] parts = rawData.split(",");
+            
+            if (parts.length < 11) {
+                throw ProtocolException.parseError("Autoseeker", "Incomplete data packet");
+            }
+            
+            String deviceId = parts[1]; // YYYYYYYYYY is device ID
+            String timeStr = parts[3]; // HHMMSS
+            
+            // Parse latitude
+            String latDir = parts[5]; // S or N
+            double lat = Double.parseDouble(parts[4]);
+            if ("S".equals(latDir)) {
+                lat = -lat;
+            }
+            
+            // Parse longitude
+            String lonDir = parts[7]; // E or W
+            double lng = Double.parseDouble(parts[6]);
+            if ("W".equals(lonDir)) {
+                lng = -lng;
+            }
+            
+            // Parse speed
+            float speed = Float.parseFloat(parts[8]);
+            
+            // Parse date
+            String dateStr = parts[10]; // DDMMYY
+            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("ddMMyyHHmmss");
+            String dateTimeStr = dateStr + timeStr;
+            Instant timestamp = java.time.LocalDateTime.parse(dateTimeStr, dateFormatter)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant();
+            
+            return new LocationPoint(lat, lng, speed, timestamp);
+            
+        } catch (ProtocolException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ProtocolException.parseError("Autoseeker", e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean canParse(String rawData) { // Changed from byte[] to String
+        if (rawData == null || rawData.isEmpty()) return false;
+        return rawData.startsWith("*XX,");
+    }
+
+    @Override
+    public String buildFuelCutCommand(String deviceId) {
+        try {
+            return String.format("*CMD,%s,FUEL,OFF#", deviceId);
+        } catch (Exception e) {
+            throw ProtocolException.commandBuildError("Autoseeker", "fuel cut");
+        }
+    }
+
+    @Override
+    public String buildEngineOnCommand(String deviceId) {
+        try {
+            return String.format("*CMD,%s,FUEL,ON#", deviceId);
+        } catch (Exception e) {
+            throw ProtocolException.commandBuildError("Autoseeker", "engine on");
+        }
+    }
+
+    @Override
+    public String getProtocolName() {
+        return "Autoseeker";
+    }
+}```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/infrastructure/SocketServer.java ===
+```.java
+package com.jjenus.tracker.devicecomm.infrastructure;
+
+import com.jjenus.tracker.devicecomm.application.DeviceDataProcessor;
+import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.time.Instant;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class SocketServer {
+    private final int port;
+    private final DeviceDataProcessor dataProcessor;
+    private final ExecutorService executor;
+    private ServerSocket serverSocket;
+    private volatile boolean running;
+    
+    public SocketServer(int port, DeviceDataProcessor dataProcessor) {
+        this.port = port;
+        this.dataProcessor = dataProcessor;
+        this.executor = Executors.newCachedThreadPool();
+    }
+    
+    public void start() throws IOException {
+        serverSocket = new ServerSocket(port);
+        running = true;
+        System.out.println("Socket server started on port " + port);
+        
+        while (running) {
+            try {
+                Socket clientSocket = serverSocket.accept();
+                executor.submit(() -> handleClient(clientSocket));
+            } catch (IOException e) {
+                if (running) {
+                    System.err.println("Error accepting connection: " + e.getMessage());
+                }
+            }
+        }
+    }
+    
+    private void handleClient(Socket clientSocket) {
+        try {
+            String clientIp = clientSocket.getInetAddress().getHostAddress();
+            System.out.println("Client connected: " + clientIp);
+            
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            
+            while (!clientSocket.isClosed() && 
+                   (bytesRead = clientSocket.getInputStream().read(buffer)) != -1) {
+                
+                byte[] data = new byte[bytesRead];
+                System.arraycopy(buffer, 0, data, 0, bytesRead);
+                
+                String deviceId = extractDeviceId(data, clientIp);
+                
+                DeviceDataPacket packet = new DeviceDataPacket(
+                    deviceId,
+                    data,
+                    Instant.now(),
+                    clientIp
+                );
+                
+                dataProcessor.processDeviceData(packet);
+            }
+            
+        } catch (IOException e) {
+            System.err.println("Client connection error: " + e.getMessage());
+        } finally {
+            try {
+                clientSocket.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
+    }
+    
+    private String extractDeviceId(byte[] data, String clientIp) {
+        return "DEV_" + clientIp.replace(".", "_") + "_" + System.currentTimeMillis();
+    }
+    
+    public void stop() {
+        running = false;
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            // Ignore
+        }
+        executor.shutdown();
+    }
+}
+```
+
+=== ./device-comm/src/main/java/com/jjenus/tracker/devicecomm/service/ReactiveTcpServer.java ===
+```.java
+package com.jjenus.tracker.devicecomm.service;
+
+import com.jjenus.tracker.devicecomm.application.DeviceDataProcessor;
+import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
+import com.jjenus.tracker.shared.redis.RedisConnectionTracker;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
+import reactor.netty.Connection;
+import reactor.netty.tcp.TcpServer;
+
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+@Service
+public class ReactiveTcpServer {
+    private static final Logger logger = LoggerFactory.getLogger(ReactiveTcpServer.class);
+    private static final AtomicInteger CONNECTION_COUNTER = new AtomicInteger(0);
+
+    private final DeviceDataProcessor deviceDataProcessor;
+    private final RedisConnectionTracker connectionTracker;
+    
+    @Value("${tracking.tcp.server.port:8080}")
+    private int tcpPort;
+    
+    @Value("${tracking.tcp.server.message-delimiter:#}")
+    private String messageDelimiter;
+    
+    @Value("${tracking.tcp.server.max-message-length:1024}")
+    private int maxMessageLength;
+    
+    @Value("${tracking.tcp.server.read-timeout:300}")
+    private int readTimeoutSeconds;
+    
+    private Connection serverConnection;
+    private volatile boolean running = false;
+
+    public ReactiveTcpServer(DeviceDataProcessor deviceDataProcessor,
+                            RedisConnectionTracker connectionTracker) {
+        this.deviceDataProcessor = deviceDataProcessor;
+        this.connectionTracker = connectionTracker;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void start() {
+        if (running) {
+            logger.warn("TCP Server is already running");
+            return;
+        }
+        
+        logger.info("Starting Reactive TCP Server on port {}", tcpPort);
+        
+        try {
+            serverConnection = TcpServer.create()
+                    .port(tcpPort)
+                    .option(ChannelOption.SO_BACKLOG, 100)
+                    .option(ChannelOption.SO_REUSEADDR, true)
+                    .option(ChannelOption.TCP_NODELAY, true)
+                    .option(ChannelOption.SO_KEEPALIVE, true)
+                    .doOnConnection(this::handleNewConnection)
+                    .doOnBind(bind -> logger.info("TCP Server binding to port {}", tcpPort))
+                    .doOnBound(bound -> logger.info("TCP Server successfully bound"))
+                    .doOnUnbound(unbound -> logger.info("TCP Server unbound"))
+                    .wiretap("reactor.netty.tcp.TcpServer", LogLevel.DEBUG)
+                    .handle((inbound, outbound) -> {
+                        String connectionId = "conn-" + CONNECTION_COUNTER.incrementAndGet();
+                        InetSocketAddress remoteAddress = (InetSocketAddress) inbound.address();
+                        String clientIp = remoteAddress != null ? 
+                            remoteAddress.getAddress().getHostAddress() : "unknown";
+                        
+                        // Get the Netty Connection object
+                        Connection nettyConnection = inbound.context().channel().attr(Connection.class).get();
+                        
+                        // Initially deviceId is unknown - will be updated when we parse first message
+                        String initialDeviceId = "unknown";
+                        connectionTracker.registerConnection(connectionId, initialDeviceId, clientIp, nettyConnection);
+                        
+                        // Add timeout handler
+                        inbound.withConnection(conn ->
+                                conn.addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS)));
+                        
+                        return inbound.receive()
+                                .asString()
+                                .transform(this::frameMessages)
+                                .doOnNext(message -> processRawMessage(message, connectionId, clientIp))
+                                .doOnError(error -> handleConnectionError(error, connectionId))
+                                .doFinally(signal -> cleanupConnection(connectionId))
+                                .then();
+                    })
+                    .bindNow(Duration.ofSeconds(30));
+            
+            running = true;
+            logger.info("TCP Server started successfully on port {}", tcpPort);
+            
+        } catch (Exception e) {
+            logger.error("Failed to start TCP Server on port {}", tcpPort, e);
+            throw new RuntimeException("Failed to start TCP Server", e);
+        }
+    }
+
+    private void handleNewConnection(Connection connection) {
+        InetSocketAddress remoteAddress = (InetSocketAddress) connection.address();
+        String clientIp = remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "unknown";
+        int clientPort = remoteAddress != null ? remoteAddress.getPort() : 0;
+        
+        logger.info("New TCP connection from {}:{}", clientIp, clientPort);
+        
+        connection.onDispose(() -> {
+            logger.info("Connection from {}:{} closed", clientIp, clientPort);
+        });
+    }
+
+    private Flux<String> frameMessages(Flux<String> dataStream) {
+        return Flux.create(sink -> {
+            StringBuilder buffer = new StringBuilder();
+            
+            dataStream.subscribe(
+                chunk -> {
+                    buffer.append(chunk);
+                    splitByDelimiter(buffer, sink);
+                },
+                sink::error,
+                () -> {
+                    if (buffer.length() > 0) {
+                        sink.next(buffer.toString());
+                    }
+                    sink.complete();
+                }
+            );
+        });
+    }
+
+    private void splitByDelimiter(StringBuilder buffer, Sinks.Many<String> sink) {
+        int delimiterIndex;
+        while ((delimiterIndex = buffer.indexOf(messageDelimiter)) != -1) {
+            String completeMessage = buffer.substring(0, delimiterIndex + 1);
+            buffer.delete(0, delimiterIndex + 1);
+            sink.tryEmitNext(completeMessage);
+        }
+        
+        if (buffer.length() > maxMessageLength) {
+            logger.warn("Message buffer overflow ({} > {}), clearing buffer", 
+                       buffer.length(), maxMessageLength);
+            buffer.setLength(0);
+        }
+    }
+
+    private void processRawMessage(String rawMessage, String connectionId, String clientIp) {
+        try {
+            logger.debug("Received message ({} chars) from connection {}", rawMessage.length(), connectionId);
+            
+            // Extract device ID from the raw message
+            String deviceId = extractDeviceIdFromRawMessage(rawMessage);
+            
+            // Update connection tracker with actual device ID if we extracted it
+            if (!"unknown".equals(deviceId)) {
+                connectionTracker.updateConnectionDevice(connectionId, deviceId);
+            }
+            
+            DeviceDataPacket packet = new DeviceDataPacket(
+                deviceId,
+                rawMessage,
+                Instant.now(),
+                clientIp
+            );
+            
+            // Process asynchronously
+            Mono.fromRunnable(() -> deviceDataProcessor.processDeviceData(packet))
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe(
+                    null,
+                    error -> logger.error("Error processing device data for connection {}", connectionId, error)
+                );
+            
+            // Update last seen in connection tracker
+            connectionTracker.updateLastSeen(connectionId);
+            
+        } catch (Exception e) {
+            logger.error("Error processing raw message from connection {}", connectionId, e);
+        }
+    }
+    
+    private String extractDeviceIdFromRawMessage(String rawMessage) {
+        // Simple extraction - assumes format: *XX,DEVICE_ID,...
+        try {
+            if (rawMessage != null && rawMessage.startsWith("*")) {
+                String[] parts = rawMessage.split(",", 3);
+                if (parts.length >= 2) {
+                    return parts[1].trim(); // Second part is device ID
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to extract device ID from message: {}", 
+                       rawMessage.substring(0, Math.min(rawMessage.length(), 50)));
+        }
+        return "unknown";
+    }
+
+    private void handleConnectionError(Throwable error, String connectionId) {
+        logger.warn("Connection error for {}: {}", connectionId, error.getMessage());
+    }
+
+    private void cleanupConnection(String connectionId) {
+        connectionTracker.removeConnection(connectionId);
+        logger.info("Cleaned up connection {}", connectionId);
+    }
+
+    public void stop() {
+        if (!running) {
+            logger.warn("TCP Server is not running");
+            return;
+        }
+        
+        logger.info("Stopping TCP Server...");
+        
+        if (serverConnection != null && !serverConnection.isDisposed()) {
+            serverConnection.disposeNow();
+        }
+        
+        running = false;
+        logger.info("TCP Server stopped");
+    }
+
+    public int getActiveConnectionCount() {
+        return connectionTracker.getActiveConnectionCount();
+    }
+
+    public Mono<Boolean> sendCommandToDevice(String deviceId, String command) {
+        return Mono.fromCallable(() -> {
+            try {
+                // Get connection from Redis
+                RedisConnectionTracker.ConnectionInfo connectionInfo = 
+                    connectionTracker.getConnectionByDeviceId(deviceId);
+                
+                if (connectionInfo == null) {
+                    logger.warn("No active connection found for device {}", deviceId);
+                    return false;
+                }
+                
+                // Get Netty connection
+                reactor.netty.Connection nettyConnection = connectionInfo.getNettyConnection();
+                if (nettyConnection == null || nettyConnection.isDisposed()) {
+                    logger.warn("Connection for device {} is not available", deviceId);
+                    // Clean up stale connection
+                    connectionTracker.removeConnection(connectionInfo.getConnectionId());
+                    return false;
+                }
+                
+                // Send command through the connection
+                return nettyConnection.outbound()
+                    .sendString(Mono.just(command + messageDelimiter))
+                    .then()
+                    .timeout(Duration.ofSeconds(10))
+                    .thenReturn(true)
+                    .onErrorResume(e -> {
+                        logger.warn("Failed to send command to device {}: {}", deviceId, e.getMessage());
+                        return Mono.just(false);
+                    })
+                    .block(); // This is okay in fromCallable as it runs on boundedElastic
+                    
+            } catch (Exception e) {
+                logger.error("Error sending command to device {}", deviceId, e);
+                return false;
+            }
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+}```
+
+=== ./main-app/src/main/java/com/jjenus/tracker/main/TrackingEngineApplication.java ===
+```.java
+package com.jjenus.tracker.main;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@SpringBootApplication(scanBasePackages = "com.jjenus.tracker")
+@EnableScheduling
+public class TrackingEngineApplication {
+    
+    public static void main(String[] args) {
+        SpringApplication.run(TrackingEngineApplication.class, args);
+    }
+}```
+
+=== ./main-app/src/main/java/com/jjenus/tracker/main/config/AppConfig.java ===
+```.java
+package com.jjenus.tracker.main.config;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.jjenus.tracker.shared.redis.RedisConnectionTracker.ConnectionInfo;
+import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.jms.annotation.EnableJms;
+import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
+import org.springframework.jms.config.JmsListenerContainerFactory;
+import org.springframework.jms.support.converter.MappingJackson2MessageConverter;
+import org.springframework.jms.support.converter.MessageConverter;
+import org.springframework.jms.support.converter.MessageType;
+
+import jakarta.jms.ConnectionFactory;
+
+@Configuration
+@EnableJms
+public class AppConfig {
+    
+    @Bean
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        // Enable polymorphic types for DomainEvent hierarchy
+        mapper.activateDefaultTyping(mapper.getPolymorphicTypeValidator(), 
+                                   ObjectMapper.DefaultTyping.NON_FINAL);
+        return mapper;
+    }
+    
+    @Bean
+    @Primary
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory,
+                                                      ObjectMapper objectMapper) {
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        
+        GenericJackson2JsonRedisSerializer serializer = 
+            new GenericJackson2JsonRedisSerializer(objectMapper);
+        template.setValueSerializer(serializer);
+        template.setHashValueSerializer(serializer);
+        
+        return template;
+    }
+    
+    @Bean
+    public RedisTemplate<String, ConnectionInfo> connectionInfoRedisTemplate(
+            RedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
+        
+        RedisTemplate<String, ConnectionInfo> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        
+        GenericJackson2JsonRedisSerializer serializer = 
+            new GenericJackson2JsonRedisSerializer(objectMapper);
+        template.setValueSerializer(serializer);
+        
+        return template;
+    }
+    
+    @Bean
+    public JmsListenerContainerFactory<?> jmsListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            DefaultJmsListenerContainerFactoryConfigurer configurer) {
+        
+        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
+        configurer.configure(factory, connectionFactory);
+        factory.setConcurrency("3-10");
+        factory.setErrorHandler(t -> {
+            System.err.println("Error in JMS listener: " + t.getMessage());
+        });
+        return factory;
+    }
+    
+    @Bean
+    public MessageConverter jacksonJmsMessageConverter(ObjectMapper objectMapper) {
+        MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
+        converter.setTargetType(MessageType.TEXT);
+        converter.setTypeIdPropertyName("_type");
+        converter.setObjectMapper(objectMapper);
+        return converter;
+    }
+}```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/exception/BusinessRuleException.java ===
+```.java
+package com.jjenus.tracker.shared.exception;
+
+public class BusinessRuleException extends DomainException {
+    public BusinessRuleException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public BusinessRuleException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/exception/DomainException.java ===
+```.java
+package com.jjenus.tracker.shared.exception;
+
+public abstract class DomainException extends RuntimeException {
+    private final String errorCode;
+
+    public DomainException(String errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+    }
+
+    public DomainException(String errorCode, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/exception/InfrastructureException.java ===
+```.java
+package com.jjenus.tracker.shared.exception;
+
+public class InfrastructureException extends DomainException {
+    public InfrastructureException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public InfrastructureException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/exception/ValidationException.java ===
+```.java
+package com.jjenus.tracker.shared.exception;
+
+public class ValidationException extends DomainException {
+    public ValidationException(String errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    public ValidationException(String errorCode, String message, Throwable cause) {
+        super(errorCode, message, cause);
+    }
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/ArtemisEventPublisher.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ArtemisEventPublisher implements EventPublisher {
+    private static final Logger logger = LoggerFactory.getLogger(ArtemisEventPublisher.class);
+    
+    private final JmsTemplate jmsTemplate;
+    private final ObjectMapper objectMapper;
+    
+    public ArtemisEventPublisher(JmsTemplate jmsTemplate, ObjectMapper objectMapper) {
+        this.jmsTemplate = jmsTemplate;
+        this.objectMapper = objectMapper;
+    }
+    
+    @Override
+    public void publish(DomainEvent event) {
+        try {
+            // Use event type as destination name for topic-based routing
+            String destination = "tracking.events." + event.getClass().getSimpleName().toLowerCase();
+            
+            jmsTemplate.convertAndSend(destination, event);
+            
+            logger.debug("Published event {} to destination {}", event.getEventId(), destination);
+            
+        } catch (Exception e) {
+            logger.error("Failed to publish event {}", event.getEventId(), e);
+            throw new RuntimeException("Failed to publish event", e);
+        }
+    }
+}```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/ArtemisEventSubscriber.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.jms.Message;
+import jakarta.jms.TextMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+@Component
+public class ArtemisEventSubscriber implements EventSubscriber {
+    private static final Logger logger = LoggerFactory.getLogger(ArtemisEventSubscriber.class);
+    
+    private final ObjectMapper objectMapper;
+    private final Map<Class<?>, CopyOnWriteArrayList<EventHandler<?>>> handlers;
+    
+    public ArtemisEventSubscriber(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+        this.handlers = new ConcurrentHashMap<>();
+    }
+    
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends DomainEvent> void subscribe(Class<T> eventType, EventHandler<T> handler) {
+        if (eventType == null || handler == null) {
+            throw new IllegalArgumentException("Event type and handler cannot be null");
+        }
+        
+        handlers.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(handler);
+        logger.debug("Registered handler for event type {}", eventType.getSimpleName());
+    }
+    
+    @Override
+    public void unsubscribe(Class<? extends DomainEvent> eventType, EventHandler<?> handler) {
+        if (eventType == null || handler == null) {
+            return;
+        }
+        
+        CopyOnWriteArrayList<EventHandler<?>> eventHandlers = handlers.get(eventType);
+        if (eventHandlers != null) {
+            eventHandlers.remove(handler);
+            logger.debug("Unregistered handler for event type {}", eventType.getSimpleName());
+        }
+    }
+    
+    @JmsListener(destination = "tracking.events.*", containerFactory = "jmsListenerContainerFactory")
+    public void handleEvent(Message message) {
+        try {
+            if (!(message instanceof TextMessage textMessage)) {
+                logger.warn("Received non-text JMS message");
+                return;
+            }
+            
+            String eventJson = textMessage.getText();
+            String destination = message.getJMSDestination().toString();
+            
+            // Extract event type from destination
+            String eventTypeName = destination.substring(destination.lastIndexOf('.') + 1);
+            eventTypeName = Character.toUpperCase(eventTypeName.charAt(0)) + eventTypeName.substring(1);
+            
+            // Parse the event
+            Class<?> eventClass = Class.forName("com.jjenus.tracker." + eventTypeName);
+            DomainEvent event = (DomainEvent) objectMapper.readValue(eventJson, eventClass);
+            
+            // Get handlers for this event type
+            CopyOnWriteArrayList<EventHandler<?>> eventHandlers = handlers.get(eventClass);
+            if (eventHandlers != null && !eventHandlers.isEmpty()) {
+                for (EventHandler handler : eventHandlers) {
+                    try {
+                        handler.handle(event);
+                    } catch (Exception e) {
+                        logger.error("Error in event handler for event {}", event.getEventId(), e);
+                    }
+                }
+            }
+            
+            logger.debug("Processed event {} from destination {}", event.getEventId(), destination);
+            
+        } catch (Exception e) {
+            logger.error("Failed to process JMS message", e);
+        }
+    }
+    
+    public Map<Class<?>, CopyOnWriteArrayList<EventHandler<?>>> getHandlers() {
+        return Map.copyOf(handlers);
+    }
+}```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/DomainEvent.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.time.Instant;
+import java.util.UUID;
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@class")
+public abstract class DomainEvent {
+    private final String eventId;
+    private final Instant occurredOn;
+
+    public DomainEvent() {
+        this.eventId = UUID.randomUUID().toString();
+        this.occurredOn = Instant.now();
+    }
+
+    public String getEventId() { return eventId; }
+    public Instant getOccurredOn() { return occurredOn; }
+}```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/EventHandler.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+@FunctionalInterface
+public interface EventHandler<T extends DomainEvent> {
+    void handle(T event);
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/EventPublisher.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+public interface EventPublisher {
+    void publish(DomainEvent event);
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/EventSubscriber.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+public interface EventSubscriber {
+    <T extends DomainEvent> void subscribe(Class<T> eventType, EventHandler<T> handler);
+    void unsubscribe(Class<? extends DomainEvent> eventType, EventHandler<?> handler);
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/pubsub/SimpleEventBus.java ===
+```.java
+package com.jjenus.tracker.shared.pubsub;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+
+public class SimpleEventBus implements EventPublisher, EventSubscriber {
+    private final ConcurrentHashMap<Class<?>, CopyOnWriteArrayList<EventHandler<?>>> handlers;
+    private final ExecutorService executor;
+
+    public SimpleEventBus() {
+        this.handlers = new ConcurrentHashMap<>();
+        this.executor = Executors.newFixedThreadPool(10);
+    }
+
+    @Override
+    public void publish(DomainEvent event) {
+        if (event == null) {
+            return;
+        }
+
+        Class<?> eventType = event.getClass();
+        CopyOnWriteArrayList<EventHandler<?>> eventHandlers = handlers.get(eventType);
+
+        if (eventHandlers != null && !eventHandlers.isEmpty()) {
+            for (EventHandler handler : eventHandlers) {
+                try {
+                    executor.submit(() -> {
+                        try {
+                            handler.handle(event);
+                        } catch (Exception e) {
+                            System.err.println("Error handling event: " + e.getMessage());
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    // Executor is shutting down, ignore
+                    System.err.println("Event rejected from executor: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    @Override
+    public <T extends DomainEvent> void subscribe(Class<T> eventType, EventHandler<T> handler) {
+        if (eventType == null || handler == null) {
+            return;
+        }
+        handlers.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(handler);
+    }
+
+    @Override
+    public void unsubscribe(Class<? extends DomainEvent> eventType, EventHandler<?> handler) {
+        if (eventType == null || handler == null) {
+            return;
+        }
+        CopyOnWriteArrayList<EventHandler<?>> eventHandlers = handlers.get(eventType);
+        if (eventHandlers != null) {
+            eventHandlers.remove(handler);
+        }
+    }
+
+    public void shutdown() {
+        executor.shutdown();
+    }
+}
+```
+
+=== ./shared/src/main/java/com/jjenus/tracker/shared/redis/RedisConnectionTracker.java ===
+```.java
+package com.jjenus.tracker.shared.redis;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Component
+public class RedisConnectionTracker {
+    private static final Logger logger = LoggerFactory.getLogger(RedisConnectionTracker.class);
+    
+    private final RedisTemplate<String, ConnectionInfo> redisTemplate;
+    private final ValueOperations<String, ConnectionInfo> valueOps;
+    private final ObjectMapper objectMapper;
+    
+    // Local cache for fast access (optional, Redis is already fast)
+    private final Map<String, ConnectionInfo> localConnectionCache = new ConcurrentHashMap<>();
+    
+    public RedisConnectionTracker(RedisTemplate<String, ConnectionInfo> redisTemplate, 
+                                 ObjectMapper objectMapper) {
+        this.redisTemplate = redisTemplate;
+        this.valueOps = redisTemplate.opsForValue();
+        this.objectMapper = objectMapper;
+    }
+    
+    public void registerConnection(String connectionId, String deviceId, String clientIp, 
+                                  reactor.netty.Connection nettyConnection) {
+        ConnectionInfo info = new ConnectionInfo(connectionId, deviceId, clientIp, nettyConnection);
+        
+        // Store in Redis with TTL
+        String key = getConnectionKey(connectionId);
+        valueOps.set(key, info, Duration.ofHours(1));
+        
+        // Also store reverse lookup: deviceId -> connectionId
+        if (!"unknown".equals(deviceId)) {
+            String deviceKey = getDeviceConnectionKey(deviceId);
+            redisTemplate.opsForValue().set(deviceKey, connectionId, Duration.ofHours(1));
+        }
+        
+        // Update local cache
+        localConnectionCache.put(connectionId, info);
+        
+        logger.info("Registered connection {} for device {}", connectionId, deviceId);
+    }
+    
+    public void updateConnectionDevice(String connectionId, String deviceId) {
+        ConnectionInfo info = getConnectionInfo(connectionId);
+        if (info != null) {
+            info.setDeviceId(deviceId);
+            
+            // Update Redis
+            String key = getConnectionKey(connectionId);
+            valueOps.set(key, info, Duration.ofHours(1));
+            
+            // Update reverse lookup
+            String deviceKey = getDeviceConnectionKey(deviceId);
+            redisTemplate.opsForValue().set(deviceKey, connectionId, Duration.ofHours(1));
+            
+            logger.info("Updated connection {} with device ID {}", connectionId, deviceId);
+        }
+    }
+    
+    public void updateLastSeen(String connectionId) {
+        ConnectionInfo info = getConnectionInfo(connectionId);
+        if (info != null) {
+            info.updateLastSeen();
+            
+            // Update Redis
+            String key = getConnectionKey(connectionId);
+            valueOps.set(key, info, Duration.ofHours(1));
+        }
+    }
+    
+    public void removeConnection(String connectionId) {
+        // Get info before removing
+        ConnectionInfo info = getConnectionInfo(connectionId);
+        
+        // Remove from Redis
+        String key = getConnectionKey(connectionId);
+        redisTemplate.delete(key);
+        
+        // Remove reverse lookup if we have device ID
+        if (info != null && info.getDeviceId() != null && !"unknown".equals(info.getDeviceId())) {
+            String deviceKey = getDeviceConnectionKey(info.getDeviceId());
+            redisTemplate.delete(deviceKey);
+        }
+        
+        // Remove from local cache
+        localConnectionCache.remove(connectionId);
+        
+        logger.info("Removed connection {}", connectionId);
+    }
+    
+    public ConnectionInfo getConnectionInfo(String connectionId) {
+        // Try local cache first
+        ConnectionInfo info = localConnectionCache.get(connectionId);
+        if (info != null) {
+            return info;
+        }
+        
+        // Fall back to Redis
+        String key = getConnectionKey(connectionId);
+        info = valueOps.get(key);
+        
+        if (info != null) {
+            localConnectionCache.put(connectionId, info);
+        }
+        
+        return info;
+    }
+    
+    public ConnectionInfo getConnectionByDeviceId(String deviceId) {
+        // First get connectionId from reverse lookup
+        String deviceKey = getDeviceConnectionKey(deviceId);
+        String connectionId = redisTemplate.opsForValue().get(deviceKey);
+        
+        if (connectionId != null) {
+            return getConnectionInfo(connectionId);
+        }
+        
+        return null;
+    }
+    
+    public int getActiveConnectionCount() {
+        // Count from Redis for accuracy across instances
+        String pattern = getConnectionKey("*");
+        Long count = redisTemplate.countExistingKeys(redisTemplate.keys(pattern));
+        return count != null ? count.intValue() : localConnectionCache.size();
+    }
+    
+    public Map<String, ConnectionInfo> getAllConnections() {
+        // Refresh local cache from Redis
+        localConnectionCache.clear();
+        
+        String pattern = getConnectionKey("*");
+        redisTemplate.keys(pattern).forEach(key -> {
+            ConnectionInfo info = valueOps.get(key);
+            if (info != null) {
+                localConnectionCache.put(info.getConnectionId(), info);
+            }
+        });
+        
+        return Map.copyOf(localConnectionCache);
+    }
+    
+    private String getConnectionKey(String connectionId) {
+        return "tracker:connection:" + connectionId;
+    }
+    
+    private String getDeviceConnectionKey(String deviceId) {
+        return "tracker:device:connection:" + deviceId;
+    }
+    
+    // ConnectionInfo is now a proper class, not JSON string
+    public static class ConnectionInfo {
+        private String connectionId;
+        private String deviceId;
+        private String clientIp;
+        private Instant connectedAt;
+        private Instant lastSeen;
+        private transient reactor.netty.Connection nettyConnection; // Transient = not serialized
+        
+        // Default constructor for Jackson
+        public ConnectionInfo() {}
+        
+        public ConnectionInfo(String connectionId, String deviceId, String clientIp, 
+                             reactor.netty.Connection nettyConnection) {
+            this.connectionId = connectionId;
+            this.deviceId = deviceId;
+            this.clientIp = clientIp;
+            this.nettyConnection = nettyConnection;
+            this.connectedAt = Instant.now();
+            this.lastSeen = this.connectedAt;
+        }
+        
+        public void updateLastSeen() {
+            this.lastSeen = Instant.now();
+        }
+        
+        // Getters and Setters (required for Jackson)
+        public String getConnectionId() { return connectionId; }
+        public void setConnectionId(String connectionId) { this.connectionId = connectionId; }
+        
+        public String getDeviceId() { return deviceId; }
+        public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+        
+        public String getClientIp() { return clientIp; }
+        public void setClientIp(String clientIp) { this.clientIp = clientIp; }
+        
+        public Instant getConnectedAt() { return connectedAt; }
+        public void setConnectedAt(Instant connectedAt) { this.connectedAt = connectedAt; }
+        
+        public Instant getLastSeen() { return lastSeen; }
+        public void setLastSeen(Instant lastSeen) { this.lastSeen = lastSeen; }
+        
+        public reactor.netty.Connection getNettyConnection() { return nettyConnection; }
+        public void setNettyConnection(reactor.netty.Connection nettyConnection) { 
+            this.nettyConnection = nettyConnection; 
+        }
+        
+        @Override
+        public String toString() {
+            return "ConnectionInfo{" +
+                    "connectionId='" + connectionId + '\'' +
+                    ", deviceId='" + deviceId + '\'' +
+                    ", clientIp='" + clientIp + '\'' +
+                    ", connectedAt=" + connectedAt +
+                    ", lastSeen=" + lastSeen +
+                    '}';
+        }
+    }
+}```
