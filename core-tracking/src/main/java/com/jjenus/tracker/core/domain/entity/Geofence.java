@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.core.domain.enums.GeofenceShapeType;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -7,7 +8,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "geofences")
-public class GeoFence {
+public class Geofence {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,10 +26,10 @@ public class GeoFence {
     @Column(name = "shape_type", length = 20)
     private GeofenceShapeType shapeType;
     
-    @Column(name = "center_latitude", precision = 10, scale = 8)
+    @Column(name = "center_latitude")
     private Double centerLatitude;
     
-    @Column(name = "center_longitude", precision = 11, scale = 8)
+    @Column(name = "center_longitude")
     private Double centerLongitude;
     
     @Column(name = "radius_meters")

@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.core.domain.enums.AlertSeverity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.Map;

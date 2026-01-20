@@ -1,10 +1,9 @@
 package com.jjenus.tracker.core.infrastructure.repository;
 
 import com.jjenus.tracker.core.domain.entity.AlertRule;
-import com.jjenus.tracker.core.domain.entity.AlertRuleType;
+import com.jjenus.tracker.core.domain.enums.AlertRuleType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;

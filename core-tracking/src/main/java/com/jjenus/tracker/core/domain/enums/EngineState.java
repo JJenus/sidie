@@ -1,4 +1,4 @@
-package com.jjenus.tracker.core.domain;
+package com.jjenus.tracker.core.domain.enums;
 
 public enum EngineState {
     OFF,

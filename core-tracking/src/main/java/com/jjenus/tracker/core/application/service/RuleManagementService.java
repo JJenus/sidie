@@ -2,7 +2,7 @@ package com.jjenus.tracker.core.application.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jjenus.tracker.core.domain.entity.AlertRule;
-import com.jjenus.tracker.core.domain.entity.AlertRuleType;
+import com.jjenus.tracker.core.domain.enums.AlertRuleType;
 import com.jjenus.tracker.core.infrastructure.repository.AlertRuleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

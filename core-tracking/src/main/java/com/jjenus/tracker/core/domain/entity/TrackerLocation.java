@@ -20,34 +20,28 @@ public class TrackerLocation {
     @JoinColumn(name = "trip_id")
     private Trip trip;
     
-    @Column(name = "latitude", precision = 10, scale = 8)
+    @Column(name = "latitude")
     private Double latitude;
     
-    @Column(name = "longitude", precision = 11, scale = 8)
+    @Column(name = "longitude")
     private Double longitude;
     
-    @Column(name = "speed_kmh", precision = 6, scale = 2)
+    @Column(name = "speed_kmh")
     private Float speedKmh;
     
-    @Column(name = "heading", precision = 5, scale = 2)
+    @Column(name = "heading")
     private Float heading;
     
-    @Column(name = "altitude", precision = 8, scale = 2)
+    @Column(name = "altitude")
     private Float altitude;
-    
-    @Column(name = "satellites")
-    private Integer satellites;
-    
-    @Column(name = "hdop", precision = 4, scale = 2)
-    private Float hdop;
     
     @Column(name = "validity", length = 1)
     private String validity = "A";
     
-    @Column(name = "odometer_km", precision = 10, scale = 2)
+    @Column(name = "odometer_km")
     private Float odometerKm;
     
-    @Column(name = "battery_voltage", precision = 4, scale = 2)
+    @Column(name = "battery_voltage")
     private Float batteryVoltage;
     
     @Column(name = "signal_strength")
@@ -117,12 +111,6 @@ public class TrackerLocation {
     
     public Float getAltitude() { return altitude; }
     public void setAltitude(Float altitude) { this.altitude = altitude; }
-    
-    public Integer getSatellites() { return satellites; }
-    public void setSatellites(Integer satellites) { this.satellites = satellites; }
-    
-    public Float getHdop() { return hdop; }
-    public void setHdop(Float hdop) { this.hdop = hdop; }
     
     public String getValidity() { return validity; }
     public void setValidity(String validity) { this.validity = validity; }

@@ -1,7 +1,7 @@
 package com.jjenus.tracker.core.infrastructure.repository;
 
 import com.jjenus.tracker.core.domain.entity.Tracker;
-import com.jjenus.tracker.core.domain.entity.TrackerStatus;
+import com.jjenus.tracker.core.domain.enums.TrackerStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -2,6 +2,7 @@ package com.jjenus.tracker.main.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.jjenus.tracker.shared.domain.ConnectionInfo;
 import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
@@ -23,14 +24,26 @@ import jakarta.jms.ConnectionFactory;
 @Configuration
 @EnableJms
 public class AppConfig {
-    
+
     @Bean
     public ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
+
+        // Essential modules for Java 17+ and records
+        mapper.registerModule(new JavaTimeModule());          // For Instant
+        mapper.registerModule(new ParameterNamesModule());    // For record parameter names
+
+        // Configure for better compatibility
+        mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.configure(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
         // Enable polymorphic types for DomainEvent hierarchy
-        mapper.activateDefaultTyping(mapper.getPolymorphicTypeValidator(), 
-                                   ObjectMapper.DefaultTyping.NON_FINAL);
+        mapper.activateDefaultTyping(
+                mapper.getPolymorphicTypeValidator(),
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY
+        );
+
         return mapper;
     }
     

@@ -1,5 +1,6 @@
 package com.jjenus.tracker.shared.domain;
 
+import reactor.netty.Connection;
 import java.time.Instant;
 
 public class ConnectionInfo {
@@ -8,13 +9,12 @@ public class ConnectionInfo {
     private String clientIp;
     private Instant connectedAt;
     private Instant lastSeen;
-    private transient reactor.netty.Connection nettyConnection; // Transient = not serialized
+    private Connection nettyConnection;
 
-    // Default constructor for Jackson
     public ConnectionInfo() {}
 
     public ConnectionInfo(String connectionId, String deviceId, String clientIp,
-                          reactor.netty.Connection nettyConnection) {
+                          Connection nettyConnection) {
         this.connectionId = connectionId;
         this.deviceId = deviceId;
         this.clientIp = clientIp;
@@ -23,11 +23,21 @@ public class ConnectionInfo {
         this.lastSeen = this.connectedAt;
     }
 
+    public ConnectionInfo(String connectionId, String deviceId, String clientIp,
+                          Instant connectedAt, Instant lastSeen, Connection nettyConnection) {
+        this.connectionId = connectionId;
+        this.deviceId = deviceId;
+        this.clientIp = clientIp;
+        this.connectedAt = connectedAt;
+        this.lastSeen = lastSeen;
+        this.nettyConnection = nettyConnection;
+    }
+
     public void updateLastSeen() {
         this.lastSeen = Instant.now();
     }
 
-    // Getters and Setters (required for Jackson)
+    // Getters and Setters
     public String getConnectionId() { return connectionId; }
     public void setConnectionId(String connectionId) { this.connectionId = connectionId; }
 
@@ -43,8 +53,8 @@ public class ConnectionInfo {
     public Instant getLastSeen() { return lastSeen; }
     public void setLastSeen(Instant lastSeen) { this.lastSeen = lastSeen; }
 
-    public reactor.netty.Connection getNettyConnection() { return nettyConnection; }
-    public void setNettyConnection(reactor.netty.Connection nettyConnection) {
+    public Connection getNettyConnection() { return nettyConnection; }
+    public void setNettyConnection(Connection nettyConnection) {
         this.nettyConnection = nettyConnection;
     }
 
@@ -56,7 +66,7 @@ public class ConnectionInfo {
                 ", clientIp='" + clientIp + '\'' +
                 ", connectedAt=" + connectedAt +
                 ", lastSeen=" + lastSeen +
+                ", nettyConnection=" + (nettyConnection != null ? "active" : "inactive") +
                 '}';
     }
 }
-

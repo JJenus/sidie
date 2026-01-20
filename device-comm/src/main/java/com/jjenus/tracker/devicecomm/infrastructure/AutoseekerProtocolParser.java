@@ -87,4 +87,11 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     public String getProtocolName() {
         return "Autoseeker";
     }
+
+    @Override
+    public String toString() {
+        return String.format("""
+                AutoseekerProtocolParser()
+                """);
+    }
 }

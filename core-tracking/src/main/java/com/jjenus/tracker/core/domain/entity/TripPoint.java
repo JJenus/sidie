@@ -23,10 +23,10 @@ public class TripPoint {
     @Column(name = "point_order", nullable = false)
     private Integer pointOrder;
     
-    @Column(name = "segment_distance_km", precision = 8, scale = 3)
+    @Column(name = "segment_distance_km")
     private Float segmentDistanceKm;
     
-    @Column(name = "segment_duration_minutes", precision = 6, scale = 2)
+    @Column(name = "segment_duration_minutes")
     private Float segmentDurationMinutes;
     
     @Column(name = "created_at")

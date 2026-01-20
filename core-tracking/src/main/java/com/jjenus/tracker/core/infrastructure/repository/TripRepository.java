@@ -1,7 +1,7 @@
 package com.jjenus.tracker.core.infrastructure.repository;
 
 import com.jjenus.tracker.core.domain.entity.Trip;
-import com.jjenus.tracker.core.domain.entity.TripEndReason;
+import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

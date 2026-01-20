@@ -1,9 +1,13 @@
+
 package com.jjenus.tracker.devicecomm.infrastructure;
 
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.core.domain.LocationPoint;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
+import com.jjenus.tracker.shared.domain.LocationPoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -13,9 +17,10 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public class GT06ProtocolParser implements ITrackerProtocolParser {
-    private static final Pattern GT06_PATTERN = Pattern.compile("^\\*[A-Z]{2},[0-9]{15},.*#");
+    private static final Pattern GT06_PATTERN = Pattern.compile("^\\*[A-Z]{2},[0-9]{10,20},(V[0-5]|HTBT|S20|D[0-9]+),.*#");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = 
         DateTimeFormatter.ofPattern("ddMMyyHHmmss");
+    private final Logger log = LoggerFactory.getLogger(GT06ProtocolParser.class);
     
     @Override
     public LocationPoint parse(String data) throws ProtocolParseException {
@@ -29,26 +34,105 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String[] parts = cleanData.split(",");
             
             String protocolType = parts[2]; // V1, V2, V3, V4, V5, HTBT
-            
-            switch (protocolType) {
-                case "V0":
-                    return parseLoginPacket(parts);
-                case "V1":
-                case "V2":
-                case "V4":
-                    return parseGPSPacket(parts);
-                case "V3":
-                    return parseLBSPacket(parts);
-                case "V5":
-                    return parseWifiPacket(parts);
-                case "HTBT":
-                    return parseHeartbeatPacket(parts);
-                default:
-                    throw new ProtocolParseException("Unknown protocol type: " + protocolType);
+            // Handle command response packets
+            if ("V4".equals(protocolType) && parts.length >= 4 && "S20".equals(parts[3])) {
+                return parseCommandResponsePacket(parts);
             }
+
+            return switch (protocolType) {
+                case "V0" -> parseLoginPacket(parts);
+                case "V1", "V2", "V4" -> parseGPSPacket(parts);
+                case "V3" -> parseLBSPacket(parts);
+                case "V5" -> parseWifiPacket(parts);
+                case "HTBT" -> parseHeartbeatPacket(parts);
+                default -> throw new ProtocolParseException("Unknown protocol type: " + protocolType);
+            };
             
         } catch (Exception e) {
             throw new ProtocolParseException("Failed to parse GT06 data: " + e.getMessage());
+        }
+    }
+
+    private LocationPoint parseCommandResponsePacket(String[] parts) throws ProtocolParseException {
+        try {
+            // Format for S20 command response:
+            // *HQ,IMEI,V4,S20,DONE,HHMMSS,response_time,A,latitude,N,longitude,E,speed,direction,DDMMYY,status,...
+            // Example: *HQ,8168000005,V4,S20,DONE,061158,061116,A,2235.0086,N,11354.3668,E,000.00,000,160716F7FFBBFF,460,00
+
+            log.debug("Parsing command response packet with {} parts", parts.length);
+
+            if (parts.length < 17) {
+                throw new ProtocolParseException("Incomplete command response packet");
+            }
+
+            String imei = parts[1];
+            String responseTimeStr = parts[5]; // 061158 - This is the response time HHMMSS
+            String gpsTimeStr = parts[6];      // 061116 - This is the GPS time
+            String validity = parts[7];        // A = valid
+            String latStr = parts[8];          // 2235.0086
+            String latDir = parts[9];          // N
+            String lonStr = parts[10];         // 11354.3668
+            String lonDir = parts[11];         // E
+            String speedStr = parts[12];       // 000.00
+            String directionStr = parts[13];   // 000
+            String dateStr = parts[14];        // 160716F7FFBBFF (this looks wrong - should be DDMMYY)
+
+            log.debug("Parsing coordinates: lat={}{}, lon={}{}", latStr, latDir, lonStr, lonDir);
+
+            // Parse latitude (DDMM.MMMMM format)
+            double latitude = parseDDMMtoDecimal(latStr);
+            if ("S".equals(latDir)) {
+                latitude = -latitude;
+            }
+
+            // Parse longitude (DDDMM.MMMMM format)
+            double longitude = parseDDMMtoDecimal(lonStr);
+            if ("W".equals(lonDir)) {
+                longitude = -longitude;
+            }
+
+            // Parse speed (knots to km/h)
+            float speedKnots = 0.0f;
+            try {
+                speedKnots = Float.parseFloat(speedStr);
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse speed: {}", speedStr);
+            }
+            float speedKmh = speedKnots * 1.852f;
+
+            // Parse timestamp - date might be corrupted (160716F7FFBBFF), so use response time
+            // Extract just the date part if it exists
+            String cleanDateStr = dateStr;
+            if (dateStr.length() >= 6 && dateStr.matches(".*[0-9]{6}.*")) {
+                // Try to extract DDMMYY from the beginning
+                cleanDateStr = dateStr.substring(0, 6);
+            } else {
+                // Use current date as fallback
+                cleanDateStr = getCurrentDateString();
+            }
+
+            Instant timestamp;
+            try {
+                timestamp = parseDateTime(cleanDateStr, gpsTimeStr);
+            } catch (Exception e) {
+                log.warn("Failed to parse timestamp, using response time: {}", e.getMessage());
+                timestamp = parseDateTime(cleanDateStr, responseTimeStr);
+            }
+
+            // Data is only valid if validity is 'A'
+            boolean isValid = "A".equals(validity);
+            if (!isValid) {
+                speedKmh = 0.0f;
+                log.debug("GPS data not valid (validity={})", validity);
+            }
+
+            log.debug("Parsed location: lat={}, lon={}, speed={} km/h, time={}",
+                    latitude, longitude, speedKmh, timestamp);
+
+            return new LocationPoint(latitude, longitude, speedKmh, timestamp);
+
+        } catch (Exception e) {
+            throw new ProtocolParseException("Failed to parse command response packet: " + e.getMessage());
         }
     }
     
@@ -217,14 +301,14 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
     }
     
     @Override
-    public byte[] buildFuelCutCommand(String deviceId) {
+    public String buildFuelCutCommand(String deviceId) {
         try {
             // GT06 fuel cut command format: *XX,IMEI,S20,HHMMSS,C,time1,time2,...#
             // From protocol: C=1 (static disable), time1=3 (3 seconds)
             
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,1,3#", deviceId, timeStr);
-            return command.getBytes();
+            return command;
             
         } catch (Exception e) {
             throw ProtocolException.commandBuildError("GT06", "fuel cut");
@@ -232,13 +316,13 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
     }
     
     @Override
-    public byte[] buildEngineOnCommand(String deviceId) {
+    public String buildEngineOnCommand(String deviceId) {
         try {
             // GT06 fuel restore command: *XX,IMEI,S20,HHMMSS,1,0#
             
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,1,0#", deviceId, timeStr);
-            return command.getBytes();
+            return command;
             
         } catch (Exception e) {
             throw ProtocolException.commandBuildError("GT06", "engine on");
@@ -298,5 +382,13 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         }
         
         return statusMap;
+    }
+
+    private String getCurrentDateString() {
+        // Returns current date as DDMMYY
+        return String.format("%02d%02d%02d",
+                java.time.LocalDate.now().getDayOfMonth(),
+                java.time.LocalDate.now().getMonthValue(),
+                java.time.LocalDate.now().getYear() % 100);
     }
 }

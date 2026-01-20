@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.core.domain.enums.TrackerStatus;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,8 +47,9 @@ public class Tracker {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20)
     private TrackerStatus status = TrackerStatus.ACTIVE;
-    
-    @OneToOne(mappedBy = "tracker")
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;
     
     @OneToMany(mappedBy = "tracker", cascade = CascadeType.ALL, orphanRemoval = true)

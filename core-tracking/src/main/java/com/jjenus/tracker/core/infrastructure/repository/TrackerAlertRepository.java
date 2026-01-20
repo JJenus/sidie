@@ -1,6 +1,6 @@
 package com.jjenus.tracker.core.infrastructure.repository;
 
-import com.jjenus.tracker.core.domain.entity.AlertSeverity;
+import com.jjenus.tracker.core.domain.enums.AlertSeverity;
 import com.jjenus.tracker.core.domain.entity.TrackerAlert;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

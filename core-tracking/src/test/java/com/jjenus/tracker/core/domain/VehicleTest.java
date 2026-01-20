@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain;
 
+import com.jjenus.tracker.core.domain.enums.EngineState;
 import com.jjenus.tracker.core.exception.TripException;
 import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.shared.domain.LocationPoint;

@@ -1,5 +1,7 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.core.domain.enums.EngineState;
+import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -53,6 +55,9 @@ public class Vehicle {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "current_location_id")
     private TrackerLocation currentLocation;
+
+    @OneToMany(mappedBy = "vehicle", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Tracker> trackers = new ArrayList<>();
     
     @OneToMany(mappedBy = "vehicle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Trip> trips = new ArrayList<>();
@@ -163,4 +168,25 @@ public class Vehicle {
     
     public List<Geofence> getGeofences() { return geofences; }
     public void setGeofences(List<Geofence> geofences) { this.geofences = geofences; }
+
+    public void addTracker(Tracker tracker) {
+        trackers.add(tracker);
+        tracker.setVehicle(this);
+    }
+
+    public void removeTracker(Tracker tracker) {
+        trackers.remove(tracker);
+        tracker.setVehicle(null);
+    }
+
+    public Tracker getActiveTracker() {
+        return trackers.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsOnline()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    // Getters and setters
+    public List<Tracker> getTrackers() { return trackers; }
+    public void setTrackers(List<Tracker> trackers) { this.trackers = trackers; }
 }

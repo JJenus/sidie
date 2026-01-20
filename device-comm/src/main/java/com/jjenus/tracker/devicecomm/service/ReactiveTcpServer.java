@@ -144,6 +144,7 @@ public class ReactiveTcpServer {
                 .flatMap(window -> window.reduce(String::concat))
                 .map(combined -> {
                     // Remove the delimiter for processing
+                    logger.debug("Message: {}", combined);
                     if (combined.endsWith(messageDelimiter)) {
                         return combined.substring(0, combined.length() - 1);
                     }
@@ -165,7 +166,7 @@ public class ReactiveTcpServer {
 
             DeviceDataPacket packet = new DeviceDataPacket(
                     deviceId,
-                    rawMessage,
+                    rawMessage.trim(),
                     Instant.now(),
                     clientIp
             );

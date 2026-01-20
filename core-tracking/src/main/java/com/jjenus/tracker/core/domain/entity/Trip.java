@@ -1,5 +1,7 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.core.domain.enums.TripEndReason;
+import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import jakarta.persistence.*;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,19 +45,19 @@ public class Trip {
     @Column(name = "acc_off_duration_seconds")
     private Integer accOffDurationSeconds;
     
-    @Column(name = "total_distance_km", precision = 10, scale = 2)
+    @Column(name = "total_distance_km")
     private Float totalDistanceKm = 0.0f;
     
-    @Column(name = "average_speed_kmh", precision = 6, scale = 2)
+    @Column(name = "average_speed_kmh")
     private Float averageSpeedKmh;
     
-    @Column(name = "max_speed_kmh", precision = 6, scale = 2)
+    @Column(name = "max_speed_kmh")
     private Float maxSpeedKmh;
     
     @Column(name = "idle_time_minutes")
     private Integer idleTimeMinutes;
     
-    @Column(name = "fuel_consumed_liters", precision = 8, scale = 2)
+    @Column(name = "fuel_consumed_liters")
     private Float fuelConsumedLiters;
     
     @Column(name = "is_active")

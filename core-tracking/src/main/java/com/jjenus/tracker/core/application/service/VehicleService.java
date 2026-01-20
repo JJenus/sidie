@@ -1,10 +1,13 @@
 package com.jjenus.tracker.core.application.service;
 
 import com.jjenus.tracker.core.domain.entity.*;
+import com.jjenus.tracker.core.domain.enums.TripEndReason;
+import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import com.jjenus.tracker.core.infrastructure.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 

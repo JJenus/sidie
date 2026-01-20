@@ -19,10 +19,10 @@ public class GeofencePoint {
     @Column(name = "point_order", nullable = false)
     private Integer pointOrder;
     
-    @Column(name = "latitude", precision = 10, scale = 8, nullable = false)
+    @Column(name = "latitude", nullable = false)
     private Double latitude;
     
-    @Column(name = "longitude", precision = 11, scale = 8, nullable = false)
+    @Column(name = "longitude", nullable = false)
     private Double longitude;
     
     @Column(name = "created_at")

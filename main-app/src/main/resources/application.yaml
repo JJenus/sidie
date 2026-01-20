@@ -2,6 +2,44 @@ spring:
   application:
     name: tracking-engine
   
+  # Database Configuration (H2 for now)
+  datasource:
+    url: jdbc:h2:mem:trackingdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA/Hibernate Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        generate_statistics: false
+    open-in-view: false
+
+  # H2 Console (for development/debugging)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        trace: false
+        web-allow-others: false
+
   # Redis Configuration
   data:
     redis:
@@ -15,16 +53,15 @@ spring:
           max-active: 8
           max-idle: 8
           min-idle: 0
-  
+
   # Artemis ActiveMQ Configuration
   artemis:
     host: ${ARTEMIS_HOST:localhost}
     port: ${ARTEMIS_PORT:61616}
     user: ${ARTEMIS_USER:admin}
     password: ${ARTEMIS_PASSWORD:admin}
-#    mode: native
     broker-url: tcp://${spring.artemis.host}:${spring.artemis.port}
-  
+
   # JMS Configuration
   jms:
     template:
@@ -32,13 +69,15 @@ spring:
     listener:
       auto-startup: true
       acknowledge-mode: auto
-  
+
   # Jackson Configuration
   jackson:
     serialization:
       write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: false
+    date-format: yyyy-MM-dd'T'HH:mm:ss.SSSXXX
+    property-naming-strategy: SNAKE_CASE
 
 # TCP Server Configuration
 tracking:
@@ -65,5 +104,7 @@ logging:
     com.jjenus.tracker: INFO
     org.springframework.jms: WARN
     reactor.netty: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
