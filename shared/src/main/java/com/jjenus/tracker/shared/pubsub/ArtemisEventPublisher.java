@@ -23,16 +23,26 @@ public class ArtemisEventPublisher implements EventPublisher {
         try {
             String destination = "tracking.events." + event.getClass().getSimpleName().toLowerCase();
 
-            // Convert to JSON string for debugging
-            String json = objectMapper.writeValueAsString(event);
-            logger.debug("Publishing event to {}: {}", destination, json);
+            logger.info("🟢 PUBLISHING to destination: {}", destination);
+            logger.info("🟢 Event class: {}", event.getClass().getName());
 
+            // TRY to serialize - log any errors
+            String json = null;
+            try {
+                json = objectMapper.writeValueAsString(event);
+                logger.info("🟢 JSON: {}", json);
+            } catch (Exception e) {
+                logger.error("🔴 FAILED to serialize event to JSON", e);
+                logger.error("🔴 Event details: {}", event);
+                throw e; // Re-throw
+            }
+
+            // Publish
             jmsTemplate.convertAndSend(destination, event);
-
-            logger.info("Published event {} to destination {}", event.getEventId(), destination);
+            logger.info("🟢✅ Published event {} to {}", event.getEventId(), destination);
 
         } catch (Exception e) {
-            logger.error("Failed to publish event {}", event.getEventId(), e);
+            logger.error("🔴 FAILED to publish event {}", event != null ? event.getEventId() : "null", e);
             throw new RuntimeException("Failed to publish event", e);
         }
     }

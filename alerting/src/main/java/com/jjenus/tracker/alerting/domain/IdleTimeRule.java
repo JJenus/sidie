@@ -20,22 +20,22 @@ public class IdleTimeRule implements IAlertRule {
     }
     
     @Override
-    public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled) return null;
         
-        Duration idleDuration = vehicle.getIdleDuration();
+        Duration idleDuration = Duration.ofHours(3);
         
         if (idleDuration.compareTo(maxIdleTime) > 0) {
             String message = String.format(
                 "Vehicle %s has been idle for %d minutes (max allowed: %d minutes)",
-                vehicle.getVehicleId(),
+                vehicleId,
                 idleDuration.toMinutes(),
                 maxIdleTime.toMinutes()
             );
             
             return new AlertEvent(
                 ruleKey,
-                vehicle.getVehicleId(),
+                vehicleId,
                 message,
                 AlertSeverity.INFO,
                 newLocation

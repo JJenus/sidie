@@ -25,6 +25,12 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.modelmapper</groupId>
+            <artifactId>modelmapper</artifactId>
+            <version>3.2.0</version>
+        </dependency>
+
         <!-- H2 Database - PRIMARY FOR NOW, will switch later -->
         <dependency>
             <groupId>com.h2database</groupId>

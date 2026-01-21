@@ -1,6 +1,12 @@
 package com.jjenus.tracker.core.application;
 
-import com.jjenus.tracker.shared.domain.LocationDataEvent;
+import com.jjenus.tracker.core.application.service.VehicleService;
+import com.jjenus.tracker.shared.events.LocationDataEvent;
+import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.TextMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -12,10 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class VehicleEventHandler {
     private static final Logger logger = LoggerFactory.getLogger(VehicleEventHandler.class);
 
-    private final VehicleCommandService vehicleCommandService;
+    private final VehicleService vehicleService;
+    private final EventPublisher eventPublisher;
 
-    public VehicleEventHandler(VehicleCommandService vehicleCommandService) {
-        this.vehicleCommandService = vehicleCommandService;
+    public VehicleEventHandler(VehicleService vehicleService, EventPublisher eventPublisher) {
+        this.vehicleService = vehicleService;
+        this.eventPublisher = eventPublisher;
     }
 
     @JmsListener(destination = "tracking.events.locationdataevent",
@@ -25,25 +33,38 @@ public class VehicleEventHandler {
     public void handleLocationUpdate(@Payload LocationDataEvent event) {
         try {
             logger.info("Received location update for device {}", event.getDeviceId());
-            logger.debug("Location details: lat={}, lon={}, speed={}, time={}",
-                    event.getLocation().latitude(),
-                    event.getLocation().longitude(),
-                    event.getLocation().speedKmh(),
-                    event.getLocation().timestamp());
 
-            // Map device to vehicle
-            String vehicleId = "VEH_" + event.getDeviceId();
+            // Find or create vehicle for this device
+            String vehicleId = vehicleService.findVehicleIdForDevice(event.getDeviceId());
 
-            vehicleCommandService.updateVehicleLocation(vehicleId, event.getLocation());
+            // Update vehicle location
+//            vehicleService.updateVehicleLocation(vehicleId, event.getLocation());
 
-            logger.info("Successfully processed location update for vehicle {}", vehicleId);
+            // Publish vehicle update event for alerting
+            VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(vehicleId, event.getLocation());
+            eventPublisher.publish(vehicleUpdatedEvent);
+
+            logger.info("Updated vehicle {} for device {}", vehicleId, event.getDeviceId());
 
         } catch (Exception e) {
             logger.error("Failed to process location update for device {}",
                     event != null ? event.getDeviceId() : "unknown", e);
-
-            // Re-throw to trigger JMS retry/DLQ
             throw e;
+        }
+    }
+
+    @JmsListener(destination = ">")  // Listen to ALL destinations
+    public void debugAll(Message message) {
+        try {
+            logger.info("DEBUG - Message on: {}", message.getJMSDestination());
+            logger.info("DEBUG - Message type: {}", message.getJMSType());
+
+            if (message instanceof TextMessage) {
+                String text = ((TextMessage) message).getText();
+                logger.info("DEBUG - Message text: {}", text);
+            }
+        } catch (JMSException e) {
+            logger.error("Debug error", e);
         }
     }
 }

@@ -16,7 +16,7 @@ public interface TrackerRepository extends JpaRepository<Tracker, String> {
     
     Optional<Tracker> findByDeviceId(String deviceId);
     
-    Optional<Tracker> findByImei(String imei);
+//    Optional<Tracker> findByImei(String imei);
     
     List<Tracker> findByIsOnline(boolean isOnline);
     
@@ -30,5 +30,5 @@ public interface TrackerRepository extends JpaRepository<Tracker, String> {
     
     boolean existsByDeviceId(String deviceId);
     
-    boolean existsByImei(String imei);
+//    boolean existsByImei(String imei);
 }

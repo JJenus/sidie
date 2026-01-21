@@ -31,12 +31,12 @@ class AlertRuleEvaluationServiceTest {
         MaxSpeedRule speedRule = new MaxSpeedRule("SPEED_100", 100.0f);
 
         // Below threshold - no alert
-        AlertEvent noAlert = evaluationService.evaluateRule(speedRule, testVehicle, testLocation);
+        AlertEvent noAlert = evaluationService.evaluateRule(speedRule, testVehicle.getVehicleId(), testLocation);
         assertNull(noAlert);
 
         // Above threshold - alert
         LocationPoint speedingLocation = new LocationPoint(40.7128, -74.0060, 120.0f, testTime);
-        AlertEvent alert = evaluationService.evaluateRule(speedRule, testVehicle, speedingLocation);
+        AlertEvent alert = evaluationService.evaluateRule(speedRule, testVehicle.getVehicleId(), speedingLocation);
 
         assertNotNull(alert);
         assertEquals("SPEED_100", alert.getRuleKey());
@@ -48,7 +48,7 @@ class AlertRuleEvaluationServiceTest {
 
     @Test
     void testEvaluateRuleWithNullRule() {
-        AlertEvent result = evaluationService.evaluateRule(null, testVehicle, testLocation);
+        AlertEvent result = evaluationService.evaluateRule(null, testVehicle.getVehicleId(), testLocation);
         assertNull(result);
     }
 
@@ -64,7 +64,7 @@ class AlertRuleEvaluationServiceTest {
     void testEvaluateRuleWithNullLocation() {
         MaxSpeedRule speedRule = new MaxSpeedRule("SPEED_100", 100.0f);
 
-        AlertEvent result = evaluationService.evaluateRule(speedRule, testVehicle, null);
+        AlertEvent result = evaluationService.evaluateRule(speedRule, testVehicle.getVehicleId(), null);
         assertNull(result);
     }
 
@@ -88,7 +88,7 @@ class AlertRuleEvaluationServiceTest {
     void testValidateRuleConfigurationEmptyKey() {
         IAlertRule emptyKeyRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return null;
             }
 
@@ -126,7 +126,7 @@ class AlertRuleEvaluationServiceTest {
     void testValidateRuleConfigurationNullKey() {
         IAlertRule nullKeyRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return null;
             }
 
@@ -164,7 +164,7 @@ class AlertRuleEvaluationServiceTest {
     void testValidateRuleConfigurationEmptyName() {
         IAlertRule emptyNameRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return null;
             }
 
@@ -202,7 +202,7 @@ class AlertRuleEvaluationServiceTest {
     void testValidateRuleConfigurationNullName() {
         IAlertRule nullNameRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return null;
             }
 
@@ -242,7 +242,7 @@ class AlertRuleEvaluationServiceTest {
         disabledRule.setEnabled(false);
 
         LocationPoint speedingLocation = new LocationPoint(40.7128, -74.0060, 120.0f, testTime);
-        AlertEvent alert = evaluationService.evaluateRule(disabledRule, testVehicle, speedingLocation);
+        AlertEvent alert = evaluationService.evaluateRule(disabledRule, testVehicle.getVehicleId(), speedingLocation);
 
         assertNull(alert);
     }
@@ -252,12 +252,12 @@ class AlertRuleEvaluationServiceTest {
         // Test with a custom rule implementation
         IAlertRule customRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
-                if (vehicle == null || newLocation == null) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+                if (vehicleId == null || newLocation == null) {
                     return null;
                 }
-                if (vehicle.getVehicleId().equals("SPECIAL_VEHICLE")) {
-                    return new AlertEvent("SPECIAL_RULE", vehicle.getVehicleId(),
+                if (vehicleId.equals("SPECIAL_VEHICLE")) {
+                    return new AlertEvent("SPECIAL_RULE", vehicleId,
                             "Special vehicle detected", AlertSeverity.INFO, newLocation);
                 }
                 return null;
@@ -290,7 +290,7 @@ class AlertRuleEvaluationServiceTest {
 
         // Test with special vehicle
         Vehicle specialVehicle = new Vehicle("SPECIAL_VEHICLE");
-        AlertEvent alert = evaluationService.evaluateRule(customRule, specialVehicle, testLocation);
+        AlertEvent alert = evaluationService.evaluateRule(customRule, specialVehicle.getVehicleId(), testLocation);
 
         assertNotNull(alert);
         assertEquals("SPECIAL_RULE", alert.getRuleKey());
@@ -298,7 +298,7 @@ class AlertRuleEvaluationServiceTest {
         assertEquals("Special vehicle detected", alert.getMessage());
 
         // Test with regular vehicle
-        AlertEvent noAlert = evaluationService.evaluateRule(customRule, testVehicle, testLocation);
+        AlertEvent noAlert = evaluationService.evaluateRule(customRule, testVehicle.getVehicleId(), testLocation);
         assertNull(noAlert);
     }
 
@@ -316,7 +316,7 @@ class AlertRuleEvaluationServiceTest {
     void testValidateRuleConfigurationInvalidPriority() {
         IAlertRule invalidPriorityRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return null;
             }
 
@@ -353,7 +353,7 @@ class AlertRuleEvaluationServiceTest {
     void testValidateRuleConfigurationInvalidKeyCharacters() {
         IAlertRule invalidKeyRule = new IAlertRule() {
             @Override
-            public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return null;
             }
 

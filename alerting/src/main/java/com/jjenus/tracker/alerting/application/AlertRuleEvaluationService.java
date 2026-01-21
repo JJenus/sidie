@@ -9,12 +9,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class AlertRuleEvaluationService {
 
-    public AlertEvent evaluateRule(IAlertRule rule, Vehicle vehicle, LocationPoint location) {
+    public AlertEvent evaluateRule(IAlertRule rule, String vehicleId, LocationPoint location) {
         // Handle null parameters
-        if (rule == null || vehicle == null || location == null) {
+        if (rule == null || vehicleId == null || location == null) {
             return null;
         }
-        return rule.evaluate(vehicle, location);
+        return rule.evaluate(vehicleId, location);
     }
 
     public boolean validateRuleConfiguration(IAlertRule rule) {

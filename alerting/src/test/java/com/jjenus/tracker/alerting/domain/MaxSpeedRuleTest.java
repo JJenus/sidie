@@ -33,7 +33,7 @@ class MaxSpeedRuleTest {
     void testEvaluateNoAlertWhenBelowThreshold() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 80.0f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNull(alert);
     }
@@ -42,7 +42,7 @@ class MaxSpeedRuleTest {
     void testEvaluateAlertWhenAtThreshold() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 120.0f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNotNull(alert);
         assertEquals("SPEED_100", alert.getRuleKey());
@@ -57,7 +57,7 @@ class MaxSpeedRuleTest {
     void testEvaluateAlertWhenAboveThreshold() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 120.0f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNotNull(alert);
         assertEquals("SPEED_100", alert.getRuleKey());
@@ -72,7 +72,7 @@ class MaxSpeedRuleTest {
         // Threshold is 100, 1.5x threshold is 150
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 160.0f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNotNull(alert);
         assertEquals(AlertSeverity.CRITICAL, alert.getSeverity());
@@ -84,7 +84,7 @@ class MaxSpeedRuleTest {
         rule.setEnabled(false);
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 120.0f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNull(alert);
     }
@@ -93,7 +93,7 @@ class MaxSpeedRuleTest {
     void testEvaluateZeroSpeed() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 0.0f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNull(alert);
     }
@@ -118,8 +118,8 @@ class MaxSpeedRuleTest {
         Vehicle vehicle2 = new Vehicle("VEH-002");
         LocationPoint speedingLocation = new LocationPoint(40.7128, -74.0060, 120.0f, testTime);
 
-        AlertEvent alert1 = rule.evaluate(vehicle, speedingLocation);
-        AlertEvent alert2 = rule.evaluate(vehicle2, speedingLocation);
+        AlertEvent alert1 = rule.evaluate(vehicle.getVehicleId(), speedingLocation);
+        AlertEvent alert2 = rule.evaluate(vehicle2.getVehicleId(), speedingLocation);
 
         assertNotNull(alert1);
         assertNotNull(alert2);
@@ -132,7 +132,7 @@ class MaxSpeedRuleTest {
     void testAlertMessageFormat() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 120.5f, testTime);
 
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
 
         assertNotNull(alert);
         String message = alert.getMessage();
@@ -145,17 +145,17 @@ class MaxSpeedRuleTest {
     void testSeverityLevels() {
         // Just below critical threshold (100 * 1.5 = 150)
         LocationPoint warningLocation = new LocationPoint(40.7128, -74.0060, 149.9f, testTime);
-        AlertEvent warningAlert = rule.evaluate(vehicle, warningLocation);
+        AlertEvent warningAlert = rule.evaluate(vehicle.getVehicleId(), warningLocation);
         assertEquals(AlertSeverity.WARNING, warningAlert.getSeverity());
 
         // At critical threshold
         LocationPoint criticalLocation = new LocationPoint(40.7128, -74.0060, 190.0f, testTime);
-        AlertEvent criticalAlert = rule.evaluate(vehicle, criticalLocation);
+        AlertEvent criticalAlert = rule.evaluate(vehicle.getVehicleId(), criticalLocation);
         assertEquals(AlertSeverity.CRITICAL, criticalAlert.getSeverity());
 
         // Above critical threshold
         LocationPoint farCriticalLocation = new LocationPoint(40.7128, -74.0060, 200.0f, testTime);
-        AlertEvent farCriticalAlert = rule.evaluate(vehicle, farCriticalLocation);
+        AlertEvent farCriticalAlert = rule.evaluate(vehicle.getVehicleId(), farCriticalLocation);
         assertEquals(AlertSeverity.CRITICAL, farCriticalAlert.getSeverity());
     }
 }

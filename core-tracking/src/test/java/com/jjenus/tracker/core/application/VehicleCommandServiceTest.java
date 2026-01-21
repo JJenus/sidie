@@ -3,6 +3,7 @@ package com.jjenus.tracker.core.application;
 import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
+import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.core.exception.VehicleException;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,7 +117,7 @@ class VehicleCommandServiceTest {
 
         Vehicle savedVehicle = vehicleCaptor.getValue();
         assertEquals(newLocation, savedVehicle.getCurrentLocation());
-        assertEquals(com.jjenus.tracker.core.domain.VehicleUpdatedEvent.class,
+        assertEquals(VehicleUpdatedEvent.class,
             eventCaptor.getValue().getClass());
     }
 

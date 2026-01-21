@@ -1,9 +1,10 @@
 package com.jjenus.tracker.alerting.application;
 
-import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
+import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,15 +20,16 @@ public class AlertEventHandler {
     @JmsListener(destination = "tracking.events.vehicleupdatedevent",
                 containerFactory = "jmsListenerContainerFactory",
                 subscription = "alert-processing")
-    public void handleVehicleUpdate(VehicleUpdatedEvent event) {
+    public void handleVehicleUpdate(@Payload VehicleUpdatedEvent event) {
         try {
-            logger.debug("Processing vehicle update for {}", event.getVehicle().getVehicleId());
+            logger.debug("Alert Processing received vehicle update for {}", event.getVehicleId());
+            logger.debug("Processing vehicle update for {}", event.getVehicleId());
             
-            alertingEngine.processVehicleUpdate(event.getVehicle(), event.getNewLocation());
+            alertingEngine.processVehicleUpdate(event.getVehicleId(), event.getNewLocation());
             
         } catch (Exception e) {
             logger.error("Failed to process vehicle update for {}", 
-                        event.getVehicle().getVehicleId(), e);
+                        event.getVehicleId(), e);
             throw e;
         }
     }

@@ -26,8 +26,8 @@ public class AlertingEngine {
         this.evaluationService = evaluationService;
     }
 
-    public void processVehicleUpdate(Vehicle vehicle, LocationPoint newLocation) {
-        if (vehicle == null || newLocation == null) {
+    public void processVehicleUpdate(String vehicleId, LocationPoint newLocation) {
+        if (vehicleId == null || newLocation == null) {
             throw new com.jjenus.tracker.shared.exception.ValidationException(
                 "ALERT_INVALID_INPUT",
                 "Vehicle and location cannot be null"
@@ -41,15 +41,15 @@ public class AlertingEngine {
 
         for (IAlertRule rule : sortedRules) {
             try {
-                AlertEvent alert = evaluationService.evaluateRule(rule, vehicle, newLocation);
+                AlertEvent alert = evaluationService.evaluateRule(rule, vehicleId, newLocation);
 
                 if (alert != null) {
                     System.out.println("Alert triggered: " + alert.getRuleKey() +
-                                     " for vehicle " + vehicle.getVehicleId());
+                                     " for vehicle " + vehicleId);
 
                     eventPublisher.publish(alert);
 
-                    vehicle.addAlert(alert.getMessage());
+//                    vehicle.addAlert(alert.getMessage());
                 }
             } catch (AlertException e) {
                 System.err.println("Alert evaluation error for rule " + rule.getRuleKey() + ": " + e.getMessage());

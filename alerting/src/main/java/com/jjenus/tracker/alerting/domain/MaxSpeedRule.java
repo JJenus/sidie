@@ -19,9 +19,9 @@ public class MaxSpeedRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation) {
+    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
         // Handle null parameters
-        if (!enabled || vehicle == null || newLocation == null) {
+        if (!enabled || vehicleId == null || newLocation == null) {
             return null;
         }
 
@@ -31,7 +31,7 @@ public class MaxSpeedRule implements IAlertRule {
         if (speed > thresholdSpeed) {
             String message = String.format(
                     "Vehicle %s exceeded speed limit of %.1f km/h. Current speed: %.1f km/h",
-                    vehicle.getVehicleId(),
+                    vehicleId,
                     thresholdSpeed,
                     speed
             );
@@ -41,7 +41,7 @@ public class MaxSpeedRule implements IAlertRule {
 
             return new AlertEvent(
                     ruleKey,
-                    vehicle.getVehicleId(),
+                    vehicleId,
                     message,
                     severity,
                     newLocation

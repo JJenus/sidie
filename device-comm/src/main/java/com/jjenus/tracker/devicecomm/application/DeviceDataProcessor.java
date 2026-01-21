@@ -2,7 +2,7 @@ package com.jjenus.tracker.devicecomm.application;
 
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.shared.domain.LocationDataEvent;
+import com.jjenus.tracker.shared.events.LocationDataEvent;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;

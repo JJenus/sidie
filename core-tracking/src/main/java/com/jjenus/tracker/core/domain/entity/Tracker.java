@@ -16,9 +16,10 @@ public class Tracker {
     
     @Column(name = "device_id", length = 50, unique = true)
     private String deviceId;
-    
-    @Column(name = "imei", length = 20, unique = true)
-    private String imei;
+
+    //    device_id == imei
+//    @Column(name = "imei", length = 20, unique = true)
+//    private String imei;
     
     @Column(name = "model", length = 100)
     private String model;
@@ -103,9 +104,10 @@ public class Tracker {
     
     public String getDeviceId() { return deviceId; }
     public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
-    
-    public String getImei() { return imei; }
-    public void setImei(String imei) { this.imei = imei; }
+
+//    device_id == imei
+//    public String getImei() { return imei; }
+//    public void setImei(String imei) { this.imei = imei; }
     
     public String getModel() { return model; }
     public void setModel(String model) { this.model = model; }

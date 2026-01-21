@@ -36,7 +36,7 @@ class IdleTimeRuleTest {
         LocationPoint movingLocation = new LocationPoint(40.7128, -74.0060, 30.0f, testTime);
         vehicle.processNewTelemetry(movingLocation);
 
-        AlertEvent alert = rule.evaluate(vehicle, movingLocation);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), movingLocation);
 
         assertNull(alert);
     }
@@ -51,7 +51,7 @@ class IdleTimeRuleTest {
         vehicle.processNewTelemetry(idleLocation);
 
         // Vehicle has been idle for 1 minute, threshold is 30 minutes
-        AlertEvent alert = rule.evaluate(vehicle, idleLocation);
+        AlertEvent alert = rule.evaluate("vehicle", idleLocation);
 
         assertNull(alert);
     }
@@ -98,7 +98,7 @@ class IdleTimeRuleTest {
         // Test enabling/disabling
         rule.setEnabled(false);
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 0.0f, testTime);
-        AlertEvent alert = rule.evaluate(vehicle, location);
+        AlertEvent alert = rule.evaluate(vehicle.getVehicleId(), location);
         assertNull(alert); // Should be null because rule is disabled
 
         rule.setEnabled(true);

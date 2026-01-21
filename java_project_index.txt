@@ -2,7 +2,7 @@
 ```.java
 package com.jjenus.tracker.alerting.application;
 
-import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
+import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -555,7 +555,7 @@ package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
-import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
+import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
@@ -651,7 +651,7 @@ public class VehicleCommandService {
 ```.java
 package com.jjenus.tracker.core.application;
 
-import com.jjenus.tracker.shared.domain.LocationDataEvent;
+import com.jjenus.tracker.shared.events.LocationDataEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -1207,7 +1207,7 @@ package com.jjenus.tracker.devicecomm.application;
 
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
-import com.jjenus.tracker.shared.domain.LocationDataEvent;
+import com.jjenus.tracker.shared.events.LocationDataEvent;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;

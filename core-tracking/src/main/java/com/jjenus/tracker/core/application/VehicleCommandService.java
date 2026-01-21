@@ -2,7 +2,7 @@ package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
-import com.jjenus.tracker.core.domain.VehicleUpdatedEvent;
+import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
 import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
@@ -76,7 +76,7 @@ public class VehicleCommandService {
             vehicle.processNewTelemetry(location);
             vehicleRepository.save(vehicle);
 
-            VehicleUpdatedEvent event = new VehicleUpdatedEvent(vehicle, location);
+            VehicleUpdatedEvent event = new VehicleUpdatedEvent(vehicle.getVehicleId(), location);
             eventPublisher.publish(event);
 
             System.out.println("Updated location for vehicle " + vehicleId + ": " +

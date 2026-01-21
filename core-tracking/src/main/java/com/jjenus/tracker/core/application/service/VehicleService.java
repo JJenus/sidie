@@ -4,6 +4,8 @@ import com.jjenus.tracker.core.domain.entity.*;
 import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import com.jjenus.tracker.core.infrastructure.repository.*;
+import com.jjenus.tracker.shared.domain.LocationPoint;
+import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,15 +20,17 @@ public class VehicleService {
     private final TrackerRepository trackerRepository;
     private final TripRepository tripRepository;
     private final TrackerLocationRepository locationRepository;
+    private final ModelMapper modelMapper;
     
     public VehicleService(VehicleRepository vehicleRepository,
-                         TrackerRepository trackerRepository,
-                         TripRepository tripRepository,
-                         TrackerLocationRepository locationRepository) {
+                          TrackerRepository trackerRepository,
+                          TripRepository tripRepository,
+                          TrackerLocationRepository locationRepository, ModelMapper modelMapper) {
         this.vehicleRepository = vehicleRepository;
         this.trackerRepository = trackerRepository;
         this.tripRepository = tripRepository;
         this.locationRepository = locationRepository;
+        this.modelMapper = modelMapper;
     }
     
     @Transactional
@@ -44,7 +48,7 @@ public class VehicleService {
     }
     
     @Transactional
-    public void updateVehicleLocation(String vehicleId, TrackerLocation location) {
+    public void updateVehicleLocation(String vehicleId, LocationPoint locationPoint) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
             .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
         
@@ -56,7 +60,10 @@ public class VehicleService {
                     trackerRepository.save(tracker);
                 });
         }
-        
+
+        // This is highly inaccurate will get back to this.
+        TrackerLocation location = modelMapper.map(locationPoint, TrackerLocation.class);
+
         // Save location
         locationRepository.save(location);
         
@@ -113,5 +120,19 @@ public class VehicleService {
     @Transactional(readOnly = true)
     public Optional<Trip> getActiveTrip(String vehicleId) {
         return tripRepository.findByVehicleVehicleIdAndIsActive(vehicleId, true);
+    }
+
+    public String findVehicleIdForDevice(String deviceId) {
+        try {
+            Tracker tracker = trackerRepository.findByDeviceId(deviceId).orElseThrow(()-> new IllegalArgumentException("Tracker Not found: "+deviceId));
+
+            if (tracker.getVehicle() == null) {
+                throw new RuntimeException(String.format("Tracker %s not assigned to a vehicle", deviceId));
+            }
+            return tracker.getVehicle().getVehicleId();
+        } catch (Exception e) {
+//            return a dummy id
+            return "VEH_"+deviceId;
+        }
     }
 }

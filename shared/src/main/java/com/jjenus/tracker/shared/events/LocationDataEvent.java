@@ -1,5 +1,6 @@
-package com.jjenus.tracker.shared.domain;
+package com.jjenus.tracker.shared.events;
 
+import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;

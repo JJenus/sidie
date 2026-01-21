@@ -4,7 +4,7 @@ import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public interface IAlertRule {
-    AlertEvent evaluate(Vehicle vehicle, LocationPoint newLocation);
+    AlertEvent evaluate(String vehicleId, LocationPoint newLocation);
     String getRuleKey();
     String getRuleName();
     boolean isEnabled();
