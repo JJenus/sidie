@@ -3,6 +3,7 @@ package com.jjenus.tracker.shared.pubsub;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ public class ArtemisEventPublisher implements EventPublisher {
     private final JmsTemplate jmsTemplate;
     private final ObjectMapper objectMapper;
 
-    public ArtemisEventPublisher(JmsTemplate jmsTemplate, ObjectMapper objectMapper) {
+    public ArtemisEventPublisher(@Qualifier("topicJmsTemplate") JmsTemplate jmsTemplate, ObjectMapper objectMapper) {
         this.jmsTemplate = jmsTemplate;
         this.objectMapper = objectMapper;
     }

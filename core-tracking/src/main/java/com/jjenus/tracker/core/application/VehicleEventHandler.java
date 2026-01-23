@@ -27,7 +27,7 @@ public class VehicleEventHandler {
     }
 
     @JmsListener(destination = "tracking.events.locationdataevent",
-            containerFactory = "jmsListenerContainerFactory",
+            containerFactory = "topicJmsListenerContainerFactory",
             subscription = "vehicle-location-updates")
     @Transactional
     public void handleLocationUpdate(@Payload LocationDataEvent event) {

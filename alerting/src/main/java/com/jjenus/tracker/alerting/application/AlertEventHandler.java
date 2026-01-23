@@ -16,10 +16,12 @@ public class AlertEventHandler {
     public AlertEventHandler(AlertingEngine alertingEngine) {
         this.alertingEngine = alertingEngine;
     }
-    
-    @JmsListener(destination = "tracking.events.vehicleupdatedevent",
-                containerFactory = "jmsListenerContainerFactory",
-                subscription = "alert-processing")
+
+    @JmsListener(
+            destination = "tracking.events.vehicleupdatedevent",
+            containerFactory = "topicJmsListenerContainerFactory",
+            subscription = "alert-processing"
+    )
     public void handleVehicleUpdate(@Payload VehicleUpdatedEvent event) {
         try {
             logger.debug("Alert Processing received vehicle update for {}", event.getVehicleId());

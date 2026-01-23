@@ -78,26 +78,26 @@ public class AppConfig {
         return template;
     }
     
-    @Bean
-    public JmsListenerContainerFactory<?> jmsListenerContainerFactory(
-            ConnectionFactory connectionFactory,
-            DefaultJmsListenerContainerFactoryConfigurer configurer) {
-        
-        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
-        configurer.configure(factory, connectionFactory);
-        factory.setConcurrency("3-10");
-        factory.setErrorHandler(t -> {
-            System.err.println("Error in JMS listener: " + t.getMessage());
-        });
-        return factory;
-    }
-    
-    @Bean
-    public MessageConverter jacksonJmsMessageConverter(ObjectMapper objectMapper) {
-        MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
-        converter.setTargetType(MessageType.TEXT);
-        converter.setTypeIdPropertyName("_type");
-        converter.setObjectMapper(objectMapper);
-        return converter;
-    }
+//    @Bean
+//    public JmsListenerContainerFactory<?> jmsListenerContainerFactory(
+//            ConnectionFactory connectionFactory,
+//            DefaultJmsListenerContainerFactoryConfigurer configurer) {
+//
+//        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
+//        configurer.configure(factory, connectionFactory);
+//        factory.setConcurrency("3-10");
+//        factory.setErrorHandler(t -> {
+//            System.err.println("Error in JMS listener: " + t.getMessage());
+//        });
+//        return factory;
+//    }
+//
+//    @Bean
+//    public MessageConverter jacksonJmsMessageConverter(ObjectMapper objectMapper) {
+//        MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
+//        converter.setTargetType(MessageType.TEXT);
+//        converter.setTypeIdPropertyName("_type");
+//        converter.setObjectMapper(objectMapper);
+//        return converter;
+//    }
 }
