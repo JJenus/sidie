@@ -26,9 +26,9 @@ public class VehicleEventHandler {
         this.eventPublisher = eventPublisher;
     }
 
-    @JmsListener(destination = "tracking.events.locationdataevent",
-            containerFactory = "topicJmsListenerContainerFactory",
-            subscription = "vehicle-location-updates")
+//    @JmsListener(destination = "tracking.events.locationdataevent",
+//            containerFactory = "topicJmsListenerContainerFactory"
+//    )
     @Transactional
     public void handleLocationUpdate(@Payload LocationDataEvent event) {
         try {
@@ -50,21 +50,6 @@ public class VehicleEventHandler {
             logger.error("Failed to process location update for device {}",
                     event != null ? event.getDeviceId() : "unknown", e);
             throw e;
-        }
-    }
-
-    @JmsListener(destination = ">")  // Listen to ALL destinations
-    public void debugAll(Message message) {
-        try {
-            logger.info("DEBUG - Message on: {}", message.getJMSDestination());
-            logger.info("DEBUG - Message type: {}", message.getJMSType());
-
-            if (message instanceof TextMessage) {
-                String text = ((TextMessage) message).getText();
-                logger.info("DEBUG - Message text: {}", text);
-            }
-        } catch (JMSException e) {
-            logger.error("Debug error", e);
         }
     }
 }

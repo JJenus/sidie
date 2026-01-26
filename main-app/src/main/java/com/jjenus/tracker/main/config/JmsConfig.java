@@ -26,6 +26,7 @@ public class JmsConfig {
         JmsTemplate template = new JmsTemplate(connectionFactory);
         template.setPubSubDomain(true);
         template.setMessageConverter(messageConverter);
+        template.setDeliveryPersistent(true);
         return template;
     }
 

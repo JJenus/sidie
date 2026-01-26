@@ -1,11 +1,13 @@
 package com.jjenus.tracker.alerting.application;
 
+import com.jjenus.tracker.shared.events.LocationDataEvent;
 import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class AlertEventHandler {
@@ -18,20 +20,20 @@ public class AlertEventHandler {
     }
 
     @JmsListener(
-            destination = "tracking.events.vehicleupdatedevent",
-            containerFactory = "topicJmsListenerContainerFactory",
-            subscription = "alert-processing"
+            destination = "tracking.events.locationdataevent",
+            containerFactory = "topicJmsListertemis"
     )
-    public void handleVehicleUpdate(@Payload VehicleUpdatedEvent event) {
+    @Transactional
+    public void handleVehicleUpdate(@Payload LocationDataEvent event) {
         try {
-            logger.debug("Alert Processing received vehicle update for {}", event.getVehicleId());
-            logger.debug("Processing vehicle update for {}", event.getVehicleId());
+            logger.debug("Alert Processing received vehicle update for {}", event.getDeviceId());
+            logger.debug("Processing vehicle update for {}", event.getEventId());
             
-            alertingEngine.processVehicleUpdate(event.getVehicleId(), event.getNewLocation());
+//            alertingEngine.processVehicleUpdate(event.getVehicleId(), event.getNewLocation());
             
         } catch (Exception e) {
             logger.error("Failed to process vehicle update for {}", 
-                        event.getVehicleId(), e);
+                        event.getEventId(), e);
             throw e;
         }
     }
