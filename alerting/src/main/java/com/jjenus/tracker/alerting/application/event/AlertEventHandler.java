@@ -1,6 +1,6 @@
-package com.jjenus.tracker.alerting.application;
+package com.jjenus.tracker.alerting.application.event;
 
-import com.jjenus.tracker.shared.events.LocationDataEvent;
+import com.jjenus.tracker.alerting.application.AlertingEngine;
 import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,29 +12,28 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class AlertEventHandler {
     private static final Logger logger = LoggerFactory.getLogger(AlertEventHandler.class);
-    
+
     private final AlertingEngine alertingEngine;
-    
+
     public AlertEventHandler(AlertingEngine alertingEngine) {
         this.alertingEngine = alertingEngine;
     }
 
     @JmsListener(
-            destination = "tracking.events.locationdataevent",
-            containerFactory = "topicJmsListertemis"
+            destination = "tracking.events.vehicleupdatedevent",
+            containerFactory = "topicJmsListenerContainerFactory"
     )
-    @Transactional
-    public void handleVehicleUpdate(@Payload LocationDataEvent event) {
+    public void handleVehicleUpdate(@Payload VehicleUpdatedEvent event) {
         try {
-            logger.debug("Alert Processing received vehicle update for {}", event.getDeviceId());
+            logger.info("Alert Processing received LOCATION update for device {}", event.getVehicleId());
             logger.debug("Processing vehicle update for {}", event.getEventId());
-            
-//            alertingEngine.processVehicleUpdate(event.getVehicleId(), event.getNewLocation());
-            
+
+             alertingEngine.processVehicleUpdate(event.getVehicleId(), event.getNewLocation());
         } catch (Exception e) {
-            logger.error("Failed to process vehicle update for {}", 
-                        event.getEventId(), e);
+            logger.error("Failed to process vehicle update for {}",
+                    event.getEventId(), e);
             throw e;
         }
     }
+
 }

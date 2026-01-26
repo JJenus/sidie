@@ -15,29 +15,25 @@
     <name>Alerting Module</name>
 
     <dependencies>
+        <!--     Spring dependencies     -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+            <scope>provided</scope> <!-- Main app provides runtime -->
+        </dependency>
+
         <!-- PRODUCTION dependencies -->
         <dependency>
             <groupId>com.jjenus.tracker</groupId>
             <artifactId>shared</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.jjenus.tracker</groupId>
-            <artifactId>core-tracking</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>2.0.9</version>
+<!--             <version>2.0.9</version> -->
         </dependency>
         
-        <!-- Spring Boot (Runtime Only - Not Starter) -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        
-        <!-- JMS for consuming VehicleUpdatedEvent -->
+        <!-- JMS for consuming events -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-jms</artifactId>
@@ -48,8 +44,25 @@
             <artifactId>jakarta.jms-api</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.activemq</groupId>
+            <artifactId>artemis-jms-client</artifactId>
+            <scope>provided</scope>
+        </dependency>
 
-        <!-- Test dependencies - MUST be declared here -->
+        <!-- Jackson for JSON serialization in Redis/Artemis -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

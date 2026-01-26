@@ -1,8 +1,8 @@
 package com.jjenus.tracker.alerting.application;
 
+import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertEvent;
-import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;

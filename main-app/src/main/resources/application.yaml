@@ -103,10 +103,11 @@ management:
 # Logging
 logging:
   level:
+    org.springframework.jms: DEBUG
+    com.jjenus.tracker.alerting: DEBUG
     com.jjenus.tracker: INFO
-    org.springframework.jms: WARN
     reactor.netty: INFO
     org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+#    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

@@ -1,8 +1,7 @@
-package com.jjenus.tracker.alerting.application;
+package com.jjenus.tracker.alerting.application.service;
 
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertEvent;
-import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.springframework.stereotype.Service;
 

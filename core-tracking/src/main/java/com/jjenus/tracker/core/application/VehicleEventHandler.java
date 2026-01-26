@@ -26,9 +26,10 @@ public class VehicleEventHandler {
         this.eventPublisher = eventPublisher;
     }
 
-//    @JmsListener(destination = "tracking.events.locationdataevent",
-//            containerFactory = "topicJmsListenerContainerFactory"
-//    )
+    @JmsListener(destination = "tracking.events.locationdataevent",
+            containerFactory = "topicJmsListenerContainerFactory",
+            concurrency = "1"
+    )
     @Transactional
     public void handleLocationUpdate(@Payload LocationDataEvent event) {
         try {

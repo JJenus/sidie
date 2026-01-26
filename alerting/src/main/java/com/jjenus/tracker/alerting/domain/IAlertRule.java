@@ -1,6 +1,5 @@
 package com.jjenus.tracker.alerting.domain;
 
-import com.jjenus.tracker.core.domain.Vehicle;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public interface IAlertRule {
