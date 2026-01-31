@@ -1,0 +1,2 @@
+# Python dependencies for GT06 simulator
+# No external dependencies needed

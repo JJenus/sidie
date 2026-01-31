@@ -1,5 +1,6 @@
 package com.jjenus.tracker.devicecomm.infrastructure;
 
+import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,7 @@ class AutoseekerProtocolParserTest {
     }
 
     @Test
-    void testParseValidAutoseekerData() {
+    void testParseValidAutoseekerData() throws ProtocolParseException {
         String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
 
         LocationPoint location = parser.parse(data);
@@ -111,7 +112,7 @@ class AutoseekerProtocolParserTest {
     }
 
     @Test
-    void testParseWithDifferentFormats() {
+    void testParseWithDifferentFormats() throws ProtocolParseException {
         // Test with extra fields (should still parse basic data)
         String data = "$POS,DEV001,34.0522,-118.2437,75.0,1700000000,1,extra,fields#";
 
@@ -124,7 +125,7 @@ class AutoseekerProtocolParserTest {
     }
 
     @Test
-    void testParseZeroSpeed() {
+    void testParseZeroSpeed() throws ProtocolParseException {
         String data = "$POS,DEV001,40.7128,-74.0060,0.0,1700000000,0#";
 
         LocationPoint location = parser.parse(data);
@@ -135,7 +136,7 @@ class AutoseekerProtocolParserTest {
     }
 
     @Test
-    void testParseNegativeSpeed() {
+    void testParseNegativeSpeed() throws ProtocolParseException {
         // Even though negative speed doesn't make sense, parser should handle it
         String data = "$POS,DEV001,40.7128,-74.0060,-10.5,1700000000,1#";
 

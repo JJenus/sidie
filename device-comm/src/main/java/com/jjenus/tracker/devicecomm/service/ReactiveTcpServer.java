@@ -4,6 +4,8 @@ import com.jjenus.tracker.devicecomm.application.DeviceDataProcessor;
 import com.jjenus.tracker.devicecomm.domain.DeviceDataPacket;
 import com.jjenus.tracker.shared.domain.ConnectionInfo;
 import com.jjenus.tracker.shared.redis.RedisConnectionTracker;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -13,17 +15,25 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
 import reactor.netty.DisposableServer;
 import reactor.netty.tcp.TcpServer;
+import reactor.util.concurrent.Queues;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -82,30 +92,27 @@ public class ReactiveTcpServer {
                         final String[] clientIp = new String[]{"unknown"};
                         final Connection[] nettyConnection = new Connection[1];
 
-                        // CORRECT: Use withConnection (one of the 3 methods) to get the Connection
+                        // Get connection and register
                         inbound.withConnection(conn -> {
                             nettyConnection[0] = conn;
 
-                            // Get client IP from the Connection, not from inbound
                             InetSocketAddress remoteAddress = (InetSocketAddress) conn.address();
                             clientIp[0] = remoteAddress != null ?
                                     remoteAddress.getAddress().getHostAddress() : "unknown";
 
                             // Register connection in tracker
-                            String initialDeviceId = "unknown";
-                            connectionTracker.registerConnection(connectionId, initialDeviceId, clientIp[0], conn);
+                            connectionTracker.registerConnection(connectionId, "unknown", clientIp[0], conn);
 
                             // Add timeout handler
                             conn.addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS));
 
-                            logger.debug("Connection {} established from {}", connectionId, clientIp[0]);
+                            logger.info("Connection {} established from {}", connectionId, clientIp[0]);
                         });
 
-                        // CORRECT: Simplified message framing using bufferUntil
-                        // Alternative: Use receive().asString().transform() with custom framing
+                        // Process incoming data with proper framing
                         return inbound.receive()
-                                .asString()
-                                .transform(this::frameMessagesWithDelimiter)
+                                .asByteArray()
+                                .transform(this::frameWithDelimiter)
                                 .doOnNext(message -> processRawMessage(message, connectionId, clientIp[0]))
                                 .doOnError(error -> handleConnectionError(error, connectionId))
                                 .doFinally(signal -> cleanupConnection(connectionId))
@@ -127,89 +134,176 @@ public class ReactiveTcpServer {
         String clientIp = remoteAddress != null ? remoteAddress.getAddress().getHostAddress() : "unknown";
         int clientPort = remoteAddress != null ? remoteAddress.getPort() : 0;
 
-        logger.info("New TCP connection from {}:{}", clientIp, clientPort);
+        logger.debug("New TCP connection from {}:{}", clientIp, clientPort);
 
         connection.onDispose(() -> {
-            logger.info("Connection from {}:{} closed", clientIp, clientPort);
+            logger.debug("Connection from {}:{} closed", clientIp, clientPort);
         });
     }
 
-    /**
-     * Correct framing implementation using only Flux operators
-     * No manual Flux.create needed
-     */
-    private Flux<String> frameMessagesWithDelimiter(Flux<String> dataStream) {
+    private Flux<String> frameWithDelimiter(Flux<byte[]> dataStream) {
         return dataStream
-                .windowUntil(s -> s.contains(messageDelimiter), true)
-                .flatMap(window -> window.reduce(String::concat))
-                .map(combined -> {
-                    // Remove the delimiter for processing
-                    logger.debug("Message: {}", combined);
-                    if (combined.endsWith(messageDelimiter)) {
-                        return combined.substring(0, combined.length() - 1);
-                    }
-                    return combined;
-                });
+                .concatMapIterable(bytes -> {
+                    // Convert byte array to a list of ByteBuffer for processing
+                    List<ByteBuffer> list = new ArrayList<>();
+                    list.add(ByteBuffer.wrap(bytes));
+                    return list;
+                })
+                .transform(flux -> Flux.create(sink -> {
+                    ByteBuffer buffer = ByteBuffer.allocate(maxMessageLength);
+                    flux.subscribe(
+                            byteBuffer -> {
+                                try {
+                                    while (byteBuffer.hasRemaining()) {
+                                        byte b = byteBuffer.get();
+
+                                        // Add byte to buffer (INCLUDING the delimiter '#')
+                                        if (buffer.position() >= maxMessageLength) {
+                                            sink.error(new RuntimeException(
+                                                    "Message exceeds maximum length of " + maxMessageLength + " bytes. " +
+                                                            "Current buffer: " + new String(buffer.array(), 0, buffer.position(), StandardCharsets.US_ASCII)));
+                                            return;
+                                        }
+                                        buffer.put(b);
+
+                                        // Check if we just added the delimiter '#'
+                                        if (b == (byte) '#') {
+                                            buffer.flip();
+                                            byte[] messageBytes = new byte[buffer.remaining()];
+                                            buffer.get(messageBytes);
+
+                                            // Convert to string WITH the delimiter included
+                                            String fullMessage = new String(messageBytes, StandardCharsets.US_ASCII);
+
+                                            // Send to parser
+                                            sink.next(fullMessage);
+
+                                            // Clear for next message
+                                            buffer.clear();
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    sink.error(new RuntimeException("Error processing byte buffer: " + e.getMessage(), e));
+                                }
+                            },
+                            error -> {
+                                // Log connection error but don't fail the sink
+                                logger.warn("Connection stream error during framing: {}", error.getMessage());
+                                // Complete the sink so connection can be cleaned up
+                                sink.complete();
+                            },
+                            () -> {
+                                // Handle any incomplete message when stream ends
+                                if (buffer.position() > 0) {
+                                    logger.debug("Connection closed with {} bytes in buffer (incomplete message)",
+                                            buffer.position());
+                                }
+                                sink.complete();
+                            }
+                    );
+                }, FluxSink.OverflowStrategy.BUFFER));
     }
 
     private void processRawMessage(String rawMessage, String connectionId, String clientIp) {
         try {
-            logger.debug("Received message ({} chars) from connection {}", rawMessage.length(), connectionId);
-
-            // Extract device ID from the raw message
-            String deviceId = extractDeviceIdFromRawMessage(rawMessage);
-
-            // Update connection tracker with actual device ID if we extracted it
-            if (!"unknown".equals(deviceId)) {
-                connectionTracker.updateConnectionDevice(connectionId, deviceId);
+            if (rawMessage == null || rawMessage.trim().isEmpty()) {
+                logger.warn("Empty message from connection {}", connectionId);
+                return;
             }
 
+            // Log raw message for debugging
+            logger.debug("Received raw message ({} chars) from connection {}: {}",
+                    rawMessage.length(), connectionId, rawMessage);
+
+            // Ensure message ends with delimiter for parser
+            String messageForParser = rawMessage;
+            if (!rawMessage.endsWith(messageDelimiter)) {
+                messageForParser = rawMessage + messageDelimiter;
+                logger.debug("Added missing delimiter to message from connection {}", connectionId);
+            }
+
+            // Extract device ID
+            String deviceId = extractDeviceIdFromRawMessage(messageForParser);
+
+            // Update connection tracker
+            if (!"unknown".equals(deviceId)) {
+                connectionTracker.updateConnectionDevice(connectionId, deviceId);
+                logger.debug("Updated connection {} with device ID {}", connectionId, deviceId);
+            }
+
+            // Create and process packet
             DeviceDataPacket packet = new DeviceDataPacket(
                     deviceId,
-                    rawMessage.trim(),
+                    messageForParser,
                     Instant.now(),
                     clientIp
             );
 
             // Process asynchronously
-            Mono.fromRunnable(() -> deviceDataProcessor.processDeviceData(packet))
+            Mono.fromRunnable(() -> {
+                        try {
+                            deviceDataProcessor.processDeviceData(packet);
+                        } catch (Exception e) {
+                            logger.error("Error in device data processor for connection {}",
+                                    connectionId, e);
+                        }
+                    })
                     .subscribeOn(Schedulers.boundedElastic())
                     .subscribe(
                             null,
-                            error -> logger.error("Error processing device data for connection {}", connectionId, error)
+                            error -> logger.error("Subscription error for connection {}",
+                                    connectionId, error)
                     );
 
-            // Update last seen in connection tracker
+            // Update last seen
             connectionTracker.updateLastSeen(connectionId);
 
         } catch (Exception e) {
-            logger.error("Error processing raw message from connection {}", connectionId, e);
+            logger.error("Error processing message from connection {}: {}",
+                    connectionId, e.getMessage());
         }
     }
 
     private String extractDeviceIdFromRawMessage(String rawMessage) {
-        // Simple extraction - assumes format: *XX,DEVICE_ID,...
         try {
             if (rawMessage != null && rawMessage.startsWith("*")) {
-                String[] parts = rawMessage.split(",", 3);
+                // Remove the delimiter for parsing
+                String cleanMessage = rawMessage;
+                if (cleanMessage.endsWith(messageDelimiter)) {
+                    cleanMessage = cleanMessage.substring(0, cleanMessage.length() - 1);
+                }
+
+                String[] parts = cleanMessage.split(",", 3);
                 if (parts.length >= 2) {
-                    return parts[1].trim(); // Second part is device ID
+                    String deviceId = parts[1].trim();
+                    // Validate device ID format (IMEI-like)
+                    if (deviceId.matches("[0-9]{10,15}")) {
+                        return deviceId;
+                    }
                 }
             }
         } catch (Exception e) {
             logger.warn("Failed to extract device ID from message: {}",
-                    rawMessage.substring(0, Math.min(rawMessage.length(), 50)));
+                    rawMessage != null ? rawMessage.substring(0, Math.min(rawMessage.length(), 100)) : "null");
         }
         return "unknown";
     }
 
     private void handleConnectionError(Throwable error, String connectionId) {
-        logger.warn("Connection error for {}: {}", connectionId, error.getMessage());
+        if (error instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            logger.warn("Read timeout for connection {}", connectionId);
+        } else {
+            logger.warn("Connection error for {}: {}", connectionId, error.getMessage());
+        }
     }
 
     private void cleanupConnection(String connectionId) {
-        connectionTracker.removeConnection(connectionId);
-        logger.info("Cleaned up connection {}", connectionId);
+        try {
+            connectionTracker.removeConnection(connectionId);
+            logger.info("Cleaned up connection {}", connectionId);
+        } catch (Exception e) {
+            logger.error("Error cleaning up connection {}", connectionId, e);
+        }
     }
 
     public void stop() {
@@ -235,31 +329,33 @@ public class ReactiveTcpServer {
     public Mono<Boolean> sendCommandToDevice(String deviceId, String command) {
         return Mono.fromCallable(() -> {
             try {
-                // Get connection from Redis
-                ConnectionInfo connectionInfo =
-                        connectionTracker.getConnectionByDeviceId(deviceId);
+                ConnectionInfo connectionInfo = connectionTracker.getConnectionByDeviceId(deviceId);
 
                 if (connectionInfo == null) {
-                    logger.warn("No active connection found for device {}", deviceId);
+                    logger.warn("No active connection for device {}", deviceId);
                     return false;
                 }
 
-                // Get Netty connection
                 Connection nettyConnection = connectionInfo.getNettyConnection();
                 if (nettyConnection == null || nettyConnection.isDisposed()) {
-                    logger.warn("Connection for device {} is not available", deviceId);
-                    // Clean up stale connection
+                    logger.warn("Connection for device {} is disposed", deviceId);
                     connectionTracker.removeConnection(connectionInfo.getConnectionId());
                     return false;
                 }
 
-                // Send command through the connection
+                // Ensure command ends with delimiter
+                String fullCommand = command;
+                if (!command.endsWith(messageDelimiter)) {
+                    fullCommand = command + messageDelimiter;
+                }
+
+                // Send command
                 nettyConnection.outbound()
-                        .sendString(Mono.just(command + messageDelimiter))
+                        .sendString(Mono.just(fullCommand))
                         .then()
                         .block(Duration.ofSeconds(10));
 
-                logger.debug("Command sent to device {}: {}", deviceId, command);
+                logger.info("Command sent to device {}: {}", deviceId, command);
                 return true;
 
             } catch (Exception e) {
