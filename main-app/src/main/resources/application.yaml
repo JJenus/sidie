@@ -31,6 +31,57 @@ spring:
         generate_statistics: false
     open-in-view: false
 
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  notification:
+    websocket:
+      enabled: true
+      endpoint: /ws/notifications
+      allowed-origins: "*"
+
+    email:
+      enabled: ${EMAIL_ENABLED:false}
+      from: ${EMAIL_FROM:alerts@tracking-system.com}
+
+    sms:
+      enabled: ${SMS_ENABLED:false}
+      provider: ${SMS_PROVIDER:none}
+      # Twilio configuration (example)
+      # provider: twilio
+      # account-sid: ${TWILIO_ACCOUNT_SID:}
+      # auth-token: ${TWILIO_AUTH_TOKEN:}
+      # from-number: ${TWILIO_FROM_NUMBER:}
+
+    push:
+      enabled: ${PUSH_ENABLED:false}
+      provider: ${PUSH_PROVIDER:none}
+      # Firebase configuration (example)
+      # provider: firebase
+      # service-account-key: ${FIREBASE_SERVICE_ACCOUNT_KEY:}
+
+    retry:
+      max-attempts: 3
+      backoff-delay: 5000 # milliseconds
+
+    cleanup:
+      enabled: true
+      retention-days: 30
+      cron: "0 0 2 * * ?" # Daily at 2 AM
+
   # H2 Console (for development/debugging)
   h2:
     console:

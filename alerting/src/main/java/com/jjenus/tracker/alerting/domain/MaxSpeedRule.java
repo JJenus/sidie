@@ -11,28 +11,35 @@ public class MaxSpeedRule implements IAlertRule {
 
     public MaxSpeedRule(String ruleKey, float thresholdSpeed) {
         this.ruleKey = ruleKey;
-        this.ruleName = "Maximum Speed Rule";
+        this.ruleName = "MAX_SPEED_RULE";
         this.thresholdSpeed = thresholdSpeed;
+        this.enabled = true;
+        this.priority = 2;
+    }
+
+    public MaxSpeedRule(String ruleKey, String ruleName, float speedLimit) {
+        this.ruleKey = ruleKey;
+        this.ruleName = ruleName;
+        this.thresholdSpeed = speedLimit;
         this.enabled = true;
         this.priority = 2;
     }
 
     @Override
     public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
-        // Handle null parameters
         if (!enabled || vehicleId == null || newLocation == null) {
             return null;
         }
 
-        // Handle potential null speed
         float speed = newLocation.speedKmh();
 
         if (speed > thresholdSpeed) {
             String message = String.format(
-                    "Vehicle %s exceeded speed limit of %.1f km/h. Current speed: %.1f km/h",
+                    "Vehicle %s exceeded speed limit of %.1f km/h. Current speed: %.1f km/h at %s",
                     vehicleId,
                     thresholdSpeed,
-                    speed
+                    speed,
+                    formatCoordinates(newLocation.latitude(), newLocation.longitude())
             );
 
             AlertSeverity severity = speed > thresholdSpeed * 1.5 ?
@@ -47,6 +54,10 @@ public class MaxSpeedRule implements IAlertRule {
             );
         }
         return null;
+    }
+
+    private String formatCoordinates(double lat, double lon) {
+        return String.format("[%.6f, %.6f]", lat, lon);
     }
 
     @Override

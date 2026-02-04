@@ -69,6 +69,10 @@
             <groupId>com.jjenus.tracker</groupId>
             <artifactId>alerting</artifactId>
         </dependency>
+<!--         <dependency> -->
+<!--             <groupId>com.jjenus.tracker</groupId> -->
+<!--             <artifactId>notification</artifactId> -->
+<!--         </dependency> -->
 
         <!-- Redis client -->
         <dependency>
