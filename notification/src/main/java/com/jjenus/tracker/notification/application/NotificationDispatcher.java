@@ -1,8 +1,8 @@
 package com.jjenus.tracker.notification.application;
 
 import com.jjenus.tracker.notification.application.service.*;
-import com.jjenus.tracker.notification.domain.Notification;
-import com.jjenus.tracker.notification.domain.NotificationChannel;
+import com.jjenus.tracker.notification.domain.entity.Notification;
+import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

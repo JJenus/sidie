@@ -1,6 +1,6 @@
 package com.jjenus.tracker.notification.application.service;
 
-import com.jjenus.tracker.notification.domain.Notification;
+import com.jjenus.tracker.notification.domain.entity.Notification;
 
 public interface NotificationService {
     

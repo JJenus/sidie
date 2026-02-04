@@ -1,8 +1,9 @@
-package com.jjenus.tracker.core.domain.entity;
+package com.jjenus.tracker.alerting.domain.entity;
 
-import com.jjenus.tracker.core.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 @Entity
@@ -14,13 +15,11 @@ public class TrackerAlert {
     @Column(name = "alert_id")
     private Long alertId;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tracker_id")
-    private Tracker tracker;
+    @Column(name = "trackerId_id")
+    private String trackerId;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vehicle_id")
-    private Vehicle vehicle;
+    @Column(name = "vehicle_id")
+    private String vehicleId;
     
     @Column(name = "alert_type", length = 50, nullable = false)
     private String alertType;
@@ -32,9 +31,8 @@ public class TrackerAlert {
     @Column(name = "message", columnDefinition = "TEXT")
     private String message;
     
-    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "location_id")
-    private TrackerLocation location;
+    private String locationId;
     
     @Column(name = "triggered_at", nullable = false)
     private Instant triggeredAt = Instant.now();
@@ -61,7 +59,7 @@ public class TrackerAlert {
     private String resolutionNotes;
     
     @Column(name = "metadata", columnDefinition = "JSONB")
-    private String metadata;
+    private Map<String, Object> metadata = new HashMap<>();
     
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
@@ -97,19 +95,18 @@ public class TrackerAlert {
     }
     
     public void addMetadata(String key, Object value) {
-        // Parse existing metadata, add new key-value, and save back
-        // Implementation depends on JSON library
+        this.metadata.put(key, value);
     }
     
     // Getters and Setters
     public Long getAlertId() { return alertId; }
     public void setAlertId(Long alertId) { this.alertId = alertId; }
     
-    public Tracker getTracker() { return tracker; }
-    public void setTracker(Tracker tracker) { this.tracker = tracker; }
+    public String getTracker() { return trackerId; }
+    public void setTracker(String trackerId) { this.trackerId = trackerId; }
     
-    public Vehicle getVehicle() { return vehicle; }
-    public void setVehicle(Vehicle vehicle) { this.vehicle = vehicle; }
+    public String getVehicle() { return vehicleId; }
+    public void setVehicle(String vehicleId) { this.vehicleId = vehicleId; }
     
     public String getAlertType() { return alertType; }
     public void setAlertType(String alertType) { this.alertType = alertType; }
@@ -120,8 +117,8 @@ public class TrackerAlert {
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
     
-    public TrackerLocation getLocation() { return location; }
-    public void setLocation(TrackerLocation location) { this.location = location; }
+    public String getLocationId() { return locationId; }
+    public void setLocation(String location) { this.locationId = locationId; }
     
     public Instant getTriggeredAt() { return triggeredAt; }
     public void setTriggeredAt(Instant triggeredAt) { this.triggeredAt = triggeredAt; }
@@ -154,6 +151,6 @@ public class TrackerAlert {
     public String getResolutionNotes() { return resolutionNotes; }
     public void setResolutionNotes(String resolutionNotes) { this.resolutionNotes = resolutionNotes; }
     
-    public String getMetadata() { return metadata; }
-    public void setMetadata(String metadata) { this.metadata = metadata; }
+    public Map<String, Object> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
 }

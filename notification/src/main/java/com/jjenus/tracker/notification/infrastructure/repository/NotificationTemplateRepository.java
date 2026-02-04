@@ -1,7 +1,7 @@
 package com.jjenus.tracker.notification.infrastructure.repository;
 
-import com.jjenus.tracker.notification.domain.NotificationChannel;
-import com.jjenus.tracker.notification.domain.NotificationTemplate;
+import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
+import com.jjenus.tracker.notification.domain.entity.NotificationTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

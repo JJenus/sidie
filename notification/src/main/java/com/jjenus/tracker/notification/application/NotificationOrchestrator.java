@@ -1,8 +1,11 @@
 package com.jjenus.tracker.notification.application;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jjenus.tracker.notification.domain.*;
+import com.jjenus.tracker.notification.domain.entity.Notification;
+import com.jjenus.tracker.notification.domain.entity.NotificationPreference;
+import com.jjenus.tracker.notification.domain.entity.NotificationTemplate;
+import com.jjenus.tracker.notification.domain.enums.DeliveryStatus;
+import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
 import com.jjenus.tracker.notification.infrastructure.repository.NotificationPreferenceRepository;
 import com.jjenus.tracker.notification.infrastructure.repository.NotificationTemplateRepository;
 import com.jjenus.tracker.shared.events.AlertRaisedEvent;
@@ -11,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.*;
 
 @Service

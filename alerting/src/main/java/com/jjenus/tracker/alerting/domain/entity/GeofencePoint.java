@@ -1,4 +1,4 @@
-package com.jjenus.tracker.core.domain.entity;
+package com.jjenus.tracker.alerting.domain.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;

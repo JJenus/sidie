@@ -1,14 +1,16 @@
 package com.jjenus.tracker.alerting.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 
 import java.time.Instant;
+import java.util.Map;
 
 public class AlertRuleResponse {
     private String ruleKey;
     private String ruleName;
-    private String ruleType;
-    private String parameters;
+    private AlertRuleType ruleType;
+    private Map<String, Object> parameters;
     private int priority;
     private boolean enabled;
     
@@ -25,11 +27,11 @@ public class AlertRuleResponse {
     public String getRuleName() { return ruleName; }
     public void setRuleName(String ruleName) { this.ruleName = ruleName; }
     
-    public String getRuleType() { return ruleType; }
-    public void setRuleType(String ruleType) { this.ruleType = ruleType; }
+    public AlertRuleType getRuleType() { return ruleType; }
+    public void setRuleType(AlertRuleType ruleType) { this.ruleType = ruleType; }
     
-    public String getParameters() { return parameters; }
-    public void setParameters(String parameters) { this.parameters = parameters; }
+    public Map<String, Object> getParameters() { return parameters; }
+    public void setParameters(Map<String, Object> parameters) { this.parameters = parameters; }
     
     public int getPriority() { return priority; }
     public void setPriority(int priority) { this.priority = priority; }

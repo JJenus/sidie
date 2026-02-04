@@ -1,6 +1,6 @@
 package com.jjenus.tracker.notification.application.service;
 
-import com.jjenus.tracker.notification.domain.Notification;
+import com.jjenus.tracker.notification.domain.entity.Notification;
 import com.jjenus.tracker.notification.infrastructure.websocket.VehicleTrackingWebSocketHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,7 +1,10 @@
 package com.jjenus.tracker.notification.application;
 
 import com.jjenus.tracker.notification.api.dto.*;
-import com.jjenus.tracker.notification.domain.*;
+import com.jjenus.tracker.notification.domain.entity.Notification;
+import com.jjenus.tracker.notification.domain.entity.NotificationPreference;
+import com.jjenus.tracker.notification.domain.entity.NotificationTemplate;
+import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
 import com.jjenus.tracker.notification.infrastructure.repository.NotificationRepository;
 import com.jjenus.tracker.notification.infrastructure.repository.NotificationPreferenceRepository;
 import com.jjenus.tracker.notification.infrastructure.repository.NotificationTemplateRepository;

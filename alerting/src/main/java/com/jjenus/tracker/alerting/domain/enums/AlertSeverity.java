@@ -1,4 +1,4 @@
-package com.jjenus.tracker.core.domain.enums;
+package com.jjenus.tracker.alerting.domain.enums;
 
 public enum AlertSeverity {
     INFO,

@@ -1,5 +1,5 @@
-find . -type d \( -name "node_modules" -o -name ".git" -o -name "target" -o -name "build" -o -name "out" -o -name ".gradle" -o -name ".idea" -o -name "*.iml" -o -name "test" -o -name "tests" -o -name "__pycache__" -o -name ".mvn" \) -prune -o \
-       -type f ! -name "*.config*" ! -name "*.css" ! -name "*.json" ! -name "*.txt" ! -name "*.yaml" ! -name "*.yml" ! -name ".*" ! -name "*.iml" ! -name "*.class" ! -name "*.jar" ! -name "*.war" ! -name "*.ear" ! -name "*.log" ! -name "*.pyc" ! -name "pom.xml" ! -name "build.gradle" ! -name "gradlew" ! -name "*.md" -print | \
+find . -type d \( -name "node_modules" -o -name ".git" -o -name "target" -o -name "tools" -o -name "build" -o -name "out" -o -name ".gradle" -o -name ".idea" -o -name "*.iml" -o -name "test" -o -name "tests" -o -name "__pycache__" -o -name ".mvn" \) -prune -o \
+       -type f ! -name "*.config*" ! -name "*.css" ! -name "*.py" ! -name "*.json" ! -name "*.txt" ! -name "*.yaml" ! -name "*.yml" ! -name ".*" ! -name "*.iml" ! -name "*.class" ! -name "*.jar" ! -name "*.war" ! -name "*.ear" ! -name "*.log" ! -name "*.pyc" ! -name "pom.xml" ! -name "build.gradle" ! -name "gradlew" ! -name "*.md" -print | \
        grep -v "/\." | sort | while IFS= read -r file; do
     echo "=== $file ==="
     echo "\`\`\`$(echo "$file" | grep -o '\.[^.]*$' || echo 'text')"
