@@ -2,6 +2,9 @@ package com.jjenus.tracker.alerting.domain.entity;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 import java.util.*;
 
@@ -31,6 +34,7 @@ public class AlertRule {
     private Integer priority = 5;
 
     @Column(name = "parameters", columnDefinition = "JSONB", nullable = false)
+    @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> parameters = new HashMap<>();
 
     @ElementCollection

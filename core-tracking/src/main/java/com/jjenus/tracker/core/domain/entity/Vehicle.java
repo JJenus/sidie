@@ -62,9 +62,6 @@ public class Vehicle {
     @OneToMany(mappedBy = "vehicle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Trip> trips = new ArrayList<>();
     
-    @OneToMany(mappedBy = "vehicle", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Geofence> geofences = new ArrayList<>();
-    
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
     
@@ -165,9 +162,6 @@ public class Vehicle {
     
     public Boolean getFuelCutActive() { return fuelCutActive; }
     public void setFuelCutActive(Boolean fuelCutActive) { this.fuelCutActive = fuelCutActive; }
-    
-    public List<Geofence> getGeofences() { return geofences; }
-    public void setGeofences(List<Geofence> geofences) { this.geofences = geofences; }
 
     public void addTracker(Tracker tracker) {
         trackers.add(tracker);

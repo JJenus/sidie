@@ -1,2 +1,2 @@
-/home/jjenus/workbench/apps/tracking-engine/shared/src/test/java/com/jjenus/tracker/shared/pubsub/SimpleEventBusTest.java
-/home/jjenus/workbench/apps/tracking-engine/shared/src/test/java/com/jjenus/tracker/shared/exception/DomainExceptionTest.java
+/home/jjenus/workbench/apps/tracking-engine-temp/shared/src/test/java/com/jjenus/tracker/shared/exception/DomainExceptionTest.java
+/home/jjenus/workbench/apps/tracking-engine-temp/shared/src/test/java/com/jjenus/tracker/shared/pubsub/SimpleEventBusTest.java

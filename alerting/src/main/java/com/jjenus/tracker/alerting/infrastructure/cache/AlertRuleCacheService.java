@@ -108,7 +108,7 @@ public class AlertRuleCacheService {
             );
 
             // Add to active rules set if enabled
-            if (Boolean.TRUE.equals(rule.getIsEnabled())) {
+            if (Boolean.TRUE.equals(rule.isEnabled())) {
                 redisTemplate.opsForSet().add(
                         keyGenerator.getAllActiveRulesKey(),
                         ruleKey

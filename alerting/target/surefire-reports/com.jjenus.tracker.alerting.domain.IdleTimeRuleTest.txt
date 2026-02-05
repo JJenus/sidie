@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.jjenus.tracker.alerting.domain.IdleTimeRuleTest
--------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.201 s -- in com.jjenus.tracker.alerting.domain.IdleTimeRuleTest

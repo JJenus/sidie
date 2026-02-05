@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.jjenus.tracker.alerting.domain.MaxSpeedRuleTest
--------------------------------------------------------------------------------
-Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.112 s -- in com.jjenus.tracker.alerting.domain.MaxSpeedRuleTest

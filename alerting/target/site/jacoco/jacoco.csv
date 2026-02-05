@@ -1,9 +1,0 @@
-GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
-Alerting Module,com.jjenus.tracker.alerting.domain,AlertEvent,3,36,0,0,1,13,1,6,1,6
-Alerting Module,com.jjenus.tracker.alerting.domain,AlertSeverity,0,21,0,0,0,4,0,1,0,1
-Alerting Module,com.jjenus.tracker.alerting.domain,MaxSpeedRule,0,101,2,8,0,26,2,11,0,8
-Alerting Module,com.jjenus.tracker.alerting.domain,IdleTimeRule,34,52,1,3,6,17,1,9,0,8
-Alerting Module,com.jjenus.tracker.alerting.domain,GeofenceExitRule,147,0,10,0,34,0,14,0,9,0
-Alerting Module,com.jjenus.tracker.alerting.exception,AlertException,19,65,0,0,4,10,2,5,2,5
-Alerting Module,com.jjenus.tracker.alerting.application,AlertRuleEvaluationService,0,61,1,21,0,12,1,13,0,3
-Alerting Module,com.jjenus.tracker.alerting.application,AlertingEngine,0,176,0,16,0,47,0,16,0,8

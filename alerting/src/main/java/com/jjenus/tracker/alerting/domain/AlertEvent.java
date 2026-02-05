@@ -1,5 +1,6 @@
 package com.jjenus.tracker.alerting.domain;
 
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 import java.time.Instant;
@@ -12,8 +13,8 @@ public class AlertEvent extends DomainEvent {
     private final Instant alertTimestamp;
     private final LocationPoint location;
     
-    public AlertEvent(String ruleKey, String vehicleId, String message, 
-                     AlertSeverity severity, LocationPoint location) {
+    public AlertEvent(String ruleKey, String vehicleId, String message,
+                      AlertSeverity severity, LocationPoint location) {
         this.ruleKey = ruleKey;
         this.vehicleId = vehicleId;
         this.message = message;

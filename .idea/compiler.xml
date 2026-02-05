@@ -8,8 +8,8 @@
         <outputRelativeToContentRoot value="true" />
         <module name="core-tracking" />
         <module name="main-app" />
-        <module name="shared" />
         <module name="notification" />
+        <module name="shared" />
         <module name="device-comm" />
         <module name="alerting" />
       </profile>

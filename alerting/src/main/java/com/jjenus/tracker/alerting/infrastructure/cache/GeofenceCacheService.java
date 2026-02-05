@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -117,7 +118,9 @@ public class GeofenceCacheService {
         try {
             String allKey = keyGenerator.getVehicleGeofencesKey(vehicleId);
             String activeKey = keyGenerator.getActiveVehicleGeofencesKey(vehicleId);
-            redisTemplate.delete(allKey, activeKey);
+            List<String> keysToDelete = Arrays.asList(allKey, activeKey);
+
+            redisTemplate.delete(keysToDelete);
         } catch (Exception e) {
             logger.error("Failed to invalidate vehicle geofence cache: {}", vehicleId, e);
         }

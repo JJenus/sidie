@@ -2,6 +2,9 @@ package com.jjenus.tracker.alerting.domain.entity;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +62,7 @@ public class TrackerAlert {
     private String resolutionNotes;
     
     @Column(name = "metadata", columnDefinition = "JSONB")
+    @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata = new HashMap<>();
     
     @Column(name = "created_at")

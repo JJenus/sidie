@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.jjenus.tracker.alerting.application.AlertingEngineTest
--------------------------------------------------------------------------------
-Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.763 s -- in com.jjenus.tracker.alerting.application.AlertingEngineTest

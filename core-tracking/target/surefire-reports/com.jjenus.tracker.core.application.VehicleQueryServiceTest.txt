@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.jjenus.tracker.core.application.VehicleQueryServiceTest
--------------------------------------------------------------------------------
-Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.346 s -- in com.jjenus.tracker.core.application.VehicleQueryServiceTest
