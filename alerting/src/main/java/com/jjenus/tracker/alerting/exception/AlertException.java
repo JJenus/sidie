@@ -46,4 +46,11 @@ public class AlertException extends BusinessRuleException {
             String.format("Error evaluating rule '%s': %s", ruleKey, detail)
         );
     }
+
+    public static AlertException alertNotFound(Long alertId) {
+        return new AlertException(
+                "ALERT_NOT_FOUND_ERROR",
+                String.format("Error alert '%s' not found", alertId)
+        );
+    }
 }

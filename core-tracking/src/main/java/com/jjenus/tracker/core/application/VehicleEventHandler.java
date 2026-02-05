@@ -42,7 +42,7 @@ public class VehicleEventHandler {
 //            vehicleService.updateVehicleLocation(vehicleId, event.getLocation());
 
             // Publish vehicle update event for alerting
-            VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(vehicleId, event.getLocation());
+            VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(vehicleId, event.getLocation(), event.getMetaData());
             eventPublisher.publish(vehicleUpdatedEvent);
 
             logger.info("Updated vehicle {} for device {}", vehicleId, event.getDeviceId());

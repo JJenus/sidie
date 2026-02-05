@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/geofences")
+@RequestMapping("/alerts/geofences")
 @Tag(name = "Geofences", description = "Geofence management endpoints")
 public class GeofenceController {
 

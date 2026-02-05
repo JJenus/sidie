@@ -31,13 +31,13 @@ public class GeofenceRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled || boundaryPoints == null || boundaryPoints.size() < 3) {
             return null;
         }
 
         boolean isInside = isPointInPolygon(newLocation);
-        AlertEvent alert = null;
+        AlertDetectedEvent alert = null;
 
         // Check based on action type
         switch (action) {
@@ -66,8 +66,8 @@ public class GeofenceRule implements IAlertRule {
         return alert;
     }
 
-    private AlertEvent createAlert(String vehicleId, LocationPoint location,
-                                   String actionStr, AlertSeverity severity) {
+    private AlertDetectedEvent createAlert(String vehicleId, LocationPoint location,
+                                           String actionStr, AlertSeverity severity) {
         String message = String.format(
                 "Vehicle %s %s geofence %s at %s",
                 vehicleId,
@@ -76,7 +76,7 @@ public class GeofenceRule implements IAlertRule {
                 formatCoordinates(location.latitude(), location.longitude())
         );
 
-        return new AlertEvent(
+        return new AlertDetectedEvent(
                 ruleKey,
                 vehicleId,
                 message,

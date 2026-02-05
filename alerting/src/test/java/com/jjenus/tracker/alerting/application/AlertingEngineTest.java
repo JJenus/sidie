@@ -1,7 +1,7 @@
 package com.jjenus.tracker.alerting.application;
 
 import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
-import com.jjenus.tracker.alerting.domain.AlertEvent;
+import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.alerting.domain.AlertRuleTestBuilder;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
@@ -110,7 +110,7 @@ class AlertingEngineTest {
             .vehicleId(vehicleId)
             .build();
 
-        AlertEvent alert = new AlertEvent(
+        AlertDetectedEvent alert = new AlertDetectedEvent(
             "speed-rule",
             vehicleId,
             "Speed exceeded",
@@ -150,7 +150,7 @@ class AlertingEngineTest {
             .vehicleId(vehicleId)
             .build();
 
-        AlertEvent alert = new AlertEvent(
+        AlertDetectedEvent alert = new AlertDetectedEvent(
             "good-rule",
             vehicleId,
             "Alert triggered",

@@ -86,11 +86,11 @@ public class NotificationOrchestrator {
     private void createNotificationsForRecipient(AlertRaisedEvent alert, String recipient) {
         // Get user's preferences for this alert type
         List<NotificationPreference> preferences = preferenceRepository
-            .findByUserIdAndAlertType(recipient, alert.getRuleType());
+            .findByUserIdAndAlertType(recipient, alert.getAlertType());
         
         if (preferences.isEmpty()) {
             // Use default preferences
-            preferences = getDefaultPreferences(recipient, alert.getRuleType());
+            preferences = getDefaultPreferences(recipient, alert.getAlertType());
         }
         
         // Create notifications for each enabled channel
@@ -113,10 +113,10 @@ public class NotificationOrchestrator {
     ) {
         try {
             // Find appropriate template
-            NotificationTemplate template = findTemplate(alert.getRuleType(), channel);
+            NotificationTemplate template = findTemplate(alert.getAlertType(), channel);
             if (template == null || !template.isEnabled()) {
                 logger.warn("No enabled template found for rule type {} and channel {}", 
-                          alert.getRuleType(), channel);
+                          alert.getAlertType(), channel);
                 return;
             }
             
@@ -181,7 +181,7 @@ public class NotificationOrchestrator {
             variables.put("alertId", alert.getAlertId());
             variables.put("ruleKey", alert.getRuleKey());
             variables.put("vehicleId", alert.getVehicleId());
-            variables.put("alertType", alert.getRuleType());
+            variables.put("alertType", alert.getAlertType());
             variables.put("severity", alert.getSeverity());
             variables.put("message", alert.getMessage());
             variables.put("timestamp", alert.getTimestamp().toString());
@@ -205,7 +205,7 @@ public class NotificationOrchestrator {
             .replace("{{alertId}}", alert.getAlertId())
             .replace("{{ruleKey}}", alert.getRuleKey())
             .replace("{{vehicleId}}", alert.getVehicleId())
-            .replace("{{alertType}}", alert.getRuleType())
+            .replace("{{alertType}}", alert.getAlertType())
             .replace("{{severity}}", alert.getSeverity())
             .replace("{{message}}", alert.getMessage())
             .replace("{{timestamp}}", alert.getTimestamp().toString())

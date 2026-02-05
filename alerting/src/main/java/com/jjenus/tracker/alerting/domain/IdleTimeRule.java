@@ -23,7 +23,7 @@ public class IdleTimeRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled) return null;
 
         Instant now = Instant.now();
@@ -52,7 +52,7 @@ public class IdleTimeRule implements IAlertRule {
                     formatCoordinates(newLocation.latitude(), newLocation.longitude())
             );
 
-            return new AlertEvent(
+            return new AlertDetectedEvent(
                     ruleKey,
                     vehicleId,
                     message,

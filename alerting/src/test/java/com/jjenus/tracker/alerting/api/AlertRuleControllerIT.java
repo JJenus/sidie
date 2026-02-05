@@ -5,9 +5,9 @@ import com.jjenus.tracker.alerting.api.dto.*;
 import com.jjenus.tracker.alerting.application.service.AlertRuleService;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -32,7 +32,7 @@ class AlertRuleControllerIT {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @Mock
     private AlertRuleService alertRuleService;
 
     @Test

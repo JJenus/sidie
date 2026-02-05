@@ -34,7 +34,9 @@ public enum AlertType {
     // Business rules
     ROUTE_DEVIATION("Route deviation"),
     UNAUTHORIZED_AREA("Entered unauthorized area"),
-    HIJACKING_SUSPECTED("Possible hijacking");
+    HIJACKING_SUSPECTED("Possible hijacking"),
+
+    UNKNOWN("Unknowm alert");
     
     private final String description;
     

@@ -67,28 +67,4 @@ public class VehicleCommandService {
                 "Failed to restore fuel for vehicle " + vehicleId, e);
         }
     }
-
-    public void updateVehicleLocation(String vehicleId, LocationPoint location) {
-        try {
-            Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                .orElseThrow(() -> VehicleException.notFound(vehicleId));
-
-            vehicle.processNewTelemetry(location);
-            vehicleRepository.save(vehicle);
-
-            VehicleUpdatedEvent event = new VehicleUpdatedEvent(vehicle.getVehicleId(), location);
-            eventPublisher.publish(event);
-
-            System.out.println("Updated location for vehicle " + vehicleId + ": " +
-                             location.latitude() + ", " + location.longitude());
-
-        } catch (VehicleException e) {
-            System.err.println("Location update failed for vehicle " + vehicleId + ": " + e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            System.err.println("Failed to update location for vehicle " + vehicleId + ": " + e.getMessage());
-            throw new ValidationException("LOCATION_UPDATE_ERROR",
-                "Failed to update location for vehicle " + vehicleId, e);
-        }
-    }
 }

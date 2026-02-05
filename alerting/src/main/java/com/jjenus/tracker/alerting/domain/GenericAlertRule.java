@@ -20,7 +20,7 @@ public class GenericAlertRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         // Custom rule evaluation logic based on parameters
         // Could be implemented using scripting engine or rule engine
         return null; // Override in specific implementations

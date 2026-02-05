@@ -2,7 +2,7 @@ package com.jjenus.tracker.alerting.application;
 
 import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
-import com.jjenus.tracker.alerting.domain.AlertEvent;
+import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
@@ -62,7 +62,7 @@ public class AlertingEngine {
         for (AlertRule rule : vehicleRules) {
             try {
                 IAlertRule domainRule = convertToDomainRule(rule);
-                AlertEvent alert = evaluationService.evaluateRule(domainRule, vehicleId, newLocation);
+                AlertDetectedEvent alert = evaluationService.evaluateRule(domainRule, vehicleId, newLocation);
 
                 if (alert != null) {
                     logger.info("Alert triggered: {} for vehicle {}",
@@ -80,7 +80,7 @@ public class AlertingEngine {
     private IAlertRule convertToDomainRule(AlertRule entityRule) {
         return new IAlertRule() {
             @Override
-            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+            public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return evaluationService.evaluateRule(this, vehicleId, newLocation);
             }
 

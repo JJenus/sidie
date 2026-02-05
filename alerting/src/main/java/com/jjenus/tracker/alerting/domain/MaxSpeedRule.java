@@ -27,7 +27,7 @@ public class MaxSpeedRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled || vehicleId == null || newLocation == null) {
             return null;
         }
@@ -46,7 +46,7 @@ public class MaxSpeedRule implements IAlertRule {
             AlertSeverity severity = speed > thresholdSpeed * 1.5 ?
                     AlertSeverity.CRITICAL : AlertSeverity.WARNING;
 
-            return new AlertEvent(
+            return new AlertDetectedEvent(
                     ruleKey,
                     vehicleId,
                     message,

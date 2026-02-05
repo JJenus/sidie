@@ -1160,7 +1160,7 @@ package com.jjenus.tracker.alerting.application;
 
 import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
-import com.jjenus.tracker.alerting.domain.AlertEvent;
+import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
@@ -1376,7 +1376,7 @@ public class CacheInvalidationEventListener {
 package com.jjenus.tracker.alerting.application.service;
 
 import com.jjenus.tracker.alerting.domain.IAlertRule;
-import com.jjenus.tracker.alerting.domain.AlertEvent;
+import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.springframework.stereotype.Service;
 

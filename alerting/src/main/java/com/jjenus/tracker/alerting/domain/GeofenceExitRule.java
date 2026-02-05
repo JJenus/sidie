@@ -26,11 +26,11 @@ public class GeofenceExitRule implements IAlertRule {
     }
     
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled) return null;
         
         boolean isInside = isPointInPolygon(newLocation);
-        AlertEvent alert = null;
+        AlertDetectedEvent alert = null;
         
         if (wasInside && !isInside) {
             String message = String.format(
@@ -39,7 +39,7 @@ public class GeofenceExitRule implements IAlertRule {
                 geofenceId
             );
             
-            alert = new AlertEvent(
+            alert = new AlertDetectedEvent(
                 ruleKey,
                 vehicleId,
                 message,

@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.domain.entity;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -23,9 +24,10 @@ public class TrackerAlert {
     
     @Column(name = "vehicle_id")
     private String vehicleId;
-    
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "alert_type", length = 50, nullable = false)
-    private String alertType;
+    private AlertType alertType;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "severity", length = 20)
@@ -111,10 +113,35 @@ public class TrackerAlert {
     
     public String getVehicle() { return vehicleId; }
     public void setVehicle(String vehicleId) { this.vehicleId = vehicleId; }
-    
-    public String getAlertType() { return alertType; }
-    public void setAlertType(String alertType) { this.alertType = alertType; }
-    
+
+    public String getTrackerId() {
+        return trackerId;
+    }
+
+    public void setTrackerId(String trackerId) {
+        this.trackerId = trackerId;
+    }
+
+    public String getVehicleId() {
+        return vehicleId;
+    }
+
+    public void setVehicleId(String vehicleId) {
+        this.vehicleId = vehicleId;
+    }
+
+    public AlertType getAlertType() {
+        return alertType;
+    }
+
+    public void setAlertType(AlertType alertType) {
+        this.alertType = alertType;
+    }
+
+    public void setLocationId(String locationId) {
+        this.locationId = locationId;
+    }
+
     public AlertSeverity getSeverity() { return severity; }
     public void setSeverity(AlertSeverity severity) { this.severity = severity; }
     
