@@ -330,32 +330,4 @@ public class AlertService {
         logger.warn("CRITICAL ALERT - Vehicle: {}, Type: {}, Message: {}",
                 vehicleId, alertType, message);
     }
-
-
-    @Service
-    @Transactional(readOnly = true)
-    public static class AlertQueryService {
-
-        private final TrackerAlertRepository alertRepository;
-
-        public AlertQueryService(TrackerAlertRepository alertRepository) {
-            this.alertRepository = alertRepository;
-        }
-
-        @Cacheable(value = "alerts", key = "#alertId")
-        public TrackerAlert getAlertById(Long alertId) {
-            return alertRepository.findById(alertId)
-                    .orElseThrow(() -> AlertException.alertNotFound(alertId));
-        }
-
-        @Cacheable(value = "alertStats", key = "'statistics_' + #startDate.toString()")
-        public Map<String, Long> getAlertStatistics(Instant startDate, Instant endDate) {
-            List<Object[]> stats = alertRepository.getAlertTypeStatistics(startDate);
-            return stats.stream()
-                    .collect(Collectors.toMap(
-                            obj -> (String) obj[0],
-                            obj -> (Long) obj[1]
-                    ));
-        }
-    }
 }

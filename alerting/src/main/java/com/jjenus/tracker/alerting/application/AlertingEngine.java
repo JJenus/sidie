@@ -17,18 +17,18 @@ import java.util.List;
 
 @Component
 public class AlertingEngine {
-    private final VehicleRuleCacheService vehicleRuleCacheService;
+    private final AlertRuleQueryService ruleQueryService;
     private final EventPublisher eventPublisher;
-    private final AlertRuleEvaluationService evaluationService;
+    private final AlertRuleFactory alertRuleFactory;
     private final Logger logger = LoggerFactory.getLogger(AlertingEngine.class);
 
     public AlertingEngine(
             EventPublisher eventPublisher,
-            AlertRuleEvaluationService evaluationService,
-            VehicleRuleCacheService vehicleRuleCacheService) {
-        this.vehicleRuleCacheService = vehicleRuleCacheService;
+            AlertRuleFactory alertRuleFactory,
+            AlertRuleQueryService ruleQueryService) {
+        this.ruleQueryService = ruleQueryService;
         this.eventPublisher = eventPublisher;
-        this.evaluationService = evaluationService;
+        this.alertRuleFactory = alertRuleFactory;
     }
 
     public void processVehicleUpdate(String vehicleId, LocationPoint newLocation) {
@@ -39,19 +39,7 @@ public class AlertingEngine {
             );
         }
 
-        // QUICK CHECK 1: Using cached index
-        if (!vehicleRuleCacheService.hasRulesCached(vehicleId)) {
-            logger.debug("Vehicle {} has no active rules (cached index), skipping", vehicleId);
-            return;
-        }
-
-        // QUICK CHECK 2: Full cache check
-        if (!vehicleRuleCacheService.hasActiveRules(vehicleId)) {
-            return;
-        }
-
-        // Get pre-sorted rules from Redis cache
-        List<AlertRule> vehicleRules = vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId);
+        List<AlertRule> vehicleRules = ruleQueryService.getActiveRulesForVehicle(vehicleId);
 
         if (vehicleRules.isEmpty()) {
             return;
@@ -61,8 +49,12 @@ public class AlertingEngine {
 
         for (AlertRule rule : vehicleRules) {
             try {
-                IAlertRule domainRule = convertToDomainRule(rule);
-                AlertDetectedEvent alert = evaluationService.evaluateRule(domainRule, vehicleId, newLocation);
+                IAlertRule domainRule = alertRuleFactory.createDomainRule(rule, vehicleId);
+                if (domainRule == null) {
+                    continue;
+                }
+                
+                AlertDetectedEvent alert = domainRule.evaluate(vehicleId, newLocation);
 
                 if (alert != null) {
                     logger.info("Alert triggered: {} for vehicle {}",
@@ -75,43 +67,5 @@ public class AlertingEngine {
                 logger.error("Unexpected error evaluating rule {}: {}", rule.getRuleKey(), e.getMessage());
             }
         }
-    }
-
-    private IAlertRule convertToDomainRule(AlertRule entityRule) {
-        return new IAlertRule() {
-            @Override
-            public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
-                return evaluationService.evaluateRule(this, vehicleId, newLocation);
-            }
-
-            @Override
-            public String getRuleKey() { return entityRule.getRuleKey(); }
-
-            @Override
-            public String getRuleName() { return entityRule.getRuleName(); }
-
-            @Override
-            public boolean isEnabled() { return Boolean.TRUE.equals(entityRule.isEnabled()); }
-
-            @Override
-            public void setEnabled(boolean enabled) { entityRule.setIsEnabled(enabled); }
-
-            @Override
-            public int getPriority() { return entityRule.getPriority() != null ? entityRule.getPriority() : 5; }
-        };
-    }
-
-    // Cache management methods
-    public void invalidateVehicleCache(String vehicleId) {
-        vehicleRuleCacheService.invalidateVehicleRules(vehicleId);
-    }
-
-    public void invalidateAllCache() {
-        vehicleRuleCacheService.invalidateAllVehicleRules();
-    }
-
-    public void refreshVehicleRules(String vehicleId) {
-        vehicleRuleCacheService.invalidateVehicleRules(vehicleId);
-        vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId); // Re-cache
     }
 }

@@ -37,16 +37,23 @@ public class CacheConfig {
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
 
+        // Alert Rules (long TTL - rarely change)
         cacheConfigs.put("alertRules", defaultConfig.entryTtl(Duration.ofHours(12)));
+        cacheConfigs.put("alertRulesPaged", defaultConfig.entryTtl(Duration.ofHours(6)));
         cacheConfigs.put("vehicleRules", defaultConfig.entryTtl(Duration.ofHours(6)));
+        
+        // Geofences (long TTL - rarely change)
         cacheConfigs.put("geofences", defaultConfig.entryTtl(Duration.ofHours(12)));
+        cacheConfigs.put("geofencesPaged", defaultConfig.entryTtl(Duration.ofHours(6)));
         cacheConfigs.put("vehicleGeofences", defaultConfig.entryTtl(Duration.ofHours(6)));
-
-        cacheConfigs.put("alerts", defaultConfig.entryTtl(Duration.ofMinutes(20)));
-        cacheConfigs.put("vehicleAlerts", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-
-        cacheConfigs.put("alertStats", defaultConfig.entryTtl(Duration.ofMinutes(5)));
-        cacheConfigs.put("geofenceStats", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        
+        // Alerts (medium TTL - change more frequently)
+        cacheConfigs.put("alerts", defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigs.put("vehicleAlerts", defaultConfig.entryTtl(Duration.ofMinutes(15)));
+        
+        // Statistics (short TTL - need fresh data)
+        cacheConfigs.put("alertStats", defaultConfig.entryTtl(Duration.ofMinutes(10)));
+        cacheConfigs.put("geofenceStats", defaultConfig.entryTtl(Duration.ofMinutes(10)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

@@ -2,6 +2,7 @@ package com.jjenus.tracker.alerting.api;
 
 import com.jjenus.tracker.alerting.api.dto.*;
 import com.jjenus.tracker.alerting.application.service.AlertService;
+import com.jjenus.tracker.alerting.application.service.AlertQueryService;
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,11 +24,13 @@ import java.util.Map;
 @Tag(name = "Alerts", description = "Alert management endpoints")
 public class AlertController {
 
-    private final AlertService alertService;
-
-    public AlertController(AlertService alertService) {
-        this.alertService = alertService;
-    }
+  private final AlertService alertService;
+  private final AlertQueryService alertQueryService;
+  
+  public AlertController(AlertService alertService, AlertQueryService alertQueryService) {
+      this.alertService = alertService;
+      this.alertQueryService = alertQueryService;
+  }
 
     // ========== CRUD ENDPOINTS ==========
 
@@ -187,7 +190,7 @@ public class AlertController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startDate) {
 
         Instant start = startDate != null ? startDate : Instant.now().minusSeconds(7 * 24 * 60 * 60); // Default: last 7 days
-        Map<String, Long> stats = alertService.getAlertStatistics(start, Instant.now());
+        Map<String, Long> stats = alertQueryService.getAlertStatistics(start, Instant.now());
         return ResponseEntity.ok(stats);
     }
 

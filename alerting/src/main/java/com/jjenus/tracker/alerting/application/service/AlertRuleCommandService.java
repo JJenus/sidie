@@ -111,7 +111,8 @@ public class AlertRuleCommandService {
 
     // ========== CRUD METHODS ==========
 
-    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
+    @CacheEvict(
+      value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public AlertRuleResponse createRule(CreateAlertRuleRequest request) {
         logger.info("Creating custom alert rule: {}", request.getRuleKey());
 
@@ -267,7 +268,8 @@ public class AlertRuleCommandService {
 
     // ========== BATCH OPERATIONS ==========
 
-    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
+    @CacheEvict(
+      value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public List<AlertRuleResponse> batchCreateRules(List<CreateAlertRuleRequest> requests) {
         logger.info("Batch creating {} alert rules", requests.size());
 
@@ -289,7 +291,8 @@ public class AlertRuleCommandService {
         return responses;
     }
 
-    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
+    @CacheEvict(
+      value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public void batchEnableRules(Set<String> ruleKeys) {
         logger.info("Batch enabling {} alert rules", ruleKeys.size());
 

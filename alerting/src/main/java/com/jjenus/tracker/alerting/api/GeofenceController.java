@@ -1,7 +1,8 @@
 package com.jjenus.tracker.alerting.api;
 
 import com.jjenus.tracker.alerting.api.dto.*;
-import com.jjenus.tracker.alerting.application.service.GeofenceService;
+import com.jjenus.tracker.alerting.application.service.GeofenceQueryService;
+import com.jjenus.tracker.alerting.application.service.GeofenceCommandService;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,22 +21,25 @@ import java.util.stream.Collectors;
 @Tag(name = "Geofences", description = "Geofence management endpoints")
 public class GeofenceController {
 
-    private final GeofenceService geofenceService;
-
-    public GeofenceController(GeofenceService geofenceService) {
-        this.geofenceService = geofenceService;
+    private final GeofenceCommandService geofenceCommandService;
+    private final GeofenceQueryService geofenceQueryService;
+    
+    public GeofenceController(GeofenceCommandService geofenceCommandService, GeofenceQueryService geofenceQueryService) {
+        this.geofenceCommandService = geofenceCommandService;
+        this.geofenceQueryService = geofenceQueryService;
     }
 
     @PostMapping
     @Operation(summary = "Create a new geofence")
     public ResponseEntity<GeofenceResponse> createGeofence(@Valid @RequestBody CreateGeofenceRequest request) {
         Geofence geofence = convertToEntity(request);
-        Geofence created = geofenceService.createGeofence(geofence);
+        Geofence created = geofenceCommandService.createGeofence(geofence);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created));
     }
 
     @GetMapping
-    @Operation(summary = "Search geofences with pagination and filtering")
+    @Operation(
+      summary = "Search geofences with pagination and filtering")
     public ResponseEntity<PagedResponse<GeofenceResponse>> searchGeofences(
             @Parameter(description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
@@ -67,7 +71,7 @@ public class GeofenceController {
         searchRequest.setVehicleId(vehicleId);
         searchRequest.setActive(active);
 
-        return ResponseEntity.ok(geofenceService.searchGeofences(searchRequest));
+        return ResponseEntity.ok(geofenceQueryService.searchGeofences(searchRequest));
     }
 
     @GetMapping("/vehicle/{vehicleId}")
@@ -92,13 +96,13 @@ public class GeofenceController {
         searchRequest.setSortBy(sortBy);
         searchRequest.setSortDirection(sortDirection);
 
-        return ResponseEntity.ok(geofenceService.getVehicleGeofencesPaged(vehicleId, searchRequest));
+        return ResponseEntity.ok(geofenceQueryService.getVehicleGeofencesPaged(vehicleId, searchRequest));
     }
 
     @GetMapping("/vehicle/{vehicleId}/list")
     @Operation(summary = "Get all geofences for a vehicle (without pagination)")
     public ResponseEntity<List<GeofenceResponse>> getVehicleGeofencesList(@PathVariable String vehicleId) {
-        List<Geofence> geofences = geofenceService.getVehicleGeofences(vehicleId);
+        List<Geofence> geofences = geofenceQueryService.getVehicleGeofences(vehicleId);
         return ResponseEntity.ok(geofences.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList()));
@@ -126,13 +130,13 @@ public class GeofenceController {
         searchRequest.setSortBy(sortBy);
         searchRequest.setSortDirection(sortDirection);
 
-        return ResponseEntity.ok(geofenceService.getActiveGeofencesPaged(vehicleId, searchRequest));
+        return ResponseEntity.ok(geofenceQueryService.getActiveGeofencesPaged(vehicleId, searchRequest));
     }
 
     @GetMapping("/vehicle/{vehicleId}/active/list")
     @Operation(summary = "Get active geofences for a vehicle (without pagination)")
     public ResponseEntity<List<GeofenceResponse>> getActiveVehicleGeofencesList(@PathVariable String vehicleId) {
-        List<Geofence> geofences = geofenceService.getActiveGeofences(vehicleId);
+        List<Geofence> geofences = geofenceQueryService.getActiveGeofences(vehicleId);
         return ResponseEntity.ok(geofences.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList()));
@@ -141,7 +145,7 @@ public class GeofenceController {
     @GetMapping("/{geofenceId}")
     @Operation(summary = "Get geofence by ID")
     public ResponseEntity<GeofenceResponse> getGeofenceById(@PathVariable Long geofenceId) {
-        Geofence geofence = geofenceService.getGeofenceById(geofenceId);
+        Geofence geofence = geofenceQueryService.getGeofenceById(geofenceId);
         return ResponseEntity.ok(toResponse(geofence));
     }
 
@@ -151,7 +155,7 @@ public class GeofenceController {
             @PathVariable Long geofenceId,
             @Valid @RequestBody UpdateGeofenceRequest request) {
         Geofence updates = convertToEntity(request);
-        Geofence updated = geofenceService.updateGeofence(geofenceId, updates);
+        Geofence updated = geofenceCommandService.updateGeofence(geofenceId, updates);
         return ResponseEntity.ok(toResponse(updated));
     }
 
@@ -159,7 +163,7 @@ public class GeofenceController {
     @Operation(summary = "Delete a geofence")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteGeofence(@PathVariable Long geofenceId) {
-        geofenceService.deleteGeofence(geofenceId);
+        geofenceCommandService.deleteGeofence(geofenceId);
     }
 
     @PostMapping("/check-violations")
@@ -168,7 +172,7 @@ public class GeofenceController {
             @RequestParam String vehicleId,
             @RequestParam Double latitude,
             @RequestParam Double longitude) {
-        geofenceService.checkGeofenceViolations(vehicleId, latitude, longitude);
+        geofenceCommandService.checkGeofenceViolations(vehicleId, latitude, longitude);
         return ResponseEntity.ok().build();
     }
 

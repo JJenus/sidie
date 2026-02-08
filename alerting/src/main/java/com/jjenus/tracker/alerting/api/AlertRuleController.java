@@ -1,7 +1,8 @@
 package com.jjenus.tracker.alerting.api;
 
 import com.jjenus.tracker.alerting.api.dto.*;
-import com.jjenus.tracker.alerting.application.service.AlertRuleService;
+import com.jjenus.tracker.alerting.application.service.AlertRuleQueryService;
+import com.jjenus.tracker.alerting.application.service.AlertRuleCommandService;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,10 +20,12 @@ import java.util.List;
 @Tag(name = "Alert Rules", description = "Alert rule management endpoints")
 public class AlertRuleController {
 
-    private final AlertRuleService ruleService;
+    private final AlertRuleCommandService ruleCommandService;
+    private final AlertRuleQueryService ruleQueryService;
 
-    public AlertRuleController(AlertRuleService ruleService) {
-        this.ruleService = ruleService;
+    public AlertRuleController(AlertRuleCommandService ruleCommandService, AlertRuleQueryService ruleQueryService) {
+        this.ruleCommandService = ruleCommandService;
+        this.ruleQueryService = ruleQueryService;
     }
 
     // ========== CRUD ENDPOINTS ==========
@@ -31,7 +34,7 @@ public class AlertRuleController {
     @Operation(summary = "Create a new custom alert rule")
     public ResponseEntity<AlertRuleResponse> createRule(@Valid @RequestBody CreateAlertRuleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ruleService.createRule(request));
+                .body(ruleCommandService.createRule(request));
     }
 
     @GetMapping
@@ -67,7 +70,7 @@ public class AlertRuleController {
         searchRequest.setRuleType(ruleType);
         searchRequest.setEnabled(enabled);
 
-        return ResponseEntity.ok(ruleService.getAllRulesPaged(searchRequest));
+        return ResponseEntity.ok(ruleQueryService.getAllRulesPaged(searchRequest));
     }
 
     @GetMapping("/enabled")
@@ -96,25 +99,25 @@ public class AlertRuleController {
         searchRequest.setSearch(search);
         searchRequest.setEnabled(true);
 
-        return ResponseEntity.ok(ruleService.getEnabledRulesPaged(searchRequest));
+        return ResponseEntity.ok(ruleQueryService.getEnabledRulesPaged(searchRequest));
     }
 
     @GetMapping("/list")
     @Operation(summary = "Get all alert rules (without pagination)")
     public ResponseEntity<List<AlertRuleResponse>> getAllRulesList() {
-        return ResponseEntity.ok(ruleService.getAllRules());
+        return ResponseEntity.ok(ruleQueryService.getAllRules());
     }
 
     @GetMapping("/enabled/list")
     @Operation(summary = "Get all enabled alert rules (without pagination)")
     public ResponseEntity<List<AlertRuleResponse>> getEnabledRulesList() {
-        return ResponseEntity.ok(ruleService.getEnabledRules());
+        return ResponseEntity.ok(ruleQueryService.getEnabledRules());
     }
 
     @GetMapping("/{ruleKey}")
     @Operation(summary = "Get alert rule by key")
     public ResponseEntity<AlertRuleResponse> getRuleByKey(@PathVariable String ruleKey) {
-        return ResponseEntity.ok(ruleService.getRuleByKey(ruleKey));
+        return ResponseEntity.ok(ruleQueryService.getRuleByKey(ruleKey));
     }
 
     @PutMapping("/{ruleKey}")
@@ -122,27 +125,27 @@ public class AlertRuleController {
     public ResponseEntity<AlertRuleResponse> updateRule(
             @PathVariable String ruleKey,
             @Valid @RequestBody UpdateAlertRuleRequest request) {
-        return ResponseEntity.ok(ruleService.updateRule(ruleKey, request));
+        return ResponseEntity.ok(ruleCommandService.updateRule(ruleKey, request));
     }
 
     @DeleteMapping("/{ruleKey}")
     @Operation(summary = "Delete an alert rule")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteRule(@PathVariable String ruleKey) {
-        ruleService.deleteRule(ruleKey);
+        ruleCommandService.deleteRule(ruleKey);
     }
 
     @PatchMapping("/{ruleKey}/enable")
     @Operation(summary = "Enable an alert rule")
     public ResponseEntity<Void> enableRule(@PathVariable String ruleKey) {
-        ruleService.enableRule(ruleKey);
+        ruleCommandService.enableRule(ruleKey);
         return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/{ruleKey}/disable")
     @Operation(summary = "Disable an alert rule")
     public ResponseEntity<Void> disableRule(@PathVariable String ruleKey) {
-        ruleService.disableRule(ruleKey);
+        ruleCommandService.disableRule(ruleKey);
         return ResponseEntity.ok().build();
     }
 
@@ -153,7 +156,7 @@ public class AlertRuleController {
     public ResponseEntity<AlertRuleResponse> createOverspeedRule(
             @Valid @RequestBody OverspeedRuleTemplateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ruleService.createOverspeedRule(request));
+                .body(ruleCommandService.createOverspeedRule(request));
     }
 
     @PostMapping("/templates/idle-timeout")
@@ -161,7 +164,7 @@ public class AlertRuleController {
     public ResponseEntity<AlertRuleResponse> createIdleTimeoutRule(
             @Valid @RequestBody IdleTimeoutRuleTemplateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ruleService.createIdleTimeoutRule(request));
+                .body(ruleCommandService.createIdleTimeoutRule(request));
     }
 
     @PostMapping("/templates/geofence")
@@ -169,7 +172,7 @@ public class AlertRuleController {
     public ResponseEntity<AlertRuleResponse> createGeofenceRule(
             @Valid @RequestBody GeofenceRuleTemplateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ruleService.createGeofenceRule(request));
+                .body(ruleCommandService.createGeofenceRule(request));
     }
 
     // ========== BATCH OPERATIONS ==========
@@ -179,13 +182,13 @@ public class AlertRuleController {
     public ResponseEntity<List<AlertRuleResponse>> batchCreateRules(
             @Valid @RequestBody List<CreateAlertRuleRequest> requests) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ruleService.batchCreateRules(requests));
+                .body(ruleCommandService.batchCreateRules(requests));
     }
 
     @PostMapping("/batch/enable")
     @Operation(summary = "Enable multiple alert rules")
     public ResponseEntity<Void> batchEnableRules(@RequestBody List<String> ruleKeys) {
-        ruleService.batchEnableRules(new java.util.HashSet<>(ruleKeys));
+        ruleCommandService.batchEnableRules(new java.util.HashSet<>(ruleKeys));
         return ResponseEntity.ok().build();
     }
 }
