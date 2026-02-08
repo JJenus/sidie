@@ -8,6 +8,10 @@ import com.jjenus.tracker.alerting.exception.AlertException;
 import com.jjenus.tracker.alerting.infrastructure.repository.TrackerAlertRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,17 +32,26 @@ public class AlertService {
     private static final Logger logger = LoggerFactory.getLogger(AlertService.class);
 
     private final TrackerAlertRepository alertRepository;
+    private final AlertQueryService alertQueryService;
 
-    public AlertService(TrackerAlertRepository alertRepository) {
+    public AlertService(TrackerAlertRepository alertRepository, AlertQueryService alertQueryService) {
         this.alertRepository = alertRepository;
+        this.alertQueryService = alertQueryService;
     }
 
     // ========== CRUD OPERATIONS ==========
 
     @Transactional
+    @Caching(
+            evict = {
+                    @CacheEvict(value = "alerts", key = "'active_' + #request.vehicleId"),
+                    @CacheEvict(value = "alerts", key = "'recent_' + #request.vehicleId"),
+                    @CacheEvict(value = "alertStats", allEntries = true)
+            }
+    )
     public AlertResponse createAlert(CreateAlertRequest request) {
         logger.info("Creating alert for vehicle: {}, type: {}",
-                   request.getVehicleId(), request.getAlertType());
+                request.getVehicleId(), request.getAlertType());
 
         TrackerAlert alert = new TrackerAlert();
         alert.setTracker(request.getTrackerId());
@@ -49,7 +62,7 @@ public class AlertService {
 
         if (request.getLatitude() != null && request.getLongitude() != null) {
             alert.setLocation(String.format("%s,%s",
-                request.getLatitude(), request.getLongitude()));
+                    request.getLatitude(), request.getLongitude()));
         }
 
         if (request.getSpeedKmh() != null) {
@@ -71,6 +84,7 @@ public class AlertService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alerts", key = "#alertId", unless = "#result == null")
     public AlertResponse getAlertById(Long alertId) {
         TrackerAlert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> AlertException.alertNotFound(alertId));
@@ -78,6 +92,7 @@ public class AlertService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alertsPaged", key = "'search_' + #searchRequest.hashCode()")
     public PagedResponse<AlertResponse> searchAlerts(AlertSearchRequest searchRequest) {
         Pageable pageable = createPageable(searchRequest);
         Page<TrackerAlert> page = alertRepository.searchAlerts(
@@ -96,6 +111,7 @@ public class AlertService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alerts", key = "'active_' + #vehicleId")
     public List<AlertResponse> getActiveAlerts(String vehicleId) {
         List<TrackerAlert> alerts = alertRepository.findActiveVehicleAlerts(vehicleId);
         return alerts.stream()
@@ -104,30 +120,27 @@ public class AlertService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alertsPaged", key = "'activePaged_' + #page + '_' + #size")
     public PagedResponse<AlertResponse> getActiveAlertsPaged(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "severity", "triggeredAt"));
         Page<TrackerAlert> pageResult = alertRepository.findActiveAlerts(pageable);
         return new PagedResponse<>(pageResult.map(this::toResponse));
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Long> getAlertStatistics(Instant startDate, Instant endDate) {
-        List<Object[]> stats = alertRepository.getAlertTypeStatistics(startDate);
-        return stats.stream()
-                .collect(Collectors.toMap(
-                        obj -> (String) obj[0],
-                        obj -> (Long) obj[1]
-                ));
-    }
-
     // ========== ALERT MANAGEMENT ==========
 
     @Transactional
+    @Caching(
+            put = @CachePut(value = "alerts", key = "#alertId"),
+            evict = {
+                    @CacheEvict(value = "alerts", key = "'active_' + #result.vehicleId"),
+                    @CacheEvict(value = "alertStats", allEntries = true)
+            }
+    )
     public AlertResponse acknowledgeAlert(Long alertId, AcknowledgeAlertRequest request) {
         logger.info("Acknowledging alert: {} by {}", alertId, request.getAcknowledgedBy());
 
-        TrackerAlert alert = alertRepository.findById(alertId)
-                .orElseThrow(() -> AlertException.alertNotFound(alertId));
+        TrackerAlert alert = alertQueryService.getAlertById(alertId);
 
         if (Boolean.TRUE.equals(alert.getAcknowledged())) {
             logger.warn("Alert {} already acknowledged", alertId);
@@ -142,11 +155,17 @@ public class AlertService {
     }
 
     @Transactional
+    @Caching(
+            put = @CachePut(value = "alerts", key = "#alertId"),
+            evict = {
+                    @CacheEvict(value = "alerts", key = "'active_' + #result.vehicleId"),
+                    @CacheEvict(value = "alertStats", allEntries = true)
+            }
+    )
     public AlertResponse resolveAlert(Long alertId, ResolveAlertRequest request) {
         logger.info("Resolving alert: {} by {}", alertId, request.getResolvedBy());
 
-        TrackerAlert alert = alertRepository.findById(alertId)
-                .orElseThrow(() -> AlertException.alertNotFound(alertId));
+        TrackerAlert alert = alertQueryService.getAlertById(alertId);
 
         if (Boolean.TRUE.equals(alert.getResolved())) {
             logger.warn("Alert {} already resolved", alertId);
@@ -161,6 +180,7 @@ public class AlertService {
     }
 
     @Transactional
+    @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
     public void bulkAcknowledgeAlerts(List<Long> alertIds, String acknowledgedBy) {
         logger.info("Bulk acknowledging {} alerts by {}", alertIds.size(), acknowledgedBy);
 
@@ -177,6 +197,7 @@ public class AlertService {
     }
 
     @Transactional
+    @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
     public void bulkResolveAlerts(List<Long> alertIds, String resolvedBy, String resolutionNotes) {
         logger.info("Bulk resolving {} alerts by {}", alertIds.size(), resolvedBy);
 
@@ -193,6 +214,7 @@ public class AlertService {
     }
 
     @Transactional
+    @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
     public void cleanupStaleAlerts(Instant cutoffTime) {
         logger.info("Cleaning up alerts older than {}", cutoffTime);
 
@@ -225,16 +247,6 @@ public class AlertService {
         response.setSeverity(alert.getSeverity());
         response.setMessage(alert.getMessage());
 
-        // Parse location if available
-//        if (alert.getMetadata() != null) {
-//            response.setLatitude(
-//                    Double.parseDouble(String.valueOf(alert.getMetadata().get("latitude")))
-//            );
-//            response.setLongitude(
-//                    Double.parseDouble(String.valueOf(alert.getMetadata().get("longitude")))
-//            );
-//        }
-
         // Extract speed from metadata
         if (alert.getMetadata() != null && alert.getMetadata().containsKey("speedKmh")) {
             response.setSpeedKmh(((Number) alert.getMetadata().get("speedKmh")).floatValue());
@@ -258,16 +270,18 @@ public class AlertService {
     // ========== BUSINESS METHODS ==========
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alertStats", key = "'hasCritical_' + #vehicleId")
     public boolean hasCriticalUnacknowledgedAlerts(String vehicleId) {
         List<TrackerAlert> criticalAlerts = alertRepository.findBySeverityAndAcknowledged(
                 AlertSeverity.CRITICAL, false);
 
         return criticalAlerts.stream()
                 .anyMatch(alert -> vehicleId.equals(alert.getVehicle()) &&
-                                  Boolean.FALSE.equals(alert.getAcknowledged()));
+                        Boolean.FALSE.equals(alert.getAcknowledged()));
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alertStats", key = "'unacknowledgedCounts'")
     public Map<String, Long> getUnacknowledgedCountBySeverity() {
         Map<String, Long> counts = Map.of(
                 "INFO", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.INFO),
@@ -278,8 +292,9 @@ public class AlertService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "alerts", key = "'recent_' + #vehicleId + '_' + #limit")
     public List<AlertResponse> getRecentAlerts(String vehicleId, int limit) {
-        Instant startTime = Instant.now().minusSeconds(24 * 60 * 60); // Last 24 hours
+        Instant startTime = Instant.now().minusSeconds(24 * 60 * 60);
         List<TrackerAlert> alerts = alertRepository.findVehicleAlertsInRange(
                 vehicleId, startTime, Instant.now());
 
@@ -290,9 +305,10 @@ public class AlertService {
     }
 
     @Transactional
+    @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
     public void processAutomatedAlert(String vehicleId, String trackerId,
-                                     AlertType alertType, AlertSeverity severity,
-                                     String message, Map<String, Object> metadata) {
+                                      AlertType alertType, AlertSeverity severity,
+                                      String message, Map<String, Object> metadata) {
 
         CreateAlertRequest request = new CreateAlertRequest();
         request.setVehicleId(vehicleId);
@@ -311,9 +327,35 @@ public class AlertService {
     }
 
     private void notifyCriticalAlert(String vehicleId, AlertType alertType, String message) {
-        // Implementation for critical alert notification
-        // Could send to dashboard, email, SMS, etc.
         logger.warn("CRITICAL ALERT - Vehicle: {}, Type: {}, Message: {}",
-                   vehicleId, alertType, message);
+                vehicleId, alertType, message);
+    }
+
+
+    @Service
+    @Transactional(readOnly = true)
+    public static class AlertQueryService {
+
+        private final TrackerAlertRepository alertRepository;
+
+        public AlertQueryService(TrackerAlertRepository alertRepository) {
+            this.alertRepository = alertRepository;
+        }
+
+        @Cacheable(value = "alerts", key = "#alertId")
+        public TrackerAlert getAlertById(Long alertId) {
+            return alertRepository.findById(alertId)
+                    .orElseThrow(() -> AlertException.alertNotFound(alertId));
+        }
+
+        @Cacheable(value = "alertStats", key = "'statistics_' + #startDate.toString()")
+        public Map<String, Long> getAlertStatistics(Instant startDate, Instant endDate) {
+            List<Object[]> stats = alertRepository.getAlertTypeStatistics(startDate);
+            return stats.stream()
+                    .collect(Collectors.toMap(
+                            obj -> (String) obj[0],
+                            obj -> (Long) obj[1]
+                    ));
+        }
     }
 }

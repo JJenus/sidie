@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public class MaxSpeedRule implements IAlertRule {
@@ -48,6 +49,7 @@ public class MaxSpeedRule implements IAlertRule {
 
             return new AlertDetectedEvent(
                     ruleKey,
+                    AlertType.OVERSPEED,
                     vehicleId,
                     message,
                     severity,

@@ -1,3 +1,241 @@
+=== ./src/main/java/com/jjenus/tracker/alerting/api/AlertController.java ===
+```.java
+package com.jjenus.tracker.alerting.api;
+
+import com.jjenus.tracker.alerting.api.dto.*;
+import com.jjenus.tracker.alerting.application.service.AlertService;
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/alerts")
+@Tag(name = "Alerts", description = "Alert management endpoints")
+public class AlertController {
+
+    private final AlertService alertService;
+
+    public AlertController(AlertService alertService) {
+        this.alertService = alertService;
+    }
+
+    // ========== CRUD ENDPOINTS ==========
+
+    @PostMapping
+    @Operation(summary = "Create a new alert")
+    public ResponseEntity<AlertResponse> createAlert(@Valid @RequestBody CreateAlertRequest request) {
+        AlertResponse response = alertService.createAlert(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/{alertId}")
+    @Operation(summary = "Get alert by ID")
+    public ResponseEntity<AlertResponse> getAlert(@PathVariable Long alertId) {
+        AlertResponse response = alertService.getAlertById(alertId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
+    @Operation(summary = "Search alerts with pagination and filtering")
+    public ResponseEntity<PagedResponse<AlertResponse>> searchAlerts(
+            @Parameter(description = "Page number (0-based)")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size")
+            @RequestParam(defaultValue = "20") int size,
+
+            @Parameter(description = "Sort field")
+            @RequestParam(defaultValue = "triggeredAt") String sortBy,
+
+            @Parameter(description = "Sort direction")
+            @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection,
+
+            @Parameter(description = "Search in message")
+            @RequestParam(required = false) String search,
+
+            @Parameter(description = "Filter by vehicle ID")
+            @RequestParam(required = false) String vehicleId,
+
+            @Parameter(description = "Filter by tracker ID")
+            @RequestParam(required = false) String trackerId,
+
+            @Parameter(description = "Filter by alert type")
+            @RequestParam(required = false) AlertType alertType,
+
+            @Parameter(description = "Filter by severity")
+            @RequestParam(required = false) AlertSeverity severity,
+
+            @Parameter(description = "Filter by acknowledged status")
+            @RequestParam(required = false) Boolean acknowledged,
+
+            @Parameter(description = "Filter by resolved status")
+            @RequestParam(required = false) Boolean resolved,
+
+            @Parameter(description = "Start date (ISO format)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startDate,
+
+            @Parameter(description = "End date (ISO format)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endDate) {
+
+        AlertSearchRequest searchRequest = new AlertSearchRequest();
+        searchRequest.setPage(page);
+        searchRequest.setSize(size);
+        searchRequest.setSortBy(sortBy);
+        searchRequest.setSortDirection(sortDirection);
+        searchRequest.setSearch(search);
+        searchRequest.setVehicleId(vehicleId);
+        searchRequest.setTrackerId(trackerId);
+        searchRequest.setAlertType(alertType);
+        searchRequest.setSeverity(severity);
+        searchRequest.setAcknowledged(acknowledged);
+        searchRequest.setResolved(resolved);
+        searchRequest.setStartDate(startDate);
+        searchRequest.setEndDate(endDate);
+
+        PagedResponse<AlertResponse> response = alertService.searchAlerts(searchRequest);
+        return ResponseEntity.ok(response);
+    }
+
+    // ========== ALERT MANAGEMENT ==========
+
+    @PostMapping("/{alertId}/acknowledge")
+    @Operation(summary = "Acknowledge an alert")
+    public ResponseEntity<AlertResponse> acknowledgeAlert(
+            @PathVariable Long alertId,
+            @Valid @RequestBody AcknowledgeAlertRequest request) {
+        AlertResponse response = alertService.acknowledgeAlert(alertId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{alertId}/resolve")
+    @Operation(summary = "Resolve an alert")
+    public ResponseEntity<AlertResponse> resolveAlert(
+            @PathVariable Long alertId,
+            @Valid @RequestBody ResolveAlertRequest request) {
+        AlertResponse response = alertService.resolveAlert(alertId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/bulk/acknowledge")
+    @Operation(summary = "Bulk acknowledge alerts")
+    public ResponseEntity<Void> bulkAcknowledgeAlerts(
+            @RequestBody List<Long> alertIds,
+            @RequestParam String acknowledgedBy) {
+        alertService.bulkAcknowledgeAlerts(alertIds, acknowledgedBy);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/bulk/resolve")
+    @Operation(summary = "Bulk resolve alerts")
+    public ResponseEntity<Void> bulkResolveAlerts(
+            @RequestBody List<Long> alertIds,
+            @RequestParam String resolvedBy,
+            @RequestParam String resolutionNotes) {
+        alertService.bulkResolveAlerts(alertIds, resolvedBy, resolutionNotes);
+        return ResponseEntity.ok().build();
+    }
+
+    // ========== STATUS ENDPOINTS ==========
+
+    @GetMapping("/active")
+    @Operation(summary = "Get active alerts with pagination")
+    public ResponseEntity<PagedResponse<AlertResponse>> getActiveAlerts(
+            @Parameter(description = "Page number (0-based)")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size")
+            @RequestParam(defaultValue = "20") int size) {
+
+        PagedResponse<AlertResponse> response = alertService.getActiveAlertsPaged(page, size);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/vehicle/{vehicleId}/active")
+    @Operation(summary = "Get active alerts for a vehicle")
+    public ResponseEntity<List<AlertResponse>> getVehicleActiveAlerts(@PathVariable String vehicleId) {
+        List<AlertResponse> response = alertService.getActiveAlerts(vehicleId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/vehicle/{vehicleId}/recent")
+    @Operation(summary = "Get recent alerts for a vehicle")
+    public ResponseEntity<List<AlertResponse>> getVehicleRecentAlerts(
+            @PathVariable String vehicleId,
+            @Parameter(description = "Maximum number of alerts to return")
+            @RequestParam(defaultValue = "10") int limit) {
+
+        List<AlertResponse> response = alertService.getRecentAlerts(vehicleId, limit);
+        return ResponseEntity.ok(response);
+    }
+
+    // ========== STATISTICS ENDPOINTS ==========
+
+    @GetMapping("/stats")
+    @Operation(summary = "Get alert statistics")
+    public ResponseEntity<Map<String, Long>> getAlertStatistics(
+            @Parameter(description = "Start date for statistics (ISO format)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startDate) {
+
+        Instant start = startDate != null ? startDate : Instant.now().minusSeconds(7 * 24 * 60 * 60); // Default: last 7 days
+        Map<String, Long> stats = alertService.getAlertStatistics(start, Instant.now());
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/stats/unacknowledged")
+    @Operation(summary = "Get count of unacknowledged alerts by severity")
+    public ResponseEntity<Map<String, Long>> getUnacknowledgedCounts() {
+        Map<String, Long> counts = alertService.getUnacknowledgedCountBySeverity();
+        return ResponseEntity.ok(counts);
+    }
+
+    @GetMapping("/vehicle/{vehicleId}/has-critical")
+    @Operation(summary = "Check if vehicle has critical unacknowledged alerts")
+    public ResponseEntity<Boolean> hasCriticalUnacknowledgedAlerts(@PathVariable String vehicleId) {
+        boolean hasCritical = alertService.hasCriticalUnacknowledgedAlerts(vehicleId);
+        return ResponseEntity.ok(hasCritical);
+    }
+
+    // ========== MAINTENANCE ENDPOINTS ==========
+
+    @PostMapping("/cleanup")
+    @Operation(summary = "Clean up stale alerts (admin only)")
+    public ResponseEntity<Void> cleanupStaleAlerts(
+            @Parameter(description = "Cutoff time for stale alerts (ISO format)")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant cutoffTime) {
+        alertService.cleanupStaleAlerts(cutoffTime);
+        return ResponseEntity.ok().build();
+    }
+
+    // ========== AUTOMATED ALERT ENDPOINTS ==========
+
+    @PostMapping("/automated")
+    @Operation(summary = "Create an automated alert (for internal use)")
+    public ResponseEntity<AlertResponse> createAutomatedAlert(
+            @RequestParam String vehicleId,
+            @RequestParam String trackerId,
+            @RequestParam AlertType alertType,
+            @RequestParam AlertSeverity severity,
+            @RequestParam String message,
+            @RequestBody(required = false) Map<String, Object> metadata) {
+
+        alertService.processAutomatedAlert(vehicleId, trackerId, alertType, severity, message, metadata);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+}
+```
+
 === ./src/main/java/com/jjenus/tracker/alerting/api/AlertRuleController.java ===
 ```.java
 package com.jjenus.tracker.alerting.api;
@@ -17,7 +255,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/alert-rules")
+@RequestMapping("/alerts/rules")
 @Tag(name = "Alert Rules", description = "Alert rule management endpoints")
 public class AlertRuleController {
 
@@ -192,6 +430,130 @@ public class AlertRuleController {
     }
 }```
 
+=== ./src/main/java/com/jjenus/tracker/alerting/api/dto/AcknowledgeAlertRequest.java ===
+```.java
+package com.jjenus.tracker.alerting.api.dto;
+
+import jakarta.validation.constraints.NotEmpty;
+
+public class AcknowledgeAlertRequest {
+
+    @NotEmpty(message = "Acknowledged by is required")
+    private String acknowledgedBy;
+
+    public String getAcknowledgedBy() { return acknowledgedBy; }
+    public void setAcknowledgedBy(String acknowledgedBy) { this.acknowledgedBy = acknowledgedBy; }
+}
+```
+
+=== ./src/main/java/com/jjenus/tracker/alerting/api/dto/AlertResponse.java ===
+```.java
+package com.jjenus.tracker.alerting.api.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import java.time.Instant;
+import java.util.Map;
+
+public class AlertResponse {
+    private Long alertId;
+    private String trackerId;
+    private String vehicleId;
+    private AlertType alertType;
+    private AlertSeverity severity;
+    private String message;
+    private Double latitude;
+    private Double longitude;
+    private Float speedKmh;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    private Instant triggeredAt;
+
+    private Boolean acknowledged;
+    private String acknowledgedBy;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    private Instant acknowledgedAt;
+
+    private Boolean resolved;
+    private String resolvedBy;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    private Instant resolvedAt;
+
+    private String resolutionNotes;
+    private Map<String, Object> metadata;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    private Instant createdAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    private Instant updatedAt;
+
+    // Getters and Setters
+    public Long getAlertId() { return alertId; }
+    public void setAlertId(Long alertId) { this.alertId = alertId; }
+
+    public String getTrackerId() { return trackerId; }
+    public void setTrackerId(String trackerId) { this.trackerId = trackerId; }
+
+    public String getVehicleId() { return vehicleId; }
+    public void setVehicleId(String vehicleId) { this.vehicleId = vehicleId; }
+
+    public AlertType getAlertType() { return alertType; }
+    public void setAlertType(AlertType alertType) { this.alertType = alertType; }
+
+    public AlertSeverity getSeverity() { return severity; }
+    public void setSeverity(AlertSeverity severity) { this.severity = severity; }
+
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
+
+    public Float getSpeedKmh() { return speedKmh; }
+    public void setSpeedKmh(Float speedKmh) { this.speedKmh = speedKmh; }
+
+    public Instant getTriggeredAt() { return triggeredAt; }
+    public void setTriggeredAt(Instant triggeredAt) { this.triggeredAt = triggeredAt; }
+
+    public Boolean getAcknowledged() { return acknowledged; }
+    public void setAcknowledged(Boolean acknowledged) { this.acknowledged = acknowledged; }
+
+    public String getAcknowledgedBy() { return acknowledgedBy; }
+    public void setAcknowledgedBy(String acknowledgedBy) { this.acknowledgedBy = acknowledgedBy; }
+
+    public Instant getAcknowledgedAt() { return acknowledgedAt; }
+    public void setAcknowledgedAt(Instant acknowledgedAt) { this.acknowledgedAt = acknowledgedAt; }
+
+    public Boolean getResolved() { return resolved; }
+    public void setResolved(Boolean resolved) { this.resolved = resolved; }
+
+    public String getResolvedBy() { return resolvedBy; }
+    public void setResolvedBy(String resolvedBy) { this.resolvedBy = resolvedBy; }
+
+    public Instant getResolvedAt() { return resolvedAt; }
+    public void setResolvedAt(Instant resolvedAt) { this.resolvedAt = resolvedAt; }
+
+    public String getResolutionNotes() { return resolutionNotes; }
+    public void setResolutionNotes(String resolutionNotes) { this.resolutionNotes = resolutionNotes; }
+
+    public Map<String, Object> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
+
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public Instant getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+}
+```
+
 === ./src/main/java/com/jjenus/tracker/alerting/api/dto/AlertRuleResponse.java ===
 ```.java
 package com.jjenus.tracker.alerting.api.dto;
@@ -240,6 +602,134 @@ public class AlertRuleResponse {
     
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+}
+```
+
+=== ./src/main/java/com/jjenus/tracker/alerting/api/dto/AlertSearchRequest.java ===
+```.java
+package com.jjenus.tracker.alerting.api.dto;
+
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import org.springframework.data.domain.Sort;
+import java.time.Instant;
+
+public class AlertSearchRequest {
+    private Integer page = 0;
+    private Integer size = 20;
+    private String sortBy = "triggeredAt";
+    private Sort.Direction sortDirection = Sort.Direction.DESC;
+    private String search;
+    private String vehicleId;
+    private String trackerId;
+    private AlertType alertType;
+    private AlertSeverity severity;
+    private Boolean acknowledged;
+    private Boolean resolved;
+    private Instant startDate;
+    private Instant endDate;
+
+    // Getters and Setters
+    public Integer getPage() { return page; }
+    public void setPage(Integer page) { this.page = page; }
+
+    public Integer getSize() { return size; }
+    public void setSize(Integer size) { this.size = size; }
+
+    public String getSortBy() { return sortBy; }
+    public void setSortBy(String sortBy) { this.sortBy = sortBy; }
+
+    public Sort.Direction getSortDirection() { return sortDirection; }
+    public void setSortDirection(Sort.Direction sortDirection) { this.sortDirection = sortDirection; }
+
+    public String getSearch() { return search; }
+    public void setSearch(String search) { this.search = search; }
+
+    public String getVehicleId() { return vehicleId; }
+    public void setVehicleId(String vehicleId) { this.vehicleId = vehicleId; }
+
+    public String getTrackerId() { return trackerId; }
+    public void setTrackerId(String trackerId) { this.trackerId = trackerId; }
+
+    public AlertType getAlertType() { return alertType; }
+    public void setAlertType(AlertType alertType) { this.alertType = alertType; }
+
+    public AlertSeverity getSeverity() { return severity; }
+    public void setSeverity(AlertSeverity severity) { this.severity = severity; }
+
+    public Boolean getAcknowledged() { return acknowledged; }
+    public void setAcknowledged(Boolean acknowledged) { this.acknowledged = acknowledged; }
+
+    public Boolean getResolved() { return resolved; }
+    public void setResolved(Boolean resolved) { this.resolved = resolved; }
+
+    public Instant getStartDate() { return startDate; }
+    public void setStartDate(Instant startDate) { this.startDate = startDate; }
+
+    public Instant getEndDate() { return endDate; }
+    public void setEndDate(Instant endDate) { this.endDate = endDate; }
+}
+```
+
+=== ./src/main/java/com/jjenus/tracker/alerting/api/dto/CreateAlertRequest.java ===
+```.java
+package com.jjenus.tracker.alerting.api.dto;
+
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import java.util.Map;
+
+public class CreateAlertRequest {
+
+    @NotEmpty(message = "Vehicle ID is required")
+    private String vehicleId;
+
+    @NotEmpty(message = "Tracker ID is required")
+    private String trackerId;
+
+    @NotNull(message = "Alert type is required")
+    private AlertType alertType;
+
+    @NotNull(message = "Severity is required")
+    private AlertSeverity severity;
+
+    @NotEmpty(message = "Message is required")
+    private String message;
+
+    private Double latitude;
+    private Double longitude;
+    private Float speedKmh;
+    private Map<String, Object> metadata;
+
+    // Getters and Setters
+    public String getVehicleId() { return vehicleId; }
+    public void setVehicleId(String vehicleId) { this.vehicleId = vehicleId; }
+
+    public String getTrackerId() { return trackerId; }
+    public void setTrackerId(String trackerId) { this.trackerId = trackerId; }
+
+    public AlertType getAlertType() { return alertType; }
+    public void setAlertType(AlertType alertType) { this.alertType = alertType; }
+
+    public AlertSeverity getSeverity() { return severity; }
+    public void setSeverity(AlertSeverity severity) { this.severity = severity; }
+
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
+
+    public Float getSpeedKmh() { return speedKmh; }
+    public void setSpeedKmh(Float speedKmh) { this.speedKmh = speedKmh; }
+
+    public Map<String, Object> getMetadata() { return metadata; }
+    public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
 }
 ```
 
@@ -779,6 +1269,30 @@ public class PagedResponse<T> {
     public void setEmpty(boolean empty) { this.empty = empty; }
 }```
 
+=== ./src/main/java/com/jjenus/tracker/alerting/api/dto/ResolveAlertRequest.java ===
+```.java
+package com.jjenus.tracker.alerting.api.dto;
+
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+
+public class ResolveAlertRequest {
+
+    @NotEmpty(message = "Resolved by is required")
+    private String resolvedBy;
+
+    @NotEmpty(message = "Resolution notes are required")
+    @Size(min = 10, max = 1000, message = "Resolution notes must be between 10 and 1000 characters")
+    private String resolutionNotes;
+
+    public String getResolvedBy() { return resolvedBy; }
+    public void setResolvedBy(String resolvedBy) { this.resolvedBy = resolvedBy; }
+
+    public String getResolutionNotes() { return resolutionNotes; }
+    public void setResolutionNotes(String resolutionNotes) { this.resolutionNotes = resolutionNotes; }
+}
+```
+
 === ./src/main/java/com/jjenus/tracker/alerting/api/dto/SearchRequest.java ===
 ```.java
 package com.jjenus.tracker.alerting.api.dto;
@@ -933,7 +1447,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/geofences")
+@RequestMapping("/alerts/geofences")
 @Tag(name = "Geofences", description = "Geofence management endpoints")
 public class GeofenceController {
 
@@ -1220,7 +1734,7 @@ public class AlertingEngine {
         for (AlertRule rule : vehicleRules) {
             try {
                 IAlertRule domainRule = convertToDomainRule(rule);
-                AlertEvent alert = evaluationService.evaluateRule(domainRule, vehicleId, newLocation);
+                AlertDetectedEvent alert = evaluationService.evaluateRule(domainRule, vehicleId, newLocation);
 
                 if (alert != null) {
                     logger.info("Alert triggered: {} for vehicle {}",
@@ -1238,7 +1752,7 @@ public class AlertingEngine {
     private IAlertRule convertToDomainRule(AlertRule entityRule) {
         return new IAlertRule() {
             @Override
-            public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+            public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
                 return evaluationService.evaluateRule(this, vehicleId, newLocation);
             }
 
@@ -1273,6 +1787,111 @@ public class AlertingEngine {
         vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId); // Re-cache
     }
 }```
+
+=== ./src/main/java/com/jjenus/tracker/alerting/application/event/AlertCreationEventHandler.java ===
+```.java
+package com.jjenus.tracker.alerting.application.event;
+
+import com.jjenus.tracker.alerting.application.service.AlertService;
+import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Component
+public class AlertCreationEventHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(AlertCreationEventHandler.class);
+
+    private final AlertService alertService;
+
+    public AlertCreationEventHandler(AlertService alertService) {
+        this.alertService = alertService;
+    }
+
+    @JmsListener(
+            destination = "tracking.events.alertevent",
+            containerFactory = "topicJmsListenerContainerFactory"
+    )
+    public void handleAlertEvent(@Payload AlertDetectedEvent event) {
+        try {
+            logger.info("Processing alert event: {} for vehicle {}",
+                       event.getRuleKey(), event.getVehicleId());
+
+            // Map rule key to alert type
+            AlertType alertType = mapRuleKeyToAlertType(event.getRuleKey());
+
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("ruleKey", event.getRuleKey());
+            metadata.put("alertTimestamp", event.getAlertTimestamp());
+
+            if (event.getLocation() != null) {
+                metadata.put("latitude", event.getLocation().latitude());
+                metadata.put("longitude", event.getLocation().longitude());
+                metadata.put("speedKmh", event.getLocation().speedKmh());
+            }
+
+            // Create the alert
+            alertService.processAutomatedAlert(
+                event.getVehicleId(),
+                "system", // trackerId - could be extracted from event if available
+                alertType,
+                event.getSeverity(),
+                event.getMessage(),
+                metadata
+            );
+
+            logger.debug("Alert created from event: {}", event.getRuleKey());
+
+        } catch (Exception e) {
+            logger.error("Failed to process alert event: {}", event.getRuleKey(), e);
+        }
+    }
+
+    private AlertType mapRuleKeyToAlertType(String ruleKey) {
+        if (ruleKey == null) {
+            return AlertType.UNKNOWN;
+        }
+
+        // Map common rule patterns to alert types
+        if (ruleKey.contains("speed") || ruleKey.contains("overspeed")) {
+            return AlertType.OVERSPEED;
+        } else if (ruleKey.contains("idle") || ruleKey.contains("timeout")) {
+            return AlertType.IDLE_TIMEOUT;
+        } else if (ruleKey.contains("geofence") || ruleKey.contains("fence")) {
+            return AlertType.GEOFENCE_VIOLATION;
+        } else if (ruleKey.contains("battery")) {
+            return AlertType.LOW_BATTERY;
+        } else if (ruleKey.contains("disconnect")) {
+            return AlertType.DEVICE_DISCONNECTED;
+        } else if (ruleKey.contains("tamper")) {
+            return AlertType.TAMPER_DETECTED;
+        } else if (ruleKey.contains("panic")) {
+            return AlertType.PANIC_BUTTON_PRESSED;
+        }
+
+        return AlertType.UNKNOWN;
+    }
+
+    // Additional event handlers for other alert-related events
+    @JmsListener(
+            destination = "tracking.events.vehicleupdatedevent",
+            containerFactory = "topicJmsListenerContainerFactory"
+    )
+    public void handleVehicleUpdateForAlertCheck(@Payload com.jjenus.tracker.shared.events.VehicleUpdatedEvent event) {
+        // This could trigger additional alert checks based on vehicle updates
+        // For example, check for no-movement alerts, etc.
+        logger.debug("Vehicle update received for alert checking: {}", event.getVehicleId());
+    }
+}
+```
 
 === ./src/main/java/com/jjenus/tracker/alerting/application/event/AlertEventHandler.java ===
 ```.java
@@ -1383,7 +2002,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class AlertRuleEvaluationService {
 
-    public AlertEvent evaluateRule(IAlertRule rule, String vehicleId, LocationPoint location) {
+    public AlertDetectedEvent evaluateRule(IAlertRule rule, String vehicleId, LocationPoint location) {
         // Handle null parameters
         if (rule == null || vehicleId == null || location == null) {
             return null;
@@ -2186,6 +2805,329 @@ public class AlertRuleService {
     }
 }```
 
+=== ./src/main/java/com/jjenus/tracker/alerting/application/service/AlertService.java ===
+```.java
+package com.jjenus.tracker.alerting.application.service;
+
+import com.jjenus.tracker.alerting.api.dto.*;
+import com.jjenus.tracker.alerting.domain.entity.TrackerAlert;
+import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import com.jjenus.tracker.alerting.exception.AlertException;
+import com.jjenus.tracker.alerting.infrastructure.repository.TrackerAlertRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional
+public class AlertService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AlertService.class);
+
+    private final TrackerAlertRepository alertRepository;
+
+    public AlertService(TrackerAlertRepository alertRepository) {
+        this.alertRepository = alertRepository;
+    }
+
+    // ========== CRUD OPERATIONS ==========
+
+    @Transactional
+    public AlertResponse createAlert(CreateAlertRequest request) {
+        logger.info("Creating alert for vehicle: {}, type: {}",
+                   request.getVehicleId(), request.getAlertType());
+
+        TrackerAlert alert = new TrackerAlert();
+        alert.setTracker(request.getTrackerId());
+        alert.setVehicle(request.getVehicleId());
+        alert.setAlertType(request.getAlertType());
+        alert.setSeverity(request.getSeverity());
+        alert.setMessage(request.getMessage());
+
+        if (request.getLatitude() != null && request.getLongitude() != null) {
+            alert.setLocation(String.format("%s,%s",
+                request.getLatitude(), request.getLongitude()));
+        }
+
+        if (request.getSpeedKmh() != null) {
+            alert.addMetadata("speedKmh", request.getSpeedKmh());
+        }
+
+        if (request.getMetadata() != null) {
+            request.getMetadata().forEach(alert::addMetadata);
+        }
+
+        alert.setTriggeredAt(Instant.now());
+        alert.setAcknowledged(false);
+        alert.setResolved(false);
+
+        TrackerAlert saved = alertRepository.save(alert);
+        logger.info("Alert created with ID: {}", saved.getAlertId());
+
+        return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public AlertResponse getAlertById(Long alertId) {
+        TrackerAlert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> AlertException.alertNotFound(alertId));
+        return toResponse(alert);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<AlertResponse> searchAlerts(AlertSearchRequest searchRequest) {
+        Pageable pageable = createPageable(searchRequest);
+        Page<TrackerAlert> page = alertRepository.searchAlerts(
+                searchRequest.getVehicleId(),
+                searchRequest.getTrackerId(),
+                searchRequest.getAlertType() != null ? searchRequest.getAlertType().name() : null,
+                searchRequest.getSeverity(),
+                searchRequest.getAcknowledged(),
+                searchRequest.getResolved(),
+                searchRequest.getStartDate(),
+                searchRequest.getEndDate(),
+                searchRequest.getSearch(),
+                pageable);
+
+        return new PagedResponse<>(page.map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public List<AlertResponse> getActiveAlerts(String vehicleId) {
+        List<TrackerAlert> alerts = alertRepository.findActiveVehicleAlerts(vehicleId);
+        return alerts.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<AlertResponse> getActiveAlertsPaged(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "severity", "triggeredAt"));
+        Page<TrackerAlert> pageResult = alertRepository.findActiveAlerts(pageable);
+        return new PagedResponse<>(pageResult.map(this::toResponse));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getAlertStatistics(Instant startDate, Instant endDate) {
+        List<Object[]> stats = alertRepository.getAlertTypeStatistics(startDate);
+        return stats.stream()
+                .collect(Collectors.toMap(
+                        obj -> (String) obj[0],
+                        obj -> (Long) obj[1]
+                ));
+    }
+
+    // ========== ALERT MANAGEMENT ==========
+
+    @Transactional
+    public AlertResponse acknowledgeAlert(Long alertId, AcknowledgeAlertRequest request) {
+        logger.info("Acknowledging alert: {} by {}", alertId, request.getAcknowledgedBy());
+
+        TrackerAlert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> AlertException.alertNotFound(alertId));
+
+        if (Boolean.TRUE.equals(alert.getAcknowledged())) {
+            logger.warn("Alert {} already acknowledged", alertId);
+            return toResponse(alert);
+        }
+
+        alert.acknowledge(request.getAcknowledgedBy());
+        TrackerAlert updated = alertRepository.save(alert);
+
+        logger.info("Alert {} acknowledged successfully", alertId);
+        return toResponse(updated);
+    }
+
+    @Transactional
+    public AlertResponse resolveAlert(Long alertId, ResolveAlertRequest request) {
+        logger.info("Resolving alert: {} by {}", alertId, request.getResolvedBy());
+
+        TrackerAlert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> AlertException.alertNotFound(alertId));
+
+        if (Boolean.TRUE.equals(alert.getResolved())) {
+            logger.warn("Alert {} already resolved", alertId);
+            return toResponse(alert);
+        }
+
+        alert.resolve(request.getResolvedBy(), request.getResolutionNotes());
+        TrackerAlert updated = alertRepository.save(alert);
+
+        logger.info("Alert {} resolved successfully", alertId);
+        return toResponse(updated);
+    }
+
+    @Transactional
+    public void bulkAcknowledgeAlerts(List<Long> alertIds, String acknowledgedBy) {
+        logger.info("Bulk acknowledging {} alerts by {}", alertIds.size(), acknowledgedBy);
+
+        List<TrackerAlert> alerts = alertRepository.findAllById(alertIds);
+
+        for (TrackerAlert alert : alerts) {
+            if (!Boolean.TRUE.equals(alert.getAcknowledged())) {
+                alert.acknowledge(acknowledgedBy);
+            }
+        }
+
+        alertRepository.saveAll(alerts);
+        logger.info("Bulk acknowledged {} alerts", alerts.size());
+    }
+
+    @Transactional
+    public void bulkResolveAlerts(List<Long> alertIds, String resolvedBy, String resolutionNotes) {
+        logger.info("Bulk resolving {} alerts by {}", alertIds.size(), resolvedBy);
+
+        List<TrackerAlert> alerts = alertRepository.findAllById(alertIds);
+
+        for (TrackerAlert alert : alerts) {
+            if (!Boolean.TRUE.equals(alert.getResolved())) {
+                alert.resolve(resolvedBy, resolutionNotes);
+            }
+        }
+
+        alertRepository.saveAll(alerts);
+        logger.info("Bulk resolved {} alerts", alerts.size());
+    }
+
+    @Transactional
+    public void cleanupStaleAlerts(Instant cutoffTime) {
+        logger.info("Cleaning up alerts older than {}", cutoffTime);
+
+        List<TrackerAlert> staleAlerts = alertRepository.findStaleAlerts(cutoffTime);
+        int staleCount = staleAlerts.size();
+
+        for (TrackerAlert alert : staleAlerts) {
+            if (!Boolean.TRUE.equals(alert.getResolved())) {
+                alert.resolve("system", "Auto-resolved due to staleness");
+            }
+        }
+
+        alertRepository.saveAll(staleAlerts);
+        logger.info("Auto-resolved {} stale alerts", staleCount);
+    }
+
+    // ========== HELPER METHODS ==========
+
+    private Pageable createPageable(AlertSearchRequest searchRequest) {
+        Sort sort = Sort.by(searchRequest.getSortDirection(), searchRequest.getSortBy());
+        return PageRequest.of(searchRequest.getPage(), searchRequest.getSize(), sort);
+    }
+
+    private AlertResponse toResponse(TrackerAlert alert) {
+        AlertResponse response = new AlertResponse();
+        response.setAlertId(alert.getAlertId());
+        response.setTrackerId(alert.getTracker());
+        response.setVehicleId(alert.getVehicle());
+        response.setAlertType(alert.getAlertType());
+        response.setSeverity(alert.getSeverity());
+        response.setMessage(alert.getMessage());
+
+        // Parse location if available
+//        if (alert.getMetadata() != null) {
+//            response.setLatitude(
+//                    Double.parseDouble(String.valueOf(alert.getMetadata().get("latitude")))
+//            );
+//            response.setLongitude(
+//                    Double.parseDouble(String.valueOf(alert.getMetadata().get("longitude")))
+//            );
+//        }
+
+        // Extract speed from metadata
+        if (alert.getMetadata() != null && alert.getMetadata().containsKey("speedKmh")) {
+            response.setSpeedKmh(((Number) alert.getMetadata().get("speedKmh")).floatValue());
+        }
+
+        response.setTriggeredAt(alert.getTriggeredAt());
+        response.setAcknowledged(alert.getAcknowledged());
+        response.setAcknowledgedBy(alert.getAcknowledgedBy());
+        response.setAcknowledgedAt(alert.getAcknowledgedAt());
+        response.setResolved(alert.getResolved());
+        response.setResolvedBy(alert.getResolvedBy());
+        response.setResolvedAt(alert.getResolvedAt());
+        response.setResolutionNotes(alert.getResolutionNotes());
+        response.setMetadata(alert.getMetadata());
+        response.setCreatedAt(alert.getCreatedAt());
+        response.setUpdatedAt(alert.getUpdatedAt());
+
+        return response;
+    }
+
+    // ========== BUSINESS METHODS ==========
+
+    @Transactional(readOnly = true)
+    public boolean hasCriticalUnacknowledgedAlerts(String vehicleId) {
+        List<TrackerAlert> criticalAlerts = alertRepository.findBySeverityAndAcknowledged(
+                AlertSeverity.CRITICAL, false);
+
+        return criticalAlerts.stream()
+                .anyMatch(alert -> vehicleId.equals(alert.getVehicle()) &&
+                                  Boolean.FALSE.equals(alert.getAcknowledged()));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getUnacknowledgedCountBySeverity() {
+        Map<String, Long> counts = Map.of(
+                "INFO", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.INFO),
+                "WARNING", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.WARNING),
+                "CRITICAL", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.CRITICAL)
+        );
+        return counts;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AlertResponse> getRecentAlerts(String vehicleId, int limit) {
+        Instant startTime = Instant.now().minusSeconds(24 * 60 * 60); // Last 24 hours
+        List<TrackerAlert> alerts = alertRepository.findVehicleAlertsInRange(
+                vehicleId, startTime, Instant.now());
+
+        return alerts.stream()
+                .limit(limit)
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void processAutomatedAlert(String vehicleId, String trackerId,
+                                     AlertType alertType, AlertSeverity severity,
+                                     String message, Map<String, Object> metadata) {
+
+        CreateAlertRequest request = new CreateAlertRequest();
+        request.setVehicleId(vehicleId);
+        request.setTrackerId(trackerId);
+        request.setAlertType(alertType);
+        request.setSeverity(severity);
+        request.setMessage(message);
+        request.setMetadata(metadata);
+
+        createAlert(request);
+
+        // Notify relevant systems about critical alerts
+        if (severity == AlertSeverity.CRITICAL) {
+            notifyCriticalAlert(vehicleId, alertType, message);
+        }
+    }
+
+    private void notifyCriticalAlert(String vehicleId, AlertType alertType, String message) {
+        // Implementation for critical alert notification
+        // Could send to dashboard, email, SMS, etc.
+        logger.warn("CRITICAL ALERT - Vehicle: {}, Type: {}, Message: {}",
+                   vehicleId, alertType, message);
+    }
+}
+```
+
 === ./src/main/java/com/jjenus/tracker/alerting/application/service/GeofenceRuleValidator.java ===
 ```.java
 package com.jjenus.tracker.alerting.application.service;
@@ -2619,7 +3561,7 @@ public class GeofenceService {
     }
 }```
 
-=== ./src/main/java/com/jjenus/tracker/alerting/domain/AlertEvent.java ===
+=== ./src/main/java/com/jjenus/tracker/alerting/domain/AlertDetectedEvent.java ===
 ```.java
 package com.jjenus.tracker.alerting.domain;
 
@@ -2628,7 +3570,7 @@ import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 import java.time.Instant;
 
-public class AlertEvent extends DomainEvent {
+public class AlertDetectedEvent extends DomainEvent {
     private final String ruleKey;
     private final String vehicleId;
     private final String message;
@@ -2636,8 +3578,8 @@ public class AlertEvent extends DomainEvent {
     private final Instant alertTimestamp;
     private final LocationPoint location;
     
-    public AlertEvent(String ruleKey, String vehicleId, String message,
-                      AlertSeverity severity, LocationPoint location) {
+    public AlertDetectedEvent(String ruleKey, String vehicleId, String message,
+                              AlertSeverity severity, LocationPoint location) {
         this.ruleKey = ruleKey;
         this.vehicleId = vehicleId;
         this.message = message;
@@ -3031,6 +3973,7 @@ public class GeofencePoint {
 package com.jjenus.tracker.alerting.domain.entity;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -3053,9 +3996,10 @@ public class TrackerAlert {
     
     @Column(name = "vehicle_id")
     private String vehicleId;
-    
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "alert_type", length = 50, nullable = false)
-    private String alertType;
+    private AlertType alertType;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "severity", length = 20)
@@ -3141,10 +4085,35 @@ public class TrackerAlert {
     
     public String getVehicle() { return vehicleId; }
     public void setVehicle(String vehicleId) { this.vehicleId = vehicleId; }
-    
-    public String getAlertType() { return alertType; }
-    public void setAlertType(String alertType) { this.alertType = alertType; }
-    
+
+    public String getTrackerId() {
+        return trackerId;
+    }
+
+    public void setTrackerId(String trackerId) {
+        this.trackerId = trackerId;
+    }
+
+    public String getVehicleId() {
+        return vehicleId;
+    }
+
+    public void setVehicleId(String vehicleId) {
+        this.vehicleId = vehicleId;
+    }
+
+    public AlertType getAlertType() {
+        return alertType;
+    }
+
+    public void setAlertType(AlertType alertType) {
+        this.alertType = alertType;
+    }
+
+    public void setLocationId(String locationId) {
+        this.locationId = locationId;
+    }
+
     public AlertSeverity getSeverity() { return severity; }
     public void setSeverity(AlertSeverity severity) { this.severity = severity; }
     
@@ -3252,7 +4221,9 @@ public enum AlertType {
     // Business rules
     ROUTE_DEVIATION("Route deviation"),
     UNAUTHORIZED_AREA("Entered unauthorized area"),
-    HIJACKING_SUSPECTED("Possible hijacking");
+    HIJACKING_SUSPECTED("Possible hijacking"),
+
+    UNKNOWN("Unknowm alert");
     
     private final String description;
     
@@ -3510,7 +4481,7 @@ public class GenericAlertRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         // Custom rule evaluation logic based on parameters
         // Could be implemented using scripting engine or rule engine
         return null; // Override in specific implementations
@@ -3564,11 +4535,11 @@ public class GeofenceExitRule implements IAlertRule {
     }
     
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled) return null;
         
         boolean isInside = isPointInPolygon(newLocation);
-        AlertEvent alert = null;
+        AlertDetectedEvent alert = null;
         
         if (wasInside && !isInside) {
             String message = String.format(
@@ -3577,7 +4548,7 @@ public class GeofenceExitRule implements IAlertRule {
                 geofenceId
             );
             
-            alert = new AlertEvent(
+            alert = new AlertDetectedEvent(
                 ruleKey,
                 vehicleId,
                 message,
@@ -3660,13 +4631,13 @@ public class GeofenceRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled || boundaryPoints == null || boundaryPoints.size() < 3) {
             return null;
         }
 
         boolean isInside = isPointInPolygon(newLocation);
-        AlertEvent alert = null;
+        AlertDetectedEvent alert = null;
 
         // Check based on action type
         switch (action) {
@@ -3695,8 +4666,8 @@ public class GeofenceRule implements IAlertRule {
         return alert;
     }
 
-    private AlertEvent createAlert(String vehicleId, LocationPoint location,
-                                   String actionStr, AlertSeverity severity) {
+    private AlertDetectedEvent createAlert(String vehicleId, LocationPoint location,
+                                           String actionStr, AlertSeverity severity) {
         String message = String.format(
                 "Vehicle %s %s geofence %s at %s",
                 vehicleId,
@@ -3705,7 +4676,7 @@ public class GeofenceRule implements IAlertRule {
                 formatCoordinates(location.latitude(), location.longitude())
         );
 
-        return new AlertEvent(
+        return new AlertDetectedEvent(
                 ruleKey,
                 vehicleId,
                 message,
@@ -3764,7 +4735,7 @@ package com.jjenus.tracker.alerting.domain;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 
 public interface IAlertRule {
-    AlertEvent evaluate(String vehicleId, LocationPoint newLocation);
+    AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation);
     String getRuleKey();
     String getRuleName();
     boolean isEnabled();
@@ -3801,7 +4772,7 @@ public class IdleTimeRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled) return null;
 
         Instant now = Instant.now();
@@ -3830,7 +4801,7 @@ public class IdleTimeRule implements IAlertRule {
                     formatCoordinates(newLocation.latitude(), newLocation.longitude())
             );
 
-            return new AlertEvent(
+            return new AlertDetectedEvent(
                     ruleKey,
                     vehicleId,
                     message,
@@ -3894,7 +4865,7 @@ public class MaxSpeedRule implements IAlertRule {
     }
 
     @Override
-    public AlertEvent evaluate(String vehicleId, LocationPoint newLocation) {
+    public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled || vehicleId == null || newLocation == null) {
             return null;
         }
@@ -3913,7 +4884,7 @@ public class MaxSpeedRule implements IAlertRule {
             AlertSeverity severity = speed > thresholdSpeed * 1.5 ?
                     AlertSeverity.CRITICAL : AlertSeverity.WARNING;
 
-            return new AlertEvent(
+            return new AlertDetectedEvent(
                     ruleKey,
                     vehicleId,
                     message,
@@ -3995,6 +4966,176 @@ public class AlertException extends BusinessRuleException {
             "ALERT_EVALUATION_ERROR",
             String.format("Error evaluating rule '%s': %s", ruleKey, detail)
         );
+    }
+
+    public static AlertException alertNotFound(Long alertId) {
+        return new AlertException(
+                "ALERT_NOT_FOUND_ERROR",
+                String.format("Error alert '%s' not found", alertId)
+        );
+    }
+}
+```
+
+=== ./src/main/java/com/jjenus/tracker/alerting/infrastructure/cache/AlertCacheService.java ===
+```.java
+package com.jjenus.tracker.alerting.infrastructure.cache;
+
+import com.jjenus.tracker.alerting.domain.entity.TrackerAlert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+@Service
+public class AlertCacheService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AlertCacheService.class);
+
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisKeyGenerator keyGenerator;
+
+    public AlertCacheService(
+            RedisTemplate<String, Object> redisTemplate,
+            RedisKeyGenerator keyGenerator) {
+        this.redisTemplate = redisTemplate;
+        this.keyGenerator = keyGenerator;
+    }
+
+    // Cache individual alerts
+    public void cacheAlert(TrackerAlert alert) {
+        try {
+            String cacheKey = keyGenerator.getAlertDetailKey(alert.getAlertId());
+            redisTemplate.opsForValue().set(
+                    cacheKey,
+                    alert,
+                    1, // 1 hour TTL for individual alerts
+                    TimeUnit.HOURS
+            );
+        } catch (Exception e) {
+            logger.error("Failed to cache alert: {}", alert.getAlertId(), e);
+        }
+    }
+
+    public Optional<TrackerAlert> getAlertById(Long alertId) {
+        try {
+            String cacheKey = keyGenerator.getAlertDetailKey(alertId);
+            TrackerAlert alert = (TrackerAlert) redisTemplate.opsForValue().get(cacheKey);
+            return Optional.ofNullable(alert);
+        } catch (Exception e) {
+            logger.error("Failed to get alert from cache: {}", alertId, e);
+            return Optional.empty();
+        }
+    }
+
+    // Cache active alerts for vehicle
+    public void cacheActiveVehicleAlerts(String vehicleId, List<TrackerAlert> alerts) {
+        try {
+            String cacheKey = keyGenerator.getActiveVehicleAlertsKey(vehicleId);
+            redisTemplate.delete(cacheKey);
+
+            if (!alerts.isEmpty()) {
+                redisTemplate.opsForList().rightPushAll(cacheKey, alerts.toArray());
+                redisTemplate.expire(cacheKey, 30, TimeUnit.MINUTES); // 30 minute TTL
+            }
+        } catch (Exception e) {
+            logger.error("Failed to cache active alerts for vehicle: {}", vehicleId, e);
+        }
+    }
+
+    public List<TrackerAlert> getActiveVehicleAlerts(String vehicleId) {
+        try {
+            String cacheKey = keyGenerator.getActiveVehicleAlertsKey(vehicleId);
+            List<Object> cached = redisTemplate.opsForList().range(cacheKey, 0, -1);
+
+            if (cached != null && !cached.isEmpty()) {
+                return cached.stream()
+                        .map(obj -> (TrackerAlert) obj)
+                        .collect(Collectors.toList());
+            }
+            return null; // Cache miss
+        } catch (Exception e) {
+            logger.error("Failed to get active alerts from cache: {}", vehicleId, e);
+            return null;
+        }
+    }
+
+    // Cache statistics
+    public void cacheAlertStatistics(String key, Object statistics) {
+        try {
+            redisTemplate.opsForValue().set(
+                    keyGenerator.getAlertStatisticsKey(key),
+                    statistics,
+                    5, // 5 minutes TTL for statistics
+                    TimeUnit.MINUTES
+            );
+        } catch (Exception e) {
+            logger.error("Failed to cache alert statistics: {}", key, e);
+        }
+    }
+
+    public Optional<Object> getAlertStatistics(String key) {
+        try {
+            Object stats = redisTemplate.opsForValue()
+                    .get(keyGenerator.getAlertStatisticsKey(key));
+            return Optional.ofNullable(stats);
+        } catch (Exception e) {
+            logger.error("Failed to get alert statistics from cache: {}", key, e);
+            return Optional.empty();
+        }
+    }
+
+    // Invalidation methods
+    public void invalidateAlert(Long alertId) {
+        try {
+            String detailKey = keyGenerator.getAlertDetailKey(alertId);
+            redisTemplate.delete(detailKey);
+
+            // Also invalidate any lists that might contain this alert
+            // This is simpler than trying to remove from lists
+        } catch (Exception e) {
+            logger.error("Failed to invalidate alert cache: {}", alertId, e);
+        }
+    }
+
+    public void invalidateVehicleAlerts(String vehicleId) {
+        try {
+            String activeKey = keyGenerator.getActiveVehicleAlertsKey(vehicleId);
+            String recentKey = keyGenerator.getRecentVehicleAlertsKey(vehicleId);
+            redisTemplate.delete(activeKey, recentKey);
+        } catch (Exception e) {
+            logger.error("Failed to invalidate vehicle alert cache: {}", vehicleId, e);
+        }
+    }
+
+    public void invalidateStatistics() {
+        try {
+            String pattern = keyGenerator.getAlertStatisticsPattern();
+            var keys = redisTemplate.keys(pattern);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to invalidate statistics cache", e);
+        }
+    }
+
+    // Clear all alert cache
+    public void clearAll() {
+        try {
+            String pattern = keyGenerator.getAllAlertKeysPattern();
+            var keys = redisTemplate.keys(pattern);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to clear alert cache", e);
+        }
     }
 }
 ```
@@ -4360,176 +5501,43 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisKeyGenerator {
 
-    // ========== CACHE NAMESPACING & VERSIONING ==========
-    public static final String CACHE_NAMESPACE = "tracker:alerting:";
-    public static final String CACHE_VERSION = "v1:";
+    // ... existing code ...
 
-    // ========== ALERT RULE KEYS ==========
-    private static final String RULES_PREFIX = "rules:";
-    public static final String VEHICLE_RULES_KEY_PREFIX = RULES_PREFIX + "vehicle:";
-    public static final String VEHICLES_WITH_RULES_KEY = RULES_PREFIX + "vehicles:with-rules";
-    public static final String RULE_DETAIL_KEY_PREFIX = RULES_PREFIX + "detail:";
-    public static final String ALL_ACTIVE_RULES_KEY = RULES_PREFIX + "active:all";
-    public static final String RULE_VEHICLE_INDEX_KEY = RULES_PREFIX + "vehicle-index";
-
-    // ========== GEOFENCE KEYS ==========
-    private static final String GEOFENCE_PREFIX = "geofence:";
-    public static final String GEOFENCE_DETAIL_KEY_PREFIX = GEOFENCE_PREFIX + "detail:";
-    public static final String VEHICLE_GEOFENCES_KEY_PREFIX = GEOFENCE_PREFIX + "vehicle:all:";
-    public static final String ACTIVE_VEHICLE_GEOFENCES_KEY_PREFIX = GEOFENCE_PREFIX + "vehicle:active:";
-    public static final String GEOFENCE_VEHICLE_INDEX_KEY = GEOFENCE_PREFIX + "vehicle-index";
-
-    // ========== ALERT DATA KEYS ==========
+    // ========== ALERT CACHE KEYS ==========
     private static final String ALERT_PREFIX = "alert:";
-    public static final String VEHICLE_ALERT_DATA_KEY_PREFIX = ALERT_PREFIX + "vehicle:data:";
-    public static final String ALERT_COOLDOWN_KEY_PREFIX = ALERT_PREFIX + "cooldown:";
+    public static final String ALERT_DETAIL_KEY_PREFIX = ALERT_PREFIX + "detail:";
+    public static final String ACTIVE_VEHICLE_ALERTS_KEY_PREFIX = ALERT_PREFIX + "vehicle:active:";
+    public static final String RECENT_VEHICLE_ALERTS_KEY_PREFIX = ALERT_PREFIX + "vehicle:recent:";
+    public static final String ALERT_STATISTICS_KEY_PREFIX = ALERT_PREFIX + "stats:";
 
-    // ========== STATISTICS & METRICS KEYS ==========
-    private static final String STATS_PREFIX = "stats:";
-    public static final String RULE_TRIGGER_COUNT_KEY = STATS_PREFIX + "rule:trigger-count:";
-    public static final String VEHICLE_ALERT_COUNT_KEY = STATS_PREFIX + "vehicle:alert-count:";
-
-    // ========== PAGINATION KEYS ==========
-    private static final String PAGINATION_PREFIX = "pagination:";
-    public static final String PAGINATED_RULES_KEY_PREFIX = PAGINATION_PREFIX + "rules:";
-    public static final String PAGINATED_GEOFENCES_KEY_PREFIX = PAGINATION_PREFIX + "geofences:";
-
-    // ========== CACHE TTLs (in seconds) ==========
-    public static final long VEHICLE_RULE_CACHE_TTL = 2 * 60 * 60; // 2 hours
-    public static final long INDEX_CACHE_TTL = 30 * 60; // 30 minutes
-    public static final long RULE_DETAIL_TTL = 24 * 60 * 60; // 24 hours
-    public static final long GEOFENCE_CACHE_TTL = 4 * 60 * 60; // 4 hours
-    public static final long VEHICLE_GEOFENCE_CACHE_TTL = 60 * 60; // 1 hour
-    public static final long ALERT_COOLDOWN_TTL = 10 * 60; // 10 minutes
-    public static final long STATS_TTL = 7 * 24 * 60 * 60; // 7 days
-    public static final long PAGINATION_CACHE_TTL = 5 * 60; // 5 minutes
-
-    // ========== ALERT RULE METHODS ==========
-    public String getVehicleRulesKey(String vehicleId) {
-        return buildKey(VEHICLE_RULES_KEY_PREFIX + vehicleId);
+    // ========== ALERT CACHE METHODS ==========
+    public String getAlertDetailKey(Long alertId) {
+        return buildKey(ALERT_DETAIL_KEY_PREFIX + alertId);
     }
 
-    public String getVehiclesWithRulesKey() {
-        return buildKey(VEHICLES_WITH_RULES_KEY);
+    public String getActiveVehicleAlertsKey(String vehicleId) {
+        return buildKey(ACTIVE_VEHICLE_ALERTS_KEY_PREFIX + vehicleId);
     }
 
-    public String getRuleDetailKey(String ruleKey) {
-        return buildKey(RULE_DETAIL_KEY_PREFIX + ruleKey);
+    public String getRecentVehicleAlertsKey(String vehicleId) {
+        return buildKey(RECENT_VEHICLE_ALERTS_KEY_PREFIX + vehicleId);
     }
 
-    public String getAllActiveRulesKey() {
-        return buildKey(ALL_ACTIVE_RULES_KEY);
+    public String getAlertStatisticsKey(String key) {
+        return buildKey(ALERT_STATISTICS_KEY_PREFIX + key);
     }
 
-    public String getRuleVehicleIndexKey() {
-        return buildKey(RULE_VEHICLE_INDEX_KEY);
+    public String getAlertStatisticsPattern() {
+        return buildKey(ALERT_STATISTICS_KEY_PREFIX + "*");
     }
 
-    // ========== GEOFENCE METHODS ==========
-    public String getGeofenceDetailKey(Long geofenceId) {
-        return buildKey(GEOFENCE_DETAIL_KEY_PREFIX + geofenceId);
+    public String getAllAlertKeysPattern() {
+        return buildKey(ALERT_PREFIX + "*");
     }
 
-    public String getVehicleGeofencesKey(String vehicleId) {
-        return buildKey(VEHICLE_GEOFENCES_KEY_PREFIX + vehicleId);
-    }
-
-    public String getActiveVehicleGeofencesKey(String vehicleId) {
-        return buildKey(ACTIVE_VEHICLE_GEOFENCES_KEY_PREFIX + vehicleId);
-    }
-
-    public String getGeofenceVehicleIndexKey() {
-        return buildKey(GEOFENCE_VEHICLE_INDEX_KEY);
-    }
-
-    // ========== ALERT DATA METHODS ==========
-    public String getVehicleAlertDataKey(String vehicleId) {
-        return buildKey(VEHICLE_ALERT_DATA_KEY_PREFIX + vehicleId);
-    }
-
-    public String getAlertCooldownKey(String ruleKey, String vehicleId) {
-        return buildKey(ALERT_COOLDOWN_KEY_PREFIX + ruleKey + ":" + vehicleId);
-    }
-
-    // ========== STATISTICS METHODS ==========
-    public String getRuleTriggerCountKey(String ruleKey) {
-        return buildKey(RULE_TRIGGER_COUNT_KEY + ruleKey);
-    }
-
-    public String getVehicleAlertCountKey(String vehicleId) {
-        return buildKey(VEHICLE_ALERT_COUNT_KEY + vehicleId);
-    }
-
-    // ========== PAGINATION METHODS ==========
-    public String getPaginatedRulesKey(int page, int size, String sortBy, String sortDirection,
-                                       String search, String ruleType, Boolean enabled) {
-        String key = String.format("page:%d:size:%d:sort:%s:dir:%s",
-                page, size, sortBy, sortDirection);
-        if (search != null && !search.trim().isEmpty()) key += ":search:" + search.hashCode();
-        if (ruleType != null) key += ":type:" + ruleType;
-        if (enabled != null) key += ":enabled:" + enabled;
-        return buildKey(PAGINATED_RULES_KEY_PREFIX + key);
-    }
-
-    public String getPaginatedGeofencesKey(int page, int size, String sortBy, String sortDirection,
-                                           String search, String vehicleId, Boolean active) {
-        String key = String.format("page:%d:size:%d:sort:%s:dir:%s",
-                page, size, sortBy, sortDirection);
-        if (search != null && !search.trim().isEmpty()) key += ":search:" + search.hashCode();
-        if (vehicleId != null) key += ":vehicle:" + vehicleId;
-        if (active != null) key += ":active:" + active;
-        return buildKey(PAGINATED_GEOFENCES_KEY_PREFIX + key);
-    }
-
-    // ========== UTILITY METHODS ==========
-    public String getLockKey(String resource, String identifier) {
-        return buildKey("lock:" + resource + ":" + identifier);
-    }
-
-    public String getPatternKey(String pattern) {
-        return buildKey(pattern + "*");
-    }
-
-    // ========== PRIVATE HELPER ==========
-    private String buildKey(String key) {
-        return CACHE_NAMESPACE + CACHE_VERSION + key;
-    }
-
-    // ========== PATTERN GENERATORS ==========
-    public String getVehicleRulesPattern() {
-        return buildKey(VEHICLE_RULES_KEY_PREFIX + "*");
-    }
-
-    public String getGeofenceDetailPattern() {
-        return buildKey(GEOFENCE_DETAIL_KEY_PREFIX + "*");
-    }
-
-    public String getVehicleGeofencesPattern() {
-        return buildKey(VEHICLE_GEOFENCES_KEY_PREFIX + "*");
-    }
-
-    public String getAllRuleKeysPattern() {
-        return buildKey(RULE_DETAIL_KEY_PREFIX + "*");
-    }
-
-    public String getPaginatedRulesPattern() {
-        return buildKey(PAGINATED_RULES_KEY_PREFIX + "*");
-    }
-
-    public String getPaginatedGeofencesPattern() {
-        return buildKey(PAGINATED_GEOFENCES_KEY_PREFIX + "*");
-    }
-
-    // ========== SHORT TTL KEYS (For rate limiting, etc.) ==========
-    public String getRateLimitKey(String vehicleId, String ruleType) {
-        return buildKey("rate-limit:" + ruleType + ":" + vehicleId + ":" + System.currentTimeMillis() / 60000);
-    }
-
-    // ========== BATCH OPERATION KEYS ==========
-    public String getBatchOperationKey(String operationId) {
-        return buildKey("batch:" + operationId);
-    }
-}```
+    // ... rest of existing code ...
+}
+```
 
 === ./src/main/java/com/jjenus/tracker/alerting/infrastructure/cache/VehicleRuleCacheService.java ===
 ```.java
@@ -4995,17 +6003,19 @@ import java.util.List;
 
 @Repository
 public interface TrackerAlertRepository extends JpaRepository<TrackerAlert, Long> {
-    
+
+    // Basic queries
     Page<TrackerAlert> findByVehicleId(String vehicleId, Pageable pageable);
-    
+
     Page<TrackerAlert> findByTrackerId(String trackerId, Pageable pageable);
-    
+
     List<TrackerAlert> findByAlertTypeAndTriggeredAtAfter(
         String alertType, Instant triggeredAfter);
-    
+
     List<TrackerAlert> findBySeverityAndAcknowledged(
             AlertSeverity severity, boolean acknowledged);
-    
+
+    // Advanced queries with date ranges
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.vehicleId = :vehicleId " +
            "AND ta.triggeredAt >= :startTime AND ta.triggeredAt <= :endTime " +
            "ORDER BY ta.triggeredAt DESC")
@@ -5013,30 +6023,88 @@ public interface TrackerAlertRepository extends JpaRepository<TrackerAlert, Long
         @Param("vehicleId") String vehicleId,
         @Param("startTime") Instant startTime,
         @Param("endTime") Instant endTime);
-    
+
+    // Active alerts (not acknowledged and not resolved)
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.acknowledged = false " +
            "AND ta.resolved = false " +
            "ORDER BY ta.severity DESC, ta.triggeredAt DESC")
     Page<TrackerAlert> findActiveAlerts(Pageable pageable);
-    
+
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.vehicleId = :vehicleId " +
            "AND ta.acknowledged = false " +
            "AND ta.resolved = false " +
            "ORDER BY ta.triggeredAt DESC")
     List<TrackerAlert> findActiveVehicleAlerts(@Param("vehicleId") String vehicleId);
-    
+
+    // Statistics queries
     @Query("SELECT COUNT(ta) FROM TrackerAlert ta WHERE ta.acknowledged = false " +
            "AND ta.severity = :severity")
     Long countUnacknowledgedBySeverity(@Param("severity") AlertSeverity severity);
-    
+
     @Query("SELECT ta.alertType, COUNT(ta) FROM TrackerAlert ta " +
            "WHERE ta.triggeredAt >= :startTime " +
            "GROUP BY ta.alertType " +
            "ORDER BY COUNT(ta) DESC")
     List<Object[]> getAlertTypeStatistics(@Param("startTime") Instant startTime);
-    
+
+    // Stale alerts (unresolved older than cutoff)
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.resolved = false " +
            "AND ta.triggeredAt < :cutoffTime")
     List<TrackerAlert> findStaleAlerts(@Param("cutoffTime") Instant cutoffTime);
-}```
+
+    // Comprehensive search query
+    @Query("SELECT ta FROM TrackerAlert ta WHERE " +
+           "(:vehicleId IS NULL OR ta.vehicleId = :vehicleId) " +
+           "AND (:trackerId IS NULL OR ta.trackerId = :trackerId) " +
+           "AND (:alertType IS NULL OR ta.alertType = :alertType) " +
+           "AND (:severity IS NULL OR ta.severity = :severity) " +
+           "AND (:acknowledged IS NULL OR ta.acknowledged = :acknowledged) " +
+           "AND (:resolved IS NULL OR ta.resolved = :resolved) " +
+           "AND (:startDate IS NULL OR ta.triggeredAt >= :startDate) " +
+           "AND (:endDate IS NULL OR ta.triggeredAt <= :endDate) " +
+           "AND (:search IS NULL OR LOWER(ta.message) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY " +
+           "CASE WHEN :sortBy = 'severity' THEN ta.severity END DESC, " +
+           "CASE WHEN :sortBy = 'triggeredAt' THEN ta.triggeredAt END DESC, " +
+           "CASE WHEN :sortBy = 'acknowledgedAt' THEN ta.acknowledgedAt END DESC, " +
+           "ta.triggeredAt DESC")
+    Page<TrackerAlert> searchAlerts(
+            @Param("vehicleId") String vehicleId,
+            @Param("trackerId") String trackerId,
+            @Param("alertType") String alertType,
+            @Param("severity") AlertSeverity severity,
+            @Param("acknowledged") Boolean acknowledged,
+            @Param("resolved") Boolean resolved,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate,
+            @Param("search") String search,
+            Pageable pageable);
+
+    // Batch operations
+    @Query("SELECT ta FROM TrackerAlert ta WHERE ta.alertId IN :alertIds")
+    List<TrackerAlert> findByIds(@Param("alertIds") List<Long> alertIds);
+
+    // Dashboard statistics
+    @Query("SELECT COUNT(ta) FROM TrackerAlert ta WHERE " +
+           "ta.triggeredAt >= :startTime AND ta.triggeredAt <= :endTime " +
+           "AND ta.severity = :severity")
+    Long countBySeverityAndTimeRange(
+            @Param("severity") AlertSeverity severity,
+            @Param("startTime") Instant startTime,
+            @Param("endTime") Instant endTime);
+
+    @Query("SELECT ta.vehicleId, COUNT(ta) FROM TrackerAlert ta " +
+           "WHERE ta.triggeredAt >= :startTime " +
+           "GROUP BY ta.vehicleId " +
+           "ORDER BY COUNT(ta) DESC")
+    List<Object[]> getAlertCountByVehicle(@Param("startTime") Instant startTime);
+
+    // Resolution time statistics
+    @Query("SELECT AVG(TIMESTAMPDIFF(SECOND, ta.triggeredAt, ta.resolvedAt)) " +
+           "FROM TrackerAlert ta WHERE ta.resolved = true " +
+           "AND ta.resolvedAt IS NOT NULL " +
+           "AND ta.triggeredAt >= :startTime")
+    Double getAverageResolutionTime(@Param("startTime") Instant startTime);
+}
+```
 

@@ -78,6 +78,7 @@ public class GeofenceRule implements IAlertRule {
 
         return new AlertDetectedEvent(
                 ruleKey,
+                this.ruleName,
                 vehicleId,
                 message,
                 severity,

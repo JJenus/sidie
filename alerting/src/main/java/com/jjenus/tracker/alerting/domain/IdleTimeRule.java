@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.time.Duration;
 import java.time.Instant;
@@ -54,6 +55,7 @@ public class IdleTimeRule implements IAlertRule {
 
             return new AlertDetectedEvent(
                     ruleKey,
+                    AlertType.IDLE_TIMEOUT,
                     vehicleId,
                     message,
                     AlertSeverity.INFO,

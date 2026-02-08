@@ -1,8 +1,11 @@
 package com.jjenus.tracker.alerting.application.event;
 
+import com.jjenus.tracker.alerting.api.dto.AlertResponse;
 import com.jjenus.tracker.alerting.application.service.AlertService;
 import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import com.jjenus.tracker.shared.events.AlertRaisedEvent;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -18,9 +21,11 @@ public class AlertCreationEventHandler {
     private static final Logger logger = LoggerFactory.getLogger(AlertCreationEventHandler.class);
 
     private final AlertService alertService;
+    private final EventPublisher eventPublisher;
 
-    public AlertCreationEventHandler(AlertService alertService) {
+    public AlertCreationEventHandler(AlertService alertService, EventPublisher eventPublisher) {
         this.alertService = alertService;
+        this.eventPublisher = eventPublisher;
     }
 
     @JmsListener(
@@ -31,9 +36,6 @@ public class AlertCreationEventHandler {
         try {
             logger.info("Processing alert event: {} for vehicle {}",
                        event.getRuleKey(), event.getVehicleId());
-
-            // Map rule key to alert type
-            AlertType alertType = mapRuleKeyToAlertType(event.getRuleKey());
 
             // Create metadata
             Map<String, Object> metadata = new HashMap<>();
@@ -47,45 +49,35 @@ public class AlertCreationEventHandler {
             }
 
             // Create the alert
-            alertService.processAutomatedAlert(
+            AlertResponse alertResponse = alertService.processAutomatedAlert(
                 event.getVehicleId(),
                 "system", // trackerId - could be extracted from event if available
-                alertType,
+                event.getAlertType(),
                 event.getSeverity(),
                 event.getMessage(),
                 metadata
             );
 
+            AlertRaisedEvent alertRaisedEvent = new AlertRaisedEvent(
+                    alertResponse.getAlertId().toString(),
+                    event.getRuleKey(),
+                    alertResponse.getVehicleId(),
+                    event.getAlertType().name(),
+                    event.getSeverity().name(),
+                    event.getMessage(),
+                    event.getAlertTimestamp(),
+                    alertResponse.getLatitude(),
+                    alertResponse.getLongitude(),
+                    alertResponse.getSpeedKmh().doubleValue(),
+                    metadata
+            );
+
             logger.debug("Alert created from event: {}", event.getRuleKey());
 
+            eventPublisher.publish(alertRaisedEvent);
         } catch (Exception e) {
             logger.error("Failed to process alert event: {}", event.getRuleKey(), e);
         }
-    }
-
-    private AlertType mapRuleKeyToAlertType(String ruleKey) {
-        if (ruleKey == null) {
-            return AlertType.UNKNOWN;
-        }
-
-        // Map common rule patterns to alert types
-        if (ruleKey.contains("speed") || ruleKey.contains("overspeed")) {
-            return AlertType.OVERSPEED;
-        } else if (ruleKey.contains("idle") || ruleKey.contains("timeout")) {
-            return AlertType.IDLE_TIMEOUT;
-        } else if (ruleKey.contains("geofence") || ruleKey.contains("fence")) {
-            return AlertType.GEOFENCE_VIOLATION;
-        } else if (ruleKey.contains("battery")) {
-            return AlertType.LOW_BATTERY;
-        } else if (ruleKey.contains("disconnect")) {
-            return AlertType.DEVICE_DISCONNECTED;
-        } else if (ruleKey.contains("tamper")) {
-            return AlertType.TAMPER_DETECTED;
-        } else if (ruleKey.contains("panic")) {
-            return AlertType.PANIC_BUTTON_PRESSED;
-        }
-
-        return AlertType.UNKNOWN;
     }
 
     // Additional event handlers for other alert-related events

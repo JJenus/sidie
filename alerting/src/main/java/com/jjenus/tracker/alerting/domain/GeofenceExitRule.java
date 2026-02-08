@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.awt.geom.Path2D;
 import java.util.List;
@@ -40,7 +41,7 @@ public class GeofenceExitRule implements IAlertRule {
             );
             
             alert = new AlertDetectedEvent(
-                ruleKey,
+                ruleKey, AlertType.GEOFENCE_EXIT,
                 vehicleId,
                 message,
                 AlertSeverity.WARNING,

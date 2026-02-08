@@ -1,28 +1,19 @@
+
 package com.jjenus.tracker.alerting.application.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jjenus.tracker.alerting.api.dto.*;
-import com.jjenus.tracker.alerting.domain.entity.AlertRule;
+        import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 import com.jjenus.tracker.alerting.exception.AlertException;
-import com.jjenus.tracker.alerting.infrastructure.cache.AlertRuleCacheService;
-import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
-import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -30,133 +21,106 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
-public class AlertRuleService {
+public class AlertRuleCommandService {
 
-    private static final Logger logger = LoggerFactory.getLogger(AlertRuleService.class);
+    private static final Logger logger = LoggerFactory.getLogger(AlertRuleCommandService.class);
 
     private final AlertRuleRepository ruleRepository;
-    private final AlertRuleCacheService ruleCacheService;
-    private final VehicleRuleCacheService vehicleRuleCacheService;
+    private final AlertRuleQueryService ruleQueryService;
+    private final GeofenceRuleValidator geofenceRuleValidator;
     private final ObjectMapper objectMapper;
 
-    public AlertRuleService(
+    public AlertRuleCommandService(
             AlertRuleRepository ruleRepository,
-            AlertRuleCacheService ruleCacheService,
-            VehicleRuleCacheService vehicleRuleCacheService,
+            AlertRuleQueryService ruleQueryService,
+            GeofenceRuleValidator geofenceRuleValidator,
             ObjectMapper objectMapper) {
         this.ruleRepository = ruleRepository;
-        this.ruleCacheService = ruleCacheService;
-        this.vehicleRuleCacheService = vehicleRuleCacheService;
+        this.ruleQueryService = ruleQueryService;
+        this.geofenceRuleValidator = geofenceRuleValidator;
         this.objectMapper = objectMapper;
     }
 
     // ========== TEMPLATE METHODS ==========
 
-    @Transactional
-    @CacheEvict(value = {"alertRules", "alertRulesPaged"}, allEntries = true)
+    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public AlertRuleResponse createOverspeedRule(OverspeedRuleTemplateRequest request) {
         logger.info("Creating overspeed rule: {}", request.getRuleKey());
 
         validateRuleKeyUniqueness(request.getRuleKey());
         validateOverspeedRuleRequest(request);
 
-        // Build parameters with validation
         Map<String, Object> parameters = buildOverspeedParameters(request);
-
-        // Build actions configuration
         String actionsJson = buildOverspeedActions();
 
-        // Create and save rule
         AlertRule rule = createBaseRule(request, AlertRuleType.SPEED, parameters);
         rule.setActions(actionsJson);
         rule.setVehicleIds(request.getVehicleIds());
 
-        AlertRule saved = saveAndCacheRule(rule);
+        AlertRule saved = saveRule(rule);
 
         logger.info("Overspeed rule created successfully: {} for {} vehicles",
                 saved.getRuleKey(), request.getVehicleIds().size());
 
-        return toResponse(saved);
+        return ruleQueryService.toResponse(saved);
     }
 
-    @Transactional
-    @CacheEvict(value = {"alertRules", "alertRulesPaged"}, allEntries = true)
+    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public AlertRuleResponse createIdleTimeoutRule(IdleTimeoutRuleTemplateRequest request) {
         logger.info("Creating idle timeout rule: {}", request.getRuleKey());
 
         validateRuleKeyUniqueness(request.getRuleKey());
         validateIdleTimeoutRuleRequest(request);
 
-        // Build parameters
         Map<String, Object> parameters = buildIdleTimeoutParameters(request);
-
-        // Create and save rule
         AlertRule rule = createBaseRule(request, AlertRuleType.TIME, parameters);
         rule.setVehicleIds(request.getVehicleIds());
 
-        AlertRule saved = saveAndCacheRule(rule);
+        AlertRule saved = saveRule(rule);
 
         logger.info("Idle timeout rule created successfully: {} for {} vehicles",
                 saved.getRuleKey(), request.getVehicleIds().size());
 
-        return toResponse(saved);
+        return ruleQueryService.toResponse(saved);
     }
 
-    @Transactional
-    @CacheEvict(value = {"alertRules", "alertRulesPaged"}, allEntries = true)
+    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public AlertRuleResponse createGeofenceRule(GeofenceRuleTemplateRequest request) {
         logger.info("Creating geofence rule: {}", request.getRuleKey());
 
         validateRuleKeyUniqueness(request.getRuleKey());
-
-        // Validate geofence rule request
         geofenceRuleValidator.validateGeofenceRuleRequest(request);
 
-        // Get validated geofence
         Geofence geofence = geofenceRuleValidator.getValidatedGeofence(request.getGeofenceId());
-
-        // Build parameters with geofence details
         Map<String, Object> parameters = buildGeofenceParameters(request, geofence);
-
-        // Validate vehicle associations
         validateVehicleGeofenceAssociation(geofence, request.getVehicleIds());
 
-        // Create and save rule
         AlertRule rule = createBaseRule(request, AlertRuleType.GEOFENCE, parameters);
         rule.setVehicleIds(request.getVehicleIds());
 
-        AlertRule saved = saveAndCacheRule(rule);
+        AlertRule saved = saveRule(rule);
 
         logger.info("Geofence rule created successfully: {} for geofence {} and {} vehicles",
                 saved.getRuleKey(), request.getGeofenceId(), request.getVehicleIds().size());
 
-        return toResponse(saved);
+        return ruleQueryService.toResponse(saved);
     }
 
     // ========== CRUD METHODS ==========
 
-    @Transactional
-    @CacheEvict(value = {"alertRules", "alertRulesPaged"}, allEntries = true)
+    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
     public AlertRuleResponse createRule(CreateAlertRuleRequest request) {
         logger.info("Creating custom alert rule: {}", request.getRuleKey());
 
         validateRuleKeyUniqueness(request.getRuleKey());
 
-        // Parse and validate rule type
-        AlertRuleType ruleType = parseRuleType(request.getRuleType());
-
-        // Parse and validate parameters
+        AlertRuleType ruleType = ruleQueryService.parseRuleType(request.getRuleType());
         Map<String, Object> parameters = parseAndValidateParameters(request.getParameters(), ruleType);
-
-        // Extract vehicle IDs from parameters
         Set<String> vehicleIds = extractVehicleIdsFromParameters(parameters);
 
-        // Create entity
         AlertRule rule = new AlertRule();
         rule.setRuleKey(request.getRuleKey());
         rule.setRuleName(request.getRuleName());
@@ -165,122 +129,32 @@ public class AlertRuleService {
         rule.setPriority(request.getPriority());
         rule.setIsEnabled(request.isEnabled());
         rule.setVehicleIds(vehicleIds);
-        rule.setCooldownMinutes(5); // Default cooldown
+        rule.setCooldownMinutes(5);
 
-        AlertRule saved = saveAndCacheRule(rule);
-
+        AlertRule saved = saveRule(rule);
         logger.info("Custom alert rule created successfully: {}", saved.getRuleKey());
 
-        return toResponse(saved);
+        return ruleQueryService.toResponse(saved);
     }
 
-    @Transactional(readOnly = true)
-    @Cacheable(value = "alertRules", key = "'all'")
-    public List<AlertRuleResponse> getAllRules() {
-        return ruleRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "alertRulesPaged", key = "'search_' + #searchRequest.hashCode()")
-    public PagedResponse<AlertRuleResponse> getAllRulesPaged(SearchRequest searchRequest) {
-        String cacheKey = keyGenerator.getPaginatedRulesKey(
-                searchRequest.getPage(),
-                searchRequest.getSize(),
-                searchRequest.getSortBy(),
-                searchRequest.getSortDirection().name(),
-                searchRequest.getSearch(),
-                searchRequest.getRuleType() != null ? searchRequest.getRuleType().name() : null,
-                searchRequest.getEnabled()
-        );
-
-        try {
-            // Try cache first
-            Object cached = redisTemplate.opsForValue().get(cacheKey);
-            if (cached != null && cached instanceof PagedResponse) {
-                logger.debug("Cache hit for paginated rules");
-                return (PagedResponse<AlertRuleResponse>) cached;
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to get paginated rules from cache", e);
-        }
-
-        // Cache miss - query database
-        Pageable pageable = createPageable(searchRequest);
-        Page<AlertRule> page = ruleRepository.searchAlertRules(
-                searchRequest.getSearch(),
-                searchRequest.getRuleType(),
-                searchRequest.getEnabled(),
-                pageable);
-
-        PagedResponse<AlertRuleResponse> response = new PagedResponse<>(page.map(this::toResponse));
-
-        // Cache the result
-        try {
-            redisTemplate.opsForValue().set(cacheKey, response,
-                    RedisKeyGenerator.PAGINATION_CACHE_TTL, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            logger.warn("Failed to cache paginated rules", e);
-        }
-
-        return response;
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "alertRules", key = "'enabled'")
-    public List<AlertRuleResponse> getEnabledRules() {
-        return ruleRepository.findByIsEnabled(true).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "alertRulesPaged", key = "'enabled_' + #searchRequest.hashCode()")
-    public PagedResponse<AlertRuleResponse> getEnabledRulesPaged(SearchRequest searchRequest) {
-        searchRequest.setEnabled(true); // Force enabled=true
-        return getAllRulesPaged(searchRequest);
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "alertRules", key = "'rule_' + #ruleKey")
-    public AlertRuleResponse getRuleByKey(String ruleKey) {
-        // Try cache first
-        var cachedRule = ruleCacheService.getRuleByKey(ruleKey);
-        if (cachedRule.isPresent()) {
-            logger.debug("Cache hit for rule: {}", ruleKey);
-            return toResponse(cachedRule.get());
-        }
-
-        // Cache miss - load from DB
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
-                .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
-
-        // Cache the rule for future requests
-        ruleCacheService.cacheRule(rule);
-
-        return toResponse(rule);
-    }
-
-    @Transactional
     @Caching(
             put = @CachePut(value = "alertRules", key = "'rule_' + #ruleKey"),
             evict = {
                     @CacheEvict(value = "alertRules", key = "'all'"),
                     @CacheEvict(value = "alertRules", key = "'enabled'"),
-                    @CacheEvict(value = "alertRulesPaged", allEntries = true)
+                    @CacheEvict(value = "alertRules", key = "'vehicle_*'"),
+                    @CacheEvict(value = "alertRulesPaged", allEntries = true),
+                    @CacheEvict(value = "vehicleRules", allEntries = true)
             }
     )
     public AlertRuleResponse updateRule(String ruleKey, UpdateAlertRuleRequest request) {
         logger.info("Updating alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
-                .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
+        AlertRule rule = ruleQueryService.getRuleEntityByKey(ruleKey);
 
         boolean hasChanges = false;
         Set<String> oldVehicleIds = new HashSet<>(rule.getVehicleIds());
 
-        // Update fields if provided
         if (StringUtils.hasText(request.getRuleName())) {
             rule.setRuleName(request.getRuleName());
             hasChanges = true;
@@ -293,19 +167,13 @@ public class AlertRuleService {
         }
 
         if (request.getParameters() != null && !request.getParameters().isEmpty()) {
-            // Merge and validate parameters
             Map<String, Object> existingParams = rule.getParameters();
             existingParams.putAll(request.getParameters());
-
-            // Validate parameters based on rule type
             validateRuleParameters(rule.getRuleType(), existingParams);
-
             rule.setParameters(existingParams);
 
-            // Update vehicle IDs from parameters
             Set<String> newVehicleIds = extractVehicleIdsFromParameters(existingParams);
             rule.setVehicleIds(newVehicleIds);
-
             hasChanges = true;
         }
 
@@ -318,55 +186,33 @@ public class AlertRuleService {
             rule.setUpdatedAt(Instant.now());
             AlertRule updated = ruleRepository.save(rule);
 
-            // Update cache
-            ruleCacheService.cacheRule(updated);
-
-            // Invalidate vehicle caches if vehicle associations changed
-            if (!oldVehicleIds.equals(rule.getVehicleIds())) {
-                Set<String> allAffectedVehicles = new HashSet<>(oldVehicleIds);
-                allAffectedVehicles.addAll(rule.getVehicleIds());
-                allAffectedVehicles.forEach(vehicleRuleCacheService::invalidateVehicleRules);
-            }
-
-            // Invalidate pagination cache
-            invalidatePaginationCache();
-
             logger.info("Alert rule updated successfully: {}", ruleKey);
-            return toResponse(updated);
+            return ruleQueryService.toResponse(updated);
         }
 
         logger.debug("No changes detected for rule: {}", ruleKey);
-        return toResponse(rule);
+        return ruleQueryService.toResponse(rule);
     }
 
-    @Transactional
     @Caching(
             put = @CachePut(value = "alertRules", key = "'rule_' + #ruleKey"),
             evict = {
                     @CacheEvict(value = "alertRules", key = "'all'"),
                     @CacheEvict(value = "alertRules", key = "'enabled'"),
-                    @CacheEvict(value = "alertRulesPaged", allEntries = true)
+                    @CacheEvict(value = "alertRules", key = "'vehicle_*'"),
+                    @CacheEvict(value = "alertRulesPaged", allEntries = true),
+                    @CacheEvict(value = "vehicleRules", allEntries = true)
             }
     )
     public void enableRule(String ruleKey) {
         logger.info("Enabling alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
-                .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
+        AlertRule rule = ruleQueryService.getRuleEntityByKey(ruleKey);
 
         if (!Boolean.TRUE.equals(rule.isEnabled())) {
             rule.setIsEnabled(true);
             rule.setUpdatedAt(Instant.now());
             ruleRepository.save(rule);
-
-            // Update cache
-            ruleCacheService.cacheRule(rule);
-
-            // Invalidate vehicle caches
-            rule.getVehicleIds().forEach(vehicleRuleCacheService::invalidateVehicleRules);
-
-            // Invalidate pagination cache
-            invalidatePaginationCache();
 
             logger.info("Alert rule enabled: {}", ruleKey);
         } else {
@@ -374,34 +220,25 @@ public class AlertRuleService {
         }
     }
 
-    @Transactional
     @Caching(
             evict = {
                     @CacheEvict(value = "alertRules", key = "'rule_' + #ruleKey"),
                     @CacheEvict(value = "alertRules", key = "'all'"),
                     @CacheEvict(value = "alertRules", key = "'enabled'"),
-                    @CacheEvict(value = "alertRulesPaged", allEntries = true)
+                    @CacheEvict(value = "alertRules", key = "'vehicle_*'"),
+                    @CacheEvict(value = "alertRulesPaged", allEntries = true),
+                    @CacheEvict(value = "vehicleRules", allEntries = true)
             }
     )
     public void disableRule(String ruleKey) {
         logger.info("Disabling alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
-                .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
+        AlertRule rule = ruleQueryService.getRuleEntityByKey(ruleKey);
 
         if (Boolean.TRUE.equals(rule.isEnabled())) {
             rule.setIsEnabled(false);
             rule.setUpdatedAt(Instant.now());
             ruleRepository.save(rule);
-
-            // Remove from cache
-            ruleCacheService.evictRule(ruleKey);
-
-            // Invalidate vehicle caches
-            rule.getVehicleIds().forEach(vehicleRuleCacheService::invalidateVehicleRules);
-
-            // Invalidate pagination cache
-            invalidatePaginationCache();
 
             logger.info("Alert rule disabled: {}", ruleKey);
         } else {
@@ -409,81 +246,81 @@ public class AlertRuleService {
         }
     }
 
-    @Transactional
     @Caching(
             evict = {
                     @CacheEvict(value = "alertRules", key = "'rule_' + #ruleKey"),
                     @CacheEvict(value = "alertRules", key = "'all'"),
                     @CacheEvict(value = "alertRules", key = "'enabled'"),
-                    @CacheEvict(value = "alertRulesPaged", allEntries = true)
+                    @CacheEvict(value = "alertRules", key = "'vehicle_*'"),
+                    @CacheEvict(value = "alertRulesPaged", allEntries = true),
+                    @CacheEvict(value = "vehicleRules", allEntries = true)
             }
     )
     public void deleteRule(String ruleKey) {
         logger.info("Deleting alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
-                .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
-
-        Set<String> affectedVehicles = rule.getVehicleIds();
-
+        AlertRule rule = ruleQueryService.getRuleEntityByKey(ruleKey);
         ruleRepository.deleteByRuleKey(ruleKey);
-
-        // Remove from cache
-        ruleCacheService.evictRule(ruleKey);
-
-        // Invalidate vehicle caches
-        affectedVehicles.forEach(vehicleRuleCacheService::invalidateVehicleRules);
-
-        // Invalidate pagination cache
-        invalidatePaginationCache();
 
         logger.info("Alert rule deleted successfully: {}", ruleKey);
     }
 
+    // ========== BATCH OPERATIONS ==========
+
+    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
+    public List<AlertRuleResponse> batchCreateRules(List<CreateAlertRuleRequest> requests) {
+        logger.info("Batch creating {} alert rules", requests.size());
+
+        List<AlertRuleResponse> responses = new ArrayList<>();
+
+        for (CreateAlertRuleRequest request : requests) {
+            try {
+                AlertRuleResponse response = createRule(request);
+                responses.add(response);
+            } catch (Exception e) {
+                logger.error("Failed to create rule {} in batch: {}",
+                        request.getRuleKey(), e.getMessage());
+            }
+        }
+
+        logger.info("Batch creation completed: {} successful, {} total",
+                responses.size(), requests.size());
+
+        return responses;
+    }
+
+    @CacheEvict(value = {"alertRules", "alertRulesPaged", "vehicleRules"}, allEntries = true)
+    public void batchEnableRules(Set<String> ruleKeys) {
+        logger.info("Batch enabling {} alert rules", ruleKeys.size());
+
+        int enabledCount = 0;
+        for (String ruleKey : ruleKeys) {
+            try {
+                enableRule(ruleKey);
+                enabledCount++;
+            } catch (Exception e) {
+                logger.error("Failed to enable rule {} in batch: {}", ruleKey, e.getMessage());
+            }
+        }
+
+        logger.info("Batch enabling completed: {} enabled, {} total",
+                enabledCount, ruleKeys.size());
+    }
+
     // ========== HELPER METHODS ==========
 
-    private Pageable createPageable(SearchRequest searchRequest) {
-        Sort sort = Sort.by(searchRequest.getSortDirection(), searchRequest.getSortBy());
-        return PageRequest.of(searchRequest.getPage(), searchRequest.getSize(), sort);
-    }
-
-    private void invalidatePaginationCache() {
-        try {
-            Set<String> keys = redisTemplate.keys(keyGenerator.getPaginatedRulesPattern());
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-                logger.debug("Invalidated pagination cache for rules");
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to invalidate pagination cache", e);
-        }
-    }
-
-    private AlertRule saveAndCacheRule(AlertRule rule) {
-        // Set timestamps
+    private AlertRule saveRule(AlertRule rule) {
         Instant now = Instant.now();
         if (rule.getCreatedAt() == null) {
             rule.setCreatedAt(now);
         }
         rule.setUpdatedAt(now);
 
-        // Save to database
-        AlertRule saved = ruleRepository.save(rule);
-
-        // Cache the rule
-        ruleCacheService.cacheRule(saved);
-
-        // Invalidate affected vehicle caches
-        saved.getVehicleIds().forEach(vehicleRuleCacheService::invalidateVehicleRules);
-
-        // Invalidate pagination cache
-        invalidatePaginationCache();
-
-        return saved;
+        return ruleRepository.save(rule);
     }
 
     private void validateRuleKeyUniqueness(String ruleKey) {
-        if (ruleRepository.existsByRuleKey(ruleKey)) {
+        if (ruleQueryService.existsByRuleKey(ruleKey)) {
             throw AlertException.ruleAlreadyExists(ruleKey);
         }
     }
@@ -516,7 +353,7 @@ public class AlertRuleService {
         parameters.put("severity", "CRITICAL");
         parameters.put("vehicleIds", new ArrayList<>(request.getVehicleIds()));
         parameters.put("unit", "km/h");
-        parameters.put("evaluationInterval", 60); // seconds
+        parameters.put("evaluationInterval", 60);
         return parameters;
     }
 
@@ -598,30 +435,10 @@ public class AlertRuleService {
         return rule;
     }
 
-    private AlertRuleType parseRuleType(String ruleTypeStr) {
-        try {
-            return AlertRuleType.valueOf(ruleTypeStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid rule type: " + ruleTypeStr +
-                    ". Valid values: " + Arrays.toString(AlertRuleType.values()));
-        }
-    }
-
     private Map<String, Object> parseAndValidateParameters(String parametersJson, AlertRuleType ruleType) {
-        Map<String, Object> parameters = parseParameters(parametersJson);
+        Map<String, Object> parameters = ruleQueryService.parseParameters(parametersJson);
         validateRuleParameters(ruleType, parameters);
         return parameters;
-    }
-
-    private Map<String, Object> parseParameters(String parametersJson) {
-        try {
-            if (!StringUtils.hasText(parametersJson)) {
-                return new HashMap<>();
-            }
-            return objectMapper.readValue(parametersJson, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid parameters JSON format: " + e.getMessage(), e);
-        }
     }
 
     private Set<String> extractVehicleIdsFromParameters(Map<String, Object> parameters) {
@@ -636,7 +453,6 @@ public class AlertRuleService {
                     }
                 });
             } else if (vehicleIdsObj instanceof String) {
-                // Handle comma-separated string
                 String[] ids = ((String) vehicleIdsObj).split(",");
                 for (String id : ids) {
                     if (StringUtils.hasText(id)) {
@@ -675,7 +491,6 @@ public class AlertRuleService {
                 validateGeofenceRuleParameters(parameters);
                 break;
             default:
-                // Basic validation for custom rule types
                 if (!parameters.containsKey("vehicleIds") ||
                         ((Collection<?>) parameters.get("vehicleIds")).isEmpty()) {
                     throw new IllegalArgumentException("Custom rules require at least one vehicle ID");
@@ -696,7 +511,6 @@ public class AlertRuleService {
             throw new IllegalArgumentException("'speedLimit' must be positive");
         }
 
-        // Optional buffer validation
         if (parameters.containsKey("buffer")) {
             Object buffer = parameters.get("buffer");
             if (!(buffer instanceof Number)) {
@@ -731,82 +545,6 @@ public class AlertRuleService {
             throw new IllegalArgumentException("Geofence ID cannot be empty");
         }
 
-        // Validate geofence exists and is active
         geofenceRuleValidator.getValidatedGeofence(geofenceId);
-    }
-
-    // ========== RESPONSE CONVERSION ==========
-
-    public AlertRuleResponse toResponse(AlertRule rule) {
-        AlertRuleResponse response = new AlertRuleResponse();
-        response.setRuleKey(rule.getRuleKey());
-        response.setRuleName(rule.getRuleName());
-        response.setRuleType(rule.getRuleType());
-        response.setParameters(rule.getParameters());
-        response.setPriority(rule.getPriority() != null ? rule.getPriority() : 5);
-        response.setEnabled(Boolean.TRUE.equals(rule.isEnabled()));
-        response.setCreatedAt(rule.getCreatedAt());
-        response.setUpdatedAt(rule.getUpdatedAt());
-        return response;
-    }
-
-    // ========== BATCH OPERATIONS ==========
-
-    @Transactional
-    @CacheEvict(value = {"alertRules", "alertRulesPaged"}, allEntries = true)
-    public List<AlertRuleResponse> batchCreateRules(List<CreateAlertRuleRequest> requests) {
-        logger.info("Batch creating {} alert rules", requests.size());
-
-        List<AlertRuleResponse> responses = new ArrayList<>();
-
-        for (CreateAlertRuleRequest request : requests) {
-            try {
-                AlertRuleResponse response = createRule(request);
-                responses.add(response);
-            } catch (Exception e) {
-                logger.error("Failed to create rule {} in batch: {}",
-                        request.getRuleKey(), e.getMessage());
-                // Continue with other rules
-            }
-        }
-
-        logger.info("Batch creation completed: {} successful, {} total",
-                responses.size(), requests.size());
-
-        return responses;
-    }
-
-    @Transactional
-    @CacheEvict(value = {"alertRules", "alertRulesPaged"}, allEntries = true)
-    public void batchEnableRules(Set<String> ruleKeys) {
-        logger.info("Batch enabling {} alert rules", ruleKeys.size());
-
-        int enabledCount = 0;
-        for (String ruleKey : ruleKeys) {
-            try {
-                enableRule(ruleKey);
-                enabledCount++;
-            } catch (Exception e) {
-                logger.error("Failed to enable rule {} in batch: {}", ruleKey, e.getMessage());
-            }
-        }
-
-        logger.info("Batch enabling completed: {} enabled, {} total",
-                enabledCount, ruleKeys.size());
-    }
-
-    @Transactional(readOnly = true)
-    @Cacheable(value = "vehicleRules", key = "'rulesByVehicle_' + #vehicleIds.hashCode()")
-    public Map<String, List<AlertRuleResponse>> getRulesByVehicleIds(Set<String> vehicleIds) {
-        Map<String, List<AlertRuleResponse>> result = new HashMap<>();
-
-        for (String vehicleId : vehicleIds) {
-            List<AlertRule> vehicleRules = ruleRepository.findActiveRulesForVehicle(vehicleId);
-            result.put(vehicleId, vehicleRules.stream()
-                    .map(this::toResponse)
-                    .collect(Collectors.toList()));
-        }
-
-        return result;
     }
 }

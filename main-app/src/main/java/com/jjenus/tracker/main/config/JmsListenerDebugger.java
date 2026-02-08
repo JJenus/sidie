@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 
-@Component
+//Uncomment if debugging is required
+//@Component
 public class JmsListenerDebugger {
 
     private static final Logger logger = LoggerFactory.getLogger(JmsListenerDebugger.class);
