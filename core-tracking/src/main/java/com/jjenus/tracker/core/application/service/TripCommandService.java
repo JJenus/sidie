@@ -1,6 +1,7 @@
 package com.jjenus.tracker.core.application.service;
 
 import com.jjenus.tracker.core.api.dto.TripResponse;
+import com.jjenus.tracker.core.domain.entity.TrackerLocation;
 import com.jjenus.tracker.core.domain.entity.Trip;
 import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.domain.enums.TripEndReason;
@@ -138,6 +139,40 @@ public class TripCommandService {
         tripRepository.save(trip);
 
         log.info("Trip fuel consumption updated: {}", tripId);
+    }
+
+    @Caching(evict = {
+            @CacheEvict(value = "trips", key = "'active_' + #vehicleId"),
+            @CacheEvict(value = "trips", key = "'activeTrips'"),
+            @CacheEvict(value = "tripStats", allEntries = true)
+    })
+    public void addTripPoint(String vehicleId, TrackerLocation location) {
+
+        Trip trip = tripRepository
+                .findByVehicleVehicleIdAndIsActive(vehicleId, true)
+                .orElse(null);
+
+        if (trip == null) return;
+
+        trip.addLocationPoint(location);
+
+        tripRepository.save(trip);
+    }
+
+    private float tripDistance(TrackerLocation a, TrackerLocation b) {
+        final double R = 6371.0;
+
+        double lat1 = Math.toRadians(a.getLatitude());
+        double lat2 = Math.toRadians(b.getLatitude());
+        double dLat = lat2 - lat1;
+        double dLon = Math.toRadians(b.getLongitude() - a.getLongitude());
+
+        double h =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(lat1) * Math.cos(lat2) *
+                                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        return (float) (R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)));
     }
 
     private String generateTripId(String vehicleId) {

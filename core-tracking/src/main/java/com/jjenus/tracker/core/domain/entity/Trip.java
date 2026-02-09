@@ -79,25 +79,32 @@ public class Trip {
     }
     
     // Business methods
-    public void addLocationPoint(TrackerLocation location, Float segmentDistance) {
+    public void addLocationPoint(TrackerLocation location) {
+
+        TrackerLocation last = getLastLocationPoint();
+
+        float segmentDistance = 0f;
+
+        if (last != null) {
+            segmentDistance = calculateDistance(last, location);
+        }
+
         TripPoint tripPoint = new TripPoint();
         tripPoint.setTrip(this);
         tripPoint.setLocation(location);
         tripPoint.setPointOrder(tripPoints.size() + 1);
         tripPoint.setSegmentDistanceKm(segmentDistance);
-        
+
         tripPoints.add(tripPoint);
-        
-        // Update total distance
+
         this.totalDistanceKm += segmentDistance;
-        
-        // Update max speed
-        if (location.getSpeedKmh() != null && 
-            (this.maxSpeedKmh == null || location.getSpeedKmh() > this.maxSpeedKmh)) {
+
+        if (location.getSpeedKmh() != null &&
+                (this.maxSpeedKmh == null || location.getSpeedKmh() > this.maxSpeedKmh)) {
             this.maxSpeedKmh = location.getSpeedKmh();
         }
     }
-    
+
     public void endTrip(TripEndReason reason, TrackerLocation endLocation) {
         this.endTime = endLocation.getRecordedAt();
         this.endLocation = endLocation;
@@ -112,7 +119,7 @@ public class Trip {
             TrackerLocation lastLocation = getLastLocationPoint();
             if (lastLocation != null) {
                 Float segmentDistance = calculateDistance(lastLocation, endLocation);
-                addLocationPoint(endLocation, segmentDistance);
+                addLocationPoint(endLocation);
             }
         }
     }
@@ -132,10 +139,24 @@ public class Trip {
         return tripPoints.isEmpty() ? null : 
                tripPoints.get(tripPoints.size() - 1).getLocation();
     }
-    
-    private Float calculateDistance(TrackerLocation loc1, TrackerLocation loc2) {
-        // Simplified distance calculation (Haversine formula would be better)
-        return 0.0f; // Implement actual distance calculation
+
+    private Float calculateDistance(TrackerLocation a, TrackerLocation b) {
+        if (a.getLatitude() == null || a.getLongitude() == null) return 0f;
+        if (b.getLatitude() == null || b.getLongitude() == null) return 0f;
+
+        final double R = 6371.0;
+
+        double lat1 = Math.toRadians(a.getLatitude());
+        double lat2 = Math.toRadians(b.getLatitude());
+        double dLat = lat2 - lat1;
+        double dLon = Math.toRadians(b.getLongitude() - a.getLongitude());
+
+        double h =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(lat1) * Math.cos(lat2) *
+                                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+        return (float) (R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)));
     }
     
     public Duration getDuration() {

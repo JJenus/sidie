@@ -202,7 +202,7 @@ public class NotificationOrchestrator {
         if (template == null) return "";
         
         return template
-            .replace("{{alertId}}", alert.getAlertId())
+            .replace("{{alertId}}", alert.getAlertId()+"")
             .replace("{{ruleKey}}", alert.getRuleKey())
             .replace("{{vehicleId}}", alert.getVehicleId())
             .replace("{{alertType}}", alert.getAlertType())

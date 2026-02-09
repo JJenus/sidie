@@ -43,6 +43,7 @@ public class GeofenceExitRule implements IAlertRule {
             alert = new AlertDetectedEvent(
                 ruleKey, AlertType.GEOFENCE_EXIT,
                 vehicleId,
+                    "tracker_de_geofence_ex",
                 message,
                 AlertSeverity.WARNING,
                 newLocation

@@ -51,6 +51,7 @@ public class MaxSpeedRule implements IAlertRule {
                     ruleKey,
                     AlertType.OVERSPEED,
                     vehicleId,
+                    "tracker_",
                     message,
                     severity,
                     newLocation

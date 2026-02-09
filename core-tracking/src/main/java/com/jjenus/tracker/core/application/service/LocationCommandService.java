@@ -4,12 +4,12 @@ import com.jjenus.tracker.core.api.dto.LocationResponse;
 import com.jjenus.tracker.core.domain.entity.Tracker;
 import com.jjenus.tracker.core.domain.entity.TrackerLocation;
 import com.jjenus.tracker.core.domain.entity.Vehicle;
+import com.jjenus.tracker.core.infrastructure.config.LocationMetadataMapper;
 import com.jjenus.tracker.core.infrastructure.repository.TrackerLocationRepository;
 import com.jjenus.tracker.core.infrastructure.repository.TrackerRepository;
 import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
@@ -28,7 +28,7 @@ public class LocationCommandService {
     private final TrackerRepository trackerRepository;
     private final VehicleRepository vehicleRepository;
     private final LocationQueryService locationQueryService;
-    private final ModelMapper modelMapper;
+    private final TripCommandService tripCommandService;
 
 //    Find Active trip and add location
     @Caching(evict = {
@@ -50,26 +50,24 @@ public class LocationCommandService {
         location.setTracker(tracker);
         location.setValidity(location.isValid() ? "A" : "V");
 
-        /*  todo:
-         * use meta to set the rest fields. Make a constants, use that as keys
-         * to populate meta in device comm and extract data here.
-         */
+        LocationMetadataMapper.mapMetadataToLocation(location, meta);
 
-        // Update tracker last seen
         tracker.updateLastSeen();
         trackerRepository.save(tracker);
+
+        TrackerLocation savedLocation = locationRepository.save(location);
 
         // Update vehicle location if assigned
         if (tracker.getVehicle() != null) {
             Vehicle vehicle = tracker.getVehicle();
-            vehicle.updateLocation(location);
+            vehicle.updateLocation(savedLocation);
             vehicleRepository.save(vehicle);
+
+            tripCommandService.addTripPoint(vehicle.getVehicleId(), savedLocation);
         }
 
-        TrackerLocation saved = locationRepository.save(location);
-
-        log.info("Location recorded: {} for tracker: {}", saved.getLocationId(), trackerId);
-        return locationQueryService.getLocation(saved.getLocationId());
+        log.info("Location recorded: {} for tracker: {}", savedLocation.getLocationId(), trackerId);
+        return locationQueryService.getLocation(savedLocation.getLocationId());
     }
 
     @Caching(evict = {

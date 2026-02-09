@@ -23,7 +23,7 @@ public class Notification {
     private String notificationId;
     
     @Column(nullable = false)
-    private String alertId; // From alerting context
+    private long alertId; // From alerting context
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -131,8 +131,8 @@ public class Notification {
     public String getNotificationId() { return notificationId; }
     public void setNotificationId(String notificationId) { this.notificationId = notificationId; }
     
-    public String getAlertId() { return alertId; }
-    public void setAlertId(String alertId) { this.alertId = alertId; }
+    public long getAlertId() { return alertId; }
+    public void setAlertId(long alertId) { this.alertId = alertId; }
     
     public NotificationChannel getChannel() { return channel; }
     public void setChannel(NotificationChannel channel) { this.channel = channel; }

@@ -3,15 +3,17 @@ package com.jjenus.tracker.notification.api.dto;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 public class NotificationResponse {
     private String notificationId;
-    private String alertId;
     private String channel;
     private String recipient;
     private String title;
     private String message;
     private String status;
+    private Map<String, Object> meta = new HashMap<>();
     
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private Instant sentAt;
@@ -28,10 +30,15 @@ public class NotificationResponse {
     // Getters and Setters
     public String getNotificationId() { return notificationId; }
     public void setNotificationId(String notificationId) { this.notificationId = notificationId; }
-    
-    public String getAlertId() { return alertId; }
-    public void setAlertId(String alertId) { this.alertId = alertId; }
-    
+
+    public Map<String, Object> getMeta() {
+        return meta;
+    }
+
+    public void setMeta(Map<String, Object> meta) {
+        this.meta = meta;
+    }
+
     public String getChannel() { return channel; }
     public void setChannel(String channel) { this.channel = channel; }
     

@@ -85,7 +85,6 @@ public class NotificationQueryService {
     private NotificationResponse toResponse(Notification notification) {
         NotificationResponse response = new NotificationResponse();
         response.setNotificationId(notification.getNotificationId());
-        response.setAlertId(notification.getAlertId());
         response.setChannel(notification.getChannel().name());
         response.setRecipient(notification.getRecipient());
         response.setTitle(notification.getTitle());

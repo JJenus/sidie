@@ -39,7 +39,6 @@ public class VehicleEventHandler {
                 vehicleId = vehicleResponse.getVehicleId();
             } catch (Exception e) {
                 log.warn("No vehicle found for device {}, creating new vehicle", event.getDeviceId());
-                // Create new vehicle logic here
             }
 
             // Record location

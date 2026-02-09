@@ -57,6 +57,7 @@ public class IdleTimeRule implements IAlertRule {
                     ruleKey,
                     AlertType.IDLE_TIMEOUT,
                     vehicleId,
+                    "tracker_id_idle_rule",
                     message,
                     AlertSeverity.INFO,
                     newLocation

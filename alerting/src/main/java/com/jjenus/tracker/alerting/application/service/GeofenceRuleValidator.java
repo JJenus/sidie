@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class GeofenceRuleValidator {
 
-    private final GeofenceService geofenceService;
+    private final GeofenceQueryService geofenceService;
 
-    public GeofenceRuleValidator(GeofenceService geofenceService) {
+    public GeofenceRuleValidator(GeofenceQueryService geofenceService) {
         this.geofenceService = geofenceService;
     }
 

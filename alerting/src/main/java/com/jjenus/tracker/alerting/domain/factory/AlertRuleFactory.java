@@ -1,6 +1,6 @@
 package com.jjenus.tracker.alerting.domain.factory;
 
-import com.jjenus.tracker.alerting.application.service.GeofenceService;
+import com.jjenus.tracker.alerting.application.service.GeofenceQueryService;
 import com.jjenus.tracker.alerting.domain.*;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,9 +20,9 @@ public class AlertRuleFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(AlertRuleFactory.class);
 
-    private final GeofenceService geofenceService;
+    private final GeofenceQueryService geofenceService;
 
-    public AlertRuleFactory(GeofenceService geofenceService) {
+    public AlertRuleFactory(GeofenceQueryService geofenceService) {
         this.geofenceService = geofenceService;
     }
 
@@ -136,7 +137,8 @@ public class AlertRuleFactory {
                         point.getLatitude(),
                         point.getLongitude(),
                         0.0f, // Speed not relevant for geofence points
-                        java.time.Instant.now()
+                        java.time.Instant.now(),
+                        new HashMap<>()
                 ))
                 .toList();
     }
@@ -155,7 +157,8 @@ public class AlertRuleFactory {
                     lat + latOffset,
                     lon + lonOffset,
                     0.0f,
-                    java.time.Instant.now()
+                    java.time.Instant.now(),
+                    new HashMap<>()
             ));
         }
 

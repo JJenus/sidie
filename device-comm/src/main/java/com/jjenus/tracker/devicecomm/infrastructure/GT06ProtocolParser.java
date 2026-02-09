@@ -3,6 +3,7 @@ package com.jjenus.tracker.devicecomm.infrastructure;
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
+import com.jjenus.tracker.shared.util.LocationMetadataConstants;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,32 +33,38 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String cleanData = data.substring(1, data.length() - 1);
             String[] parts = cleanData.split(",");
 
+            String deviceId = parts[1];
             String protocolType = parts[2]; // V1, V2, V3, V4, V5, HTBT
+
+            // Create base metadata with device info
+            Map<String, Object> baseMetadata = new HashMap<>();
+            baseMetadata.put(LocationMetadataConstants.DEVICE_ID, deviceId);
+            baseMetadata.put(LocationMetadataConstants.PROTOCOL_NAME, "GT06");
+            baseMetadata.put(LocationMetadataConstants.PROTOCOL_TYPE, protocolType);
 
             // Handle command response packets
             if ("V4".equals(protocolType) && parts.length >= 4 && "S20".equals(parts[3])) {
-                return parseCommandResponsePacket(parts);
+                return parseCommandResponsePacket(parts, baseMetadata);
             }
 
-            return switch (protocolType) {
-                case "V0" -> parseLoginPacket(parts);
-                case "V1", "V2", "V4" -> parseGPSPacket(parts);
-                case "V3" -> parseLBSPacket(parts);
-                case "V5" -> parseWifiPacket(parts);
-                case "HTBT" -> parseHeartbeatPacket(parts);
-                default -> parseGenericPacket(parts);
+            LocationPoint location = switch (protocolType) {
+                case "V0" -> parseLoginPacket(parts, baseMetadata);
+                case "V1", "V2", "V4" -> parseGPSPacket(parts, baseMetadata);
+                case "V3" -> parseLBSPacket(parts, baseMetadata);
+                case "V5" -> parseWifiPacket(parts, baseMetadata);
+                case "HTBT" -> parseHeartbeatPacket(parts, baseMetadata);
+                default -> parseGenericPacket(parts, baseMetadata);
             };
+
+            return location;
 
         } catch (Exception e) {
             throw new ProtocolParseException("Failed to parse GT06 data: " + e.getMessage());
         }
     }
 
-    private LocationPoint parseCommandResponsePacket(String[] parts) throws ProtocolParseException {
+    private LocationPoint parseCommandResponsePacket(String[] parts, Map<String, Object> baseMetadata) throws ProtocolParseException {
         try {
-            // Format for S20 command response:
-            // *HQ,IMEI,V4,S20,DONE,HHMMSS,response_time,A,latitude,N,longitude,E,speed,direction,DDMMYY,status,...
-            // Example: *HQ,8168000005,V4,S20,DONE,061158,061116,A,2235.0086,N,11354.3668,E,000.00,000,160716F7FFBBFF,460,00
             if (parts.length < 17) {
                 throw new ProtocolParseException("Incomplete command response packet");
             }
@@ -73,79 +80,48 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String directionStr = parts[13];
             String dateStr = parts[14];
 
-            // Parse latitude
+            // Parse coordinates
             double latitude = parseDDMMtoDecimal(latStr);
-            if ("S".equals(latDir)) {
-                latitude = -latitude;
-            }
+            if ("S".equals(latDir)) latitude = -latitude;
 
-            // Parse longitude
             double longitude = parseDDMMtoDecimal(lonStr);
-            if ("W".equals(lonDir)) {
-                longitude = -longitude;
-            }
+            if ("W".equals(lonDir)) longitude = -longitude;
 
             // Parse speed
-            float speedKnots = 0.0f;
-            try {
-                speedKnots = Float.parseFloat(speedStr);
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse speed: {}", speedStr);
-            }
+            float speedKnots = parseFloatSafe(speedStr, 0.0f);
             float speedKmh = speedKnots * 1.852f;
 
             // Parse timestamp
-            String cleanDateStr = dateStr;
-            String statusHex = "";
-            if (dateStr.length() >= 6 && dateStr.matches(".*[0-9]{6}.*")) {
-                cleanDateStr = dateStr.substring(0, 6);
-                if (dateStr.length() > 6) {
-                    statusHex = dateStr.substring(6);
-                }
-            } else {
-                cleanDateStr = getCurrentDateString();
-            }
+            String[] dateAndStatus = extractDateAndStatus(dateStr);
+            String cleanDateStr = dateAndStatus[0];
+            String statusHex = dateAndStatus[1];
 
-            Instant timestamp;
-            try {
-                timestamp = parseDateTime(cleanDateStr, gpsTimeStr);
-            } catch (Exception e) {
-                log.warn("Failed to parse timestamp, using response time: {}", e.getMessage());
-                timestamp = parseDateTime(cleanDateStr, responseTimeStr);
-            }
+            Instant timestamp = parseTimestampSafe(cleanDateStr, gpsTimeStr, responseTimeStr);
 
-            // Create metadata map
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("validity", validity);
-            metadata.put("heading", parseHeading(directionStr));
-            metadata.put("response_time", responseTimeStr);
-            metadata.put("gps_time", gpsTimeStr);
-            metadata.put("protocol_type", "V4");
-            metadata.put("command_code", "S20");
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>(baseMetadata);
+            metadata.put(LocationMetadataConstants.VALIDITY, validity);
+            metadata.put(LocationMetadataConstants.HEADING, parseHeading(directionStr));
+            metadata.put(LocationMetadataConstants.RESPONSE_TIME, responseTimeStr);
+            metadata.put(LocationMetadataConstants.GPS_TIME, gpsTimeStr);
+            metadata.put(LocationMetadataConstants.PACKET_TYPE, "commandResponse");
+            metadata.put(LocationMetadataConstants.COMMAND_CODE, parts[3]);
+            metadata.put(LocationMetadataConstants.COMMAND_STATUS, parts[4]);
 
-            // Parse status bits if available
+            // Add status bits
             if (!statusHex.isEmpty()) {
-                metadata.put("vehicleStatus", statusHex);
+                metadata.put(LocationMetadataConstants.VEHICLE_STATUS_HEX, statusHex);
                 Map<String, Boolean> statusBits = parseStatusBits(statusHex);
                 metadata.putAll(statusBits);
             }
 
             // Add network information
-            if (parts.length > 15) {
-                metadata.put("mcc", parts[15]);
-                metadata.put("mnc", parts[16]);
-            }
+            addNetworkInfo(metadata, parts, 15);
 
-            if (parts.length > 17) {
-                metadata.put("lac", parts[17]);
-                metadata.put("cellId", parts[18]);
-            }
+            // Add extra fields
+            addExtraFields(metadata, parts, 19, "extra");
 
-            // Add any additional fields
-            for (int i = 19; i < parts.length; i++) {
-                metadata.put("extra_" + (i - 19), parts[i]);
-            }
-
+            log.debug("GT06 command response parsed with {} metadata entries", metadata.size());
             return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
 
         } catch (Exception e) {
@@ -153,10 +129,8 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseGPSPacket(String[] parts) throws ProtocolParseException {
+    private LocationPoint parseGPSPacket(String[] parts, Map<String, Object> baseMetadata) throws ProtocolParseException {
         try {
-            // Format: *XX,IMEI,V1/V2/V4,HHMMSS,valid,latitude,N/S,longitude,E/W,speed,direction,DDMMYY,status#
-            // Example: *HQ,865205030330012,V1,145452,A,2240.55181,N,11358.32389,E,0.00,0,100815,FFFFFBFF#
             if (parts.length < 12) {
                 throw new ProtocolParseException("Incomplete GPS packet");
             }
@@ -171,44 +145,40 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String directionStr = parts[10];
             String dateStr = parts[11];
 
-            // Parse latitude
+            // Parse coordinates
             double latitude = parseDDMMtoDecimal(latStr);
-            if ("S".equals(latDir)) {
-                latitude = -latitude;
-            }
+            if ("S".equals(latDir)) latitude = -latitude;
 
-            // Parse longitude
             double longitude = parseDDMMtoDecimal(lonStr);
-            if ("W".equals(lonDir)) {
-                longitude = -longitude;
-            }
+            if ("W".equals(lonDir)) longitude = -longitude;
 
             // Parse speed
-            float speedKnots = Float.parseFloat(speedKnotStr);
+            float speedKnots = parseFloatSafe(speedKnotStr, 0.0f);
             float speedKmh = speedKnots * 1.852f;
 
             // Parse timestamp
             Instant timestamp = parseDateTime(dateStr, timeStr);
 
-            // Create metadata map
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("validity", validity);
-            metadata.put("heading", parseHeading(directionStr));
-            metadata.put("protocol_type", parts[2]);
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>(baseMetadata);
+            metadata.put(LocationMetadataConstants.VALIDITY, validity);
+            metadata.put(LocationMetadataConstants.HEADING, parseHeading(directionStr));
+            metadata.put(LocationMetadataConstants.TIME_STR, timeStr);
+            metadata.put(LocationMetadataConstants.DATE_STR, dateStr);
+            metadata.put(LocationMetadataConstants.PACKET_TYPE, "gps");
 
             // Parse status bits if available
             if (parts.length > 12) {
                 String statusHex = parts[12];
-                metadata.put("vehicleStatus", statusHex);
+                metadata.put(LocationMetadataConstants.VEHICLE_STATUS_HEX, statusHex);
                 Map<String, Boolean> statusBits = parseStatusBits(statusHex);
                 metadata.putAll(statusBits);
             }
 
-            // Add any additional fields to metadata
-            for (int i = 13; i < parts.length; i++) {
-                metadata.put("extra_" + (i - 13), parts[i]);
-            }
+            // Add extra fields
+            addExtraFields(metadata, parts, 13, "extra");
 
+            log.debug("GT06 GPS packet parsed with {} metadata entries", metadata.size());
             return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
 
         } catch (Exception e) {
@@ -216,10 +186,8 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseLBSPacket(String[] parts) throws ProtocolParseException {
+    private LocationPoint parseLBSPacket(String[] parts, Map<String, Object> baseMetadata) throws ProtocolParseException {
         try {
-            // Format: *XX,IMEI,V3,HHMMSS,base_info,battery_info,failure_info,cont,DDMMYY,status#
-            // Example: *HQ,865205030330012,V3,000201,46000,07,...#
             if (parts.length < 9) {
                 throw new ProtocolParseException("Incomplete LBS packet");
             }
@@ -240,24 +208,26 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             // Parse timestamp
             Instant timestamp = parseDateTime(dateStr, timeStr);
 
-            // Create metadata map
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("protocol_type", "V3");
-            metadata.put("packet_type", "lbs");
-            metadata.put("mcc_mnc", mccMnc);
-            metadata.put("battery_info", batteryHex);
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>(baseMetadata);
+            metadata.put(LocationMetadataConstants.PACKET_TYPE, "lbs");
+            metadata.put(LocationMetadataConstants.MCC_MNC, mccMnc);
+            metadata.put(LocationMetadataConstants.BATTERY_INFO_HEX, batteryHex);
+            metadata.put(LocationMetadataConstants.TIME_STR, timeStr);
+            metadata.put(LocationMetadataConstants.DATE_STR, dateStr);
 
             // Parse MCC/MNC
             if (mccMnc.length() >= 5) {
-                metadata.put("mcc", mccMnc.substring(0, 3));
-                metadata.put("mnc", mccMnc.substring(3, 5));
+                metadata.put(LocationMetadataConstants.MCC, mccMnc.substring(0, 3));
+                metadata.put(LocationMetadataConstants.MNC, mccMnc.substring(3, 5));
             }
 
-            // Add all parts as metadata for debugging
+            // Add all parts for debugging
             for (int i = 0; i < parts.length; i++) {
-                metadata.put("part_" + i, parts[i]);
+                metadata.put(LocationMetadataConstants.PART_PREFIX + "_" + i, parts[i]);
             }
 
+            log.debug("GT06 LBS packet parsed with {} metadata entries", metadata.size());
             return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
 
         } catch (Exception e) {
@@ -265,9 +235,8 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseWifiPacket(String[] parts) throws ProtocolParseException {
+    private LocationPoint parseWifiPacket(String[] parts, Map<String, Object> baseMetadata) throws ProtocolParseException {
         try {
-            // Format: *XX,IMEI,V5,HHMMSS,wifi_count,wifi_info...,battery_info,DDMMYY,status#
             if (parts.length < 8) {
                 throw new ProtocolParseException("Incomplete WIFI packet");
             }
@@ -279,11 +248,12 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             // Parse timestamp
             Instant timestamp = parseDateTime(dateStr, timeStr);
 
-            // Create metadata map
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("protocol_type", "V5");
-            metadata.put("packet_type", "wifi");
-            metadata.put("wifi_count", wifiCountStr);
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>(baseMetadata);
+            metadata.put(LocationMetadataConstants.PACKET_TYPE, "wifi");
+            metadata.put(LocationMetadataConstants.WIFI_COUNT, wifiCountStr);
+            metadata.put(LocationMetadataConstants.TIME_STR, timeStr);
+            metadata.put(LocationMetadataConstants.DATE_STR, dateStr);
 
             // Parse WiFi APs if available
             try {
@@ -293,14 +263,15 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
                     String wifiInfo = parts[wifiStart + i];
                     String[] wifiParts = wifiInfo.split(":");
                     if (wifiParts.length >= 2) {
-                        metadata.put("wifi_mac_" + i, wifiParts[0]);
-                        metadata.put("wifi_signal_" + i, wifiParts[1]);
+                        metadata.put(LocationMetadataConstants.WIFI_MAC_PREFIX + "_" + i, wifiParts[0]);
+                        metadata.put(LocationMetadataConstants.WIFI_SIGNAL_PREFIX + "_" + i, wifiParts[1]);
                     }
                 }
             } catch (NumberFormatException e) {
                 log.warn("Failed to parse WiFi count: {}", wifiCountStr);
             }
 
+            log.debug("GT06 WIFI packet parsed with {} metadata entries", metadata.size());
             return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
 
         } catch (Exception e) {
@@ -308,52 +279,46 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseHeartbeatPacket(String[] parts) throws ProtocolParseException {
-        try {
-            // Format: *XX,IMEI,HTBT# or *XX,IMEI,HTBT,battery_percent#
-            Instant timestamp = Instant.now();
-
-            // Create metadata map
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("protocol_type", "HTBT");
-            metadata.put("packet_type", "heartbeat");
-
-            if (parts.length > 3) {
-                metadata.put("battery_percent", parts[3]);
-            }
-
-            return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
-
-        } catch (Exception e) {
-            throw new ProtocolParseException("Failed to parse heartbeat packet: " + e.getMessage());
-        }
-    }
-
-    private LocationPoint parseLoginPacket(String[] parts) throws ProtocolParseException {
-        // Login packet just announces device presence
+    private LocationPoint parseHeartbeatPacket(String[] parts, Map<String, Object> baseMetadata) {
         Instant timestamp = Instant.now();
 
-        // Create metadata map
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("protocol_type", "V0");
-        metadata.put("packet_type", "login");
+        Map<String, Object> metadata = new HashMap<>(baseMetadata);
+        metadata.put(LocationMetadataConstants.PACKET_TYPE, "heartbeat");
 
+        if (parts.length > 3) {
+            metadata.put(LocationMetadataConstants.BATTERY_PERCENT, parts[3]);
+        }
+
+        log.debug("GT06 heartbeat packet parsed");
         return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
     }
 
-    private LocationPoint parseGenericPacket(String[] parts) {
-        // Create metadata map for generic packets
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("protocol_type", parts[2]);
-        metadata.put("packet_type", "generic");
+    private LocationPoint parseLoginPacket(String[] parts, Map<String, Object> baseMetadata) {
+        Instant timestamp = Instant.now();
 
-        // Add all parts as metadata for debugging
+        Map<String, Object> metadata = new HashMap<>(baseMetadata);
+        metadata.put(LocationMetadataConstants.PACKET_TYPE, "login");
+
+        log.debug("GT06 login packet parsed");
+        return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
+    }
+
+    private LocationPoint parseGenericPacket(String[] parts, Map<String, Object> baseMetadata) {
+        Instant timestamp = Instant.now();
+
+        Map<String, Object> metadata = new HashMap<>(baseMetadata);
+        metadata.put(LocationMetadataConstants.PACKET_TYPE, "generic");
+
+        // Add all parts for debugging
         for (int i = 0; i < parts.length; i++) {
-            metadata.put("part_" + i, parts[i]);
+            metadata.put(LocationMetadataConstants.PART_PREFIX + "_" + i, parts[i]);
         }
 
-        return new LocationPoint(0.0, 0.0, 0.0f, Instant.now(), metadata);
+        log.debug("GT06 generic packet parsed with {} parts", parts.length);
+        return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
     }
+
+    // Helper methods
 
     private double parseDDMMtoDecimal(String ddmm) {
         try {
@@ -362,6 +327,7 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             double minutes = value - (degrees * 100);
             return degrees + (minutes / 60.0);
         } catch (NumberFormatException e) {
+            log.warn("Failed to parse DDMM coordinate: {}", ddmm);
             return 0.0;
         }
     }
@@ -380,7 +346,60 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             LocalDateTime ldt = LocalDateTime.parse(dateTimeStr, DATE_TIME_FORMATTER);
             return ldt.atZone(ZoneId.systemDefault()).toInstant();
         } catch (Exception e) {
+            log.warn("Failed to parse timestamp, using current time: {}", e.getMessage());
             return Instant.now();
+        }
+    }
+
+    private float parseFloatSafe(String value, float defaultValue) {
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private String[] extractDateAndStatus(String dateStr) {
+        String cleanDateStr = getCurrentDateString();
+        String statusHex = "";
+
+        if (dateStr != null && dateStr.length() >= 6 && dateStr.matches(".*[0-9]{6}.*")) {
+            cleanDateStr = dateStr.substring(0, 6);
+            if (dateStr.length() > 6) {
+                statusHex = dateStr.substring(6);
+            }
+        }
+
+        return new String[]{cleanDateStr, statusHex};
+    }
+
+    private Instant parseTimestampSafe(String dateStr, String gpsTimeStr, String fallbackTimeStr) {
+        try {
+            return parseDateTime(dateStr, gpsTimeStr);
+        } catch (Exception e) {
+            log.warn("Failed to parse GPS timestamp, using response time: {}", e.getMessage());
+            return parseDateTime(dateStr, fallbackTimeStr);
+        }
+    }
+
+    private void addNetworkInfo(Map<String, Object> metadata, String[] parts, int startIndex) {
+        if (parts.length > startIndex) {
+            metadata.put(LocationMetadataConstants.MCC, parts[startIndex]);
+        }
+        if (parts.length > startIndex + 1) {
+            metadata.put(LocationMetadataConstants.MNC, parts[startIndex + 1]);
+        }
+        if (parts.length > startIndex + 2) {
+            metadata.put(LocationMetadataConstants.LAC, parts[startIndex + 2]);
+        }
+        if (parts.length > startIndex + 3) {
+            metadata.put(LocationMetadataConstants.CELL_ID, parts[startIndex + 3]);
+        }
+    }
+
+    private void addExtraFields(Map<String, Object> metadata, String[] parts, int startIndex, String prefix) {
+        for (int i = startIndex; i < parts.length; i++) {
+            metadata.put(prefix + "_" + (i - startIndex), parts[i]);
         }
     }
 
@@ -389,7 +408,6 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         if (data == null || data.isEmpty()) {
             return false;
         }
-
         return GT06_PATTERN.matcher(data).matches();
     }
 
@@ -399,7 +417,6 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,1,3#", deviceId, timeStr);
             return command;
-
         } catch (Exception e) {
             throw ProtocolException.commandBuildError("GT06", "fuel cut");
         }
@@ -411,17 +428,9 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,1,0#", deviceId, timeStr);
             return command;
-
         } catch (Exception e) {
             throw ProtocolException.commandBuildError("GT06", "engine on");
         }
-    }
-
-    private String getCurrentTimeString() {
-        return String.format("%02d%02d%02d",
-                java.time.LocalTime.now().getHour(),
-                java.time.LocalTime.now().getMinute(),
-                java.time.LocalTime.now().getSecond());
     }
 
     @Override
@@ -429,7 +438,6 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
         return "GT06";
     }
 
-    // Additional utility method to parse vehicle status bits
     public Map<String, Boolean> parseStatusBits(String statusHex) {
         Map<String, Boolean> statusMap = new HashMap<>();
 
@@ -438,37 +446,43 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
                 return statusMap;
             }
 
-            // Convert hex to binary (32 bits)
             long value = Long.parseLong(statusHex, 16);
             String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
 
             // Parse bits according to protocol (LSB first, 0 = active)
             // Byte 4 bits (bits 24-31)
-            statusMap.put("door_open", binary.charAt(31) == '0');
-            statusMap.put("overspeed_alarm", binary.charAt(30) == '0');
-            statusMap.put("fence_in_alarm", binary.charAt(28) == '0');
-            statusMap.put("fence_out_alarm", binary.charAt(25) == '0');
+            statusMap.put(LocationMetadataConstants.DOOR_OPEN, binary.charAt(31) == '0');
+            statusMap.put(LocationMetadataConstants.OVERSPEED_ALARM, binary.charAt(30) == '0');
+            statusMap.put(LocationMetadataConstants.FENCE_IN_ALARM, binary.charAt(28) == '0');
+            statusMap.put(LocationMetadataConstants.FENCE_OUT_ALARM, binary.charAt(25) == '0');
 
             // Byte 3 bits (bits 16-23)
-            statusMap.put("gps_status", binary.charAt(22) == '0');
-            statusMap.put("acc_off", binary.charAt(22) == '0');
-            statusMap.put("sos_alarm", binary.charAt(21) == '0');
-            statusMap.put("vibration_alarm", binary.charAt(19) == '0');
-            statusMap.put("low_battery_alarm", binary.charAt(18) == '0');
+            statusMap.put(LocationMetadataConstants.GPS_SIGNAL, binary.charAt(22) == '0');
+            statusMap.put(LocationMetadataConstants.ACC_OFF, binary.charAt(22) == '0');
+            statusMap.put(LocationMetadataConstants.SOS_ALARM, binary.charAt(21) == '0');
+            statusMap.put(LocationMetadataConstants.VIBRATION_ALARM, binary.charAt(19) == '0');
+            statusMap.put(LocationMetadataConstants.LOW_BATTERY_ALARM, binary.charAt(18) == '0');
 
             // Byte 2 bits (bits 8-15)
-            statusMap.put("power_cut_alarm", binary.charAt(12) == '0');
+            statusMap.put(LocationMetadataConstants.POWER_CUT_ALARM, binary.charAt(12) == '0');
 
             // Byte 1 bits (bits 0-7)
-            statusMap.put("vehicle_battery_remove_alarm", binary.charAt(4) == '0');
-            statusMap.put("anti_tamper_alarm", binary.charAt(3) == '0');
-            statusMap.put("cut_off_oil", binary.charAt(2) == '0');
+            statusMap.put(LocationMetadataConstants.VEHICLE_BATTERY_REMOVE_ALARM, binary.charAt(4) == '0');
+            statusMap.put(LocationMetadataConstants.ANTI_TAMPER_ALARM, binary.charAt(3) == '0');
+            statusMap.put(LocationMetadataConstants.CUT_OFF_OIL, binary.charAt(2) == '0');
 
         } catch (Exception e) {
             log.warn("Error parsing status bits: {}", e.getMessage());
         }
 
         return statusMap;
+    }
+
+    private String getCurrentTimeString() {
+        return String.format("%02d%02d%02d",
+                java.time.LocalTime.now().getHour(),
+                java.time.LocalTime.now().getMinute(),
+                java.time.LocalTime.now().getSecond());
     }
 
     private String getCurrentDateString() {

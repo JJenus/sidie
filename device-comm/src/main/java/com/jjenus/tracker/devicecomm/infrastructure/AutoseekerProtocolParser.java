@@ -3,6 +3,7 @@ package com.jjenus.tracker.devicecomm.infrastructure;
 import com.jjenus.tracker.devicecomm.domain.ITrackerProtocolParser;
 import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import com.jjenus.tracker.devicecomm.exception.ProtocolParseException;
+import com.jjenus.tracker.shared.util.LocationMetadataConstants;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public class AutoseekerProtocolParser implements ITrackerProtocolParser {
+
     private static final Pattern AUTOSEEKER_PATTERN = Pattern.compile(
             "^\\*[A-Z]{2},[0-9]{10},(V[0-5]|R12|D1|S20|SCF|S71|R7|LOCK|MILE),.*#"
     );
@@ -36,12 +38,19 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             String cleanData = data.substring(1, data.length() - 1);
             String[] parts = cleanData.split(",");
 
+            String deviceId = parts[1];
             String protocolType = parts[2]; // V1, V4, etc.
 
+            // Create base metadata with device info
+            Map<String, Object> baseMetadata = new HashMap<>();
+            baseMetadata.put(LocationMetadataConstants.DEVICE_ID, deviceId);
+            baseMetadata.put(LocationMetadataConstants.PROTOCOL_NAME, "Autoseeker");
+            baseMetadata.put(LocationMetadataConstants.PROTOCOL_TYPE, protocolType);
+
             return switch (protocolType) {
-                case "V1" -> parseHeartPackPacket(parts);
-                case "V4" -> parseCommandResponsePacket(parts);
-                default -> parseGenericPacket(parts);
+                case "V1" -> parseHeartPackPacket(parts, baseMetadata);
+                case "V4" -> parseCommandResponsePacket(parts, baseMetadata);
+                default -> parseGenericPacket(parts, baseMetadata);
             };
 
         } catch (Exception e) {
@@ -49,14 +58,12 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseHeartPackPacket(String[] parts) throws ProtocolParseException {
+    private LocationPoint parseHeartPackPacket(String[] parts, Map<String, Object> baseMetadata) throws ProtocolParseException {
         try {
-            // Format: *HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#
             if (parts.length < 17) {
                 throw new ProtocolParseException("Incomplete heart pack packet");
             }
 
-            String deviceId = parts[1];
             String timeStr = parts[3];
             String validity = parts[4];
             String latStr = parts[5];
@@ -68,73 +75,45 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             String dateStr = parts[11];
             String vehicleStatus = parts[12];
 
-            // Parse latitude (DDMM.MMMM format)
+            // Parse coordinates
             double latitude = parseDDMMtoDecimal(latStr);
-            if ("S".equals(latDir)) {
-                latitude = -latitude;
-            }
+            if ("S".equals(latDir)) latitude = -latitude;
 
-            // Parse longitude (DDDMM.MMMM format)
             double longitude = parseDDMMtoDecimal(lonStr);
-            if ("W".equals(lonDir)) {
-                longitude = -longitude;
-            }
+            if ("W".equals(lonDir)) longitude = -longitude;
 
-            // Parse speed (knots to km/h)
-            float speedKnots = Float.parseFloat(speedStr);
+            // Parse speed
+            float speedKnots = parseFloatSafe(speedStr, 0.0f);
             float speedKmh = speedKnots * 1.852f;
 
             // Parse timestamp
             Instant timestamp = parseDateTime(dateStr, timeStr);
 
-            // Data is only valid if validity is 'A'
-            boolean isValid = "A".equals(validity);
-            if (!isValid) {
-                speedKmh = 0.0f;
-                log.debug("GPS data not valid (validity={})", validity);
-            }
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>(baseMetadata);
+            metadata.put(LocationMetadataConstants.VALIDITY, validity);
+            metadata.put(LocationMetadataConstants.HEADING, parseHeading(directionStr));
+            metadata.put(LocationMetadataConstants.VEHICLE_STATUS_HEX, vehicleStatus);
+            metadata.put(LocationMetadataConstants.PACKET_TYPE, "heartbeat");
+            metadata.put(LocationMetadataConstants.TIME_STR, timeStr);
+            metadata.put(LocationMetadataConstants.DATE_STR, dateStr);
 
-            // Create metadata map and populate with all extra fields
-            Map<String, Object> metadata = new HashMap<>();
-
-            // Add basic fields to metadata
-            metadata.put("validity", validity);
-            metadata.put("heading", parseHeading(directionStr));
-            metadata.put("vehicleStatus", vehicleStatus);
-            metadata.put("protocol_type", "V1");
-
-            // Parse vehicle status bits if available
+            // Parse vehicle status bits
             if (vehicleStatus != null && !vehicleStatus.isEmpty()) {
                 Map<String, Boolean> statusBits = parseVehicleStatus(vehicleStatus);
                 metadata.putAll(statusBits);
             }
 
-            // Add network information to metadata
-            if (parts.length > 13) {
-                metadata.put("mcc", parts[13]);
-                metadata.put("mnc", parts[14]);
-                metadata.put("lac", parts[15]);
-                metadata.put("cellId", parts[16]);
-            }
+            // Add network information
+            addNetworkInfo(metadata, parts, 13);
 
-            // Add GPS/GSM signal and voltage to metadata
-            if (parts.length > 19) {
-                try {
-                    metadata.put("gpsSignal", Integer.parseInt(parts[17]));
-                    metadata.put("gsmSignal", Integer.parseInt(parts[18]));
-                    metadata.put("voltage", Integer.parseInt(parts[19]));
-                } catch (NumberFormatException e) {
-                    log.warn("Failed to parse signal/voltage data: {}", e.getMessage());
-                }
-            }
+            // Add GPS/GSM signal and voltage
+            addSignalInfo(metadata, parts, 17);
 
-            // Add any additional fields to metadata
-            for (int i = 20; i < parts.length; i++) {
-                metadata.put("extra_" + (i - 20), parts[i]);
-            }
+            // Add extra fields
+            addExtraFields(metadata, parts, 20, "extra");
 
-            log.debug("Parsed Autoseeker location with {} metadata entries", metadata.size());
-
+            log.debug("Autoseeker heart pack parsed with {} metadata entries", metadata.size());
             return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
 
         } catch (Exception e) {
@@ -142,11 +121,8 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseCommandResponsePacket(String[] parts) throws ProtocolParseException {
+    private LocationPoint parseCommandResponsePacket(String[] parts, Map<String, Object> baseMetadata) throws ProtocolParseException {
         try {
-            // Format varies by command, e.g.:
-            // *HQ,8168000005,V4,D1,30,65535,062108,062025,A,2235.0086,N,11354.3668,E,000.00,000,160716,FFFFBBFF,460,00,10342,3721#
-            // *HQ,8168000005,V4,S20,DONE,061158,061116,A,2235.0086,N,11354.3668,E,000.00,000,160716F7FFBBFF,460,00,10342,3721#
             if (parts.length < 15) {
                 throw new ProtocolParseException("Incomplete command response packet");
             }
@@ -160,92 +136,30 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
 
             // Different response formats for different commands
             if ("D1".equals(commandCode)) {
-                // D1 format: V4,D1,30,65535,062108,062025,A,...
                 responseTime = parts[5];
                 gpsTime = parts[6];
                 gpsDataStartIndex = 7;
             } else if ("S20".equals(commandCode)) {
-                // S20 format: V4,S20,DONE,061158,061116,A,...
-                responseTime = parts[4];  // DONE (but actually it's status)
+                responseTime = parts[4];
                 gpsTime = parts[5];
                 gpsDataStartIndex = 6;
             } else {
-                // Default format for other commands
                 responseTime = parts[4];
                 gpsTime = parts[5];
                 gpsDataStartIndex = 6;
             }
 
-            // Create metadata map
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("command_code", commandCode);
-            metadata.put("command_status", status);
-            metadata.put("response_time", responseTime);
-            metadata.put("gps_time", gpsTime);
-            metadata.put("protocol_type", "V4");
+            // Create metadata
+            Map<String, Object> metadata = new HashMap<>(baseMetadata);
+            metadata.put(LocationMetadataConstants.COMMAND_CODE, commandCode);
+            metadata.put(LocationMetadataConstants.COMMAND_STATUS, status);
+            metadata.put(LocationMetadataConstants.RESPONSE_TIME, responseTime);
+            metadata.put(LocationMetadataConstants.GPS_TIME, gpsTime);
+            metadata.put(LocationMetadataConstants.PACKET_TYPE, "commandResponse");
 
             // Parse GPS data if available
             if (parts.length > gpsDataStartIndex + 9) {
-                String validity = parts[gpsDataStartIndex];
-                String latStr = parts[gpsDataStartIndex + 1];
-                String latDir = parts[gpsDataStartIndex + 2];
-                String lonStr = parts[gpsDataStartIndex + 3];
-                String lonDir = parts[gpsDataStartIndex + 4];
-                String speedStr = parts[gpsDataStartIndex + 5];
-                String directionStr = parts[gpsDataStartIndex + 6];
-                String dateStatus = parts[gpsDataStartIndex + 7];
-
-                // Parse latitude
-                double latitude = parseDDMMtoDecimal(latStr);
-                if ("S".equals(latDir)) {
-                    latitude = -latitude;
-                }
-
-                // Parse longitude
-                double longitude = parseDDMMtoDecimal(lonStr);
-                if ("W".equals(lonDir)) {
-                    longitude = -longitude;
-                }
-
-                // Parse speed
-                float speedKnots = Float.parseFloat(speedStr);
-                float speedKmh = speedKnots * 1.852f;
-
-                // Extract date from combined field
-                String dateStr;
-                String statusHex = "";
-                if (dateStatus.length() >= 6) {
-                    dateStr = dateStatus.substring(0, 6);
-                    if (dateStatus.length() > 6) {
-                        statusHex = dateStatus.substring(6);
-                        metadata.put("vehicleStatus", statusHex);
-                        // Parse status bits
-                        Map<String, Boolean> statusBits = parseVehicleStatus(statusHex);
-                        metadata.putAll(statusBits);
-                    }
-                } else {
-                    dateStr = getCurrentDateString();
-                }
-
-                // Parse timestamp
-                Instant timestamp = parseDateTime(dateStr, gpsTime);
-
-                // Add more metadata
-                metadata.put("validity", validity);
-                metadata.put("heading", parseHeading(directionStr));
-
-                // Add network information if available
-                if (parts.length > gpsDataStartIndex + 10) {
-                    int networkStart = gpsDataStartIndex + 10;
-                    if (parts.length > networkStart) metadata.put("mcc", parts[networkStart]);
-                    if (parts.length > networkStart + 1) metadata.put("mnc", parts[networkStart + 1]);
-                    if (parts.length > networkStart + 2) metadata.put("lac", parts[networkStart + 2]);
-                    if (parts.length > networkStart + 3) metadata.put("cellId", parts[networkStart + 3]);
-                }
-
-                log.debug("Command response parsed with {} metadata entries", metadata.size());
-
-                return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
+                return parseGPSFromCommandResponse(parts, gpsDataStartIndex, metadata);
             } else {
                 // No GPS data in response
                 log.debug("Command response without GPS data: cmd={}, status={}", commandCode, status);
@@ -257,19 +171,69 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         }
     }
 
-    private LocationPoint parseGenericPacket(String[] parts) {
-        // Create metadata map for generic packets
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("protocol_type", parts[2]);
-        metadata.put("packet_type", "generic");
+    private LocationPoint parseGPSFromCommandResponse(String[] parts, int startIndex, Map<String, Object> metadata) {
+        String validity = parts[startIndex];
+        String latStr = parts[startIndex + 1];
+        String latDir = parts[startIndex + 2];
+        String lonStr = parts[startIndex + 3];
+        String lonDir = parts[startIndex + 4];
+        String speedStr = parts[startIndex + 5];
+        String directionStr = parts[startIndex + 6];
+        String dateStatus = parts[startIndex + 7];
 
-        // Add all parts as metadata for debugging
-        for (int i = 0; i < parts.length; i++) {
-            metadata.put("part_" + i, parts[i]);
+        // Parse coordinates
+        double latitude = parseDDMMtoDecimal(latStr);
+        if ("S".equals(latDir)) latitude = -latitude;
+
+        double longitude = parseDDMMtoDecimal(lonStr);
+        if ("W".equals(lonDir)) longitude = -longitude;
+
+        // Parse speed
+        float speedKnots = parseFloatSafe(speedStr, 0.0f);
+        float speedKmh = speedKnots * 1.852f;
+
+        // Extract date and status
+        String[] dateAndStatus = extractDateAndStatus(dateStatus);
+        String dateStr = dateAndStatus[0];
+        String statusHex = dateAndStatus[1];
+
+        // Parse timestamp
+        Instant timestamp = parseDateTime(dateStr, metadata.get(LocationMetadataConstants.GPS_TIME).toString());
+
+        // Add GPS metadata
+        metadata.put(LocationMetadataConstants.VALIDITY, validity);
+        metadata.put(LocationMetadataConstants.HEADING, parseHeading(directionStr));
+
+        // Add status bits
+        if (!statusHex.isEmpty()) {
+            metadata.put(LocationMetadataConstants.VEHICLE_STATUS_HEX, statusHex);
+            Map<String, Boolean> statusBits = parseVehicleStatus(statusHex);
+            metadata.putAll(statusBits);
         }
 
-        return new LocationPoint(0.0, 0.0, 0.0f, Instant.now(), metadata);
+        // Add network information
+        addNetworkInfo(metadata, parts, startIndex + 10);
+
+        log.debug("Autoseeker command response GPS parsed with {} metadata entries", metadata.size());
+        return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
     }
+
+    private LocationPoint parseGenericPacket(String[] parts, Map<String, Object> baseMetadata) {
+        Instant timestamp = Instant.now();
+
+        Map<String, Object> metadata = new HashMap<>(baseMetadata);
+        metadata.put(LocationMetadataConstants.PACKET_TYPE, "generic");
+
+        // Add all parts for debugging
+        for (int i = 0; i < parts.length; i++) {
+            metadata.put(LocationMetadataConstants.PART_PREFIX + "_" + i, parts[i]);
+        }
+
+        log.debug("Autoseeker generic packet parsed with {} parts", parts.length);
+        return new LocationPoint(0.0, 0.0, 0.0f, timestamp, metadata);
+    }
+
+    // Helper methods
 
     private double parseDDMMtoDecimal(String ddmm) {
         try {
@@ -307,12 +271,78 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         }
     }
 
+    private float parseFloatSafe(String value, float defaultValue) {
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private String[] extractDateAndStatus(String dateStatus) {
+        String dateStr = getCurrentDateString();
+        String statusHex = "";
+
+        if (dateStatus != null && dateStatus.length() >= 6) {
+            dateStr = dateStatus.substring(0, 6);
+            if (dateStatus.length() > 6) {
+                statusHex = dateStatus.substring(6);
+            }
+        }
+
+        return new String[]{dateStr, statusHex};
+    }
+
+    private void addNetworkInfo(Map<String, Object> metadata, String[] parts, int startIndex) {
+        if (parts.length > startIndex) {
+            metadata.put(LocationMetadataConstants.MCC, parts[startIndex]);
+        }
+        if (parts.length > startIndex + 1) {
+            metadata.put(LocationMetadataConstants.MNC, parts[startIndex + 1]);
+        }
+        if (parts.length > startIndex + 2) {
+            metadata.put(LocationMetadataConstants.LAC, parts[startIndex + 2]);
+        }
+        if (parts.length > startIndex + 3) {
+            metadata.put(LocationMetadataConstants.CELL_ID, parts[startIndex + 3]);
+        }
+    }
+
+    private void addSignalInfo(Map<String, Object> metadata, String[] parts, int startIndex) {
+        if (parts.length > startIndex) {
+            try {
+                metadata.put(LocationMetadataConstants.GPS_SIGNAL, Integer.parseInt(parts[startIndex]));
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse GPS signal: {}", parts[startIndex]);
+            }
+        }
+        if (parts.length > startIndex + 1) {
+            try {
+                metadata.put(LocationMetadataConstants.GSM_SIGNAL, Integer.parseInt(parts[startIndex + 1]));
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse GSM signal: {}", parts[startIndex + 1]);
+            }
+        }
+        if (parts.length > startIndex + 2) {
+            try {
+                metadata.put(LocationMetadataConstants.BATTERY_VOLTAGE, Integer.parseInt(parts[startIndex + 2]));
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse voltage: {}", parts[startIndex + 2]);
+            }
+        }
+    }
+
+    private void addExtraFields(Map<String, Object> metadata, String[] parts, int startIndex, String prefix) {
+        for (int i = startIndex; i < parts.length; i++) {
+            metadata.put(prefix + "_" + (i - startIndex), parts[i]);
+        }
+    }
+
     @Override
     public boolean canParse(String data) {
         if (data == null || data.isEmpty()) {
             return false;
         }
-
         return AUTOSEEKER_PATTERN.matcher(data).matches();
     }
 
@@ -322,7 +352,6 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,1,3,10,3,5,5,3,5,3,5,3,5#", deviceId, timeStr);
             return command;
-
         } catch (Exception e) {
             throw ProtocolException.commandBuildError("Autoseeker", "fuel cut");
         }
@@ -334,7 +363,6 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,0,0#", deviceId, timeStr);
             return command;
-
         } catch (Exception e) {
             throw ProtocolException.commandBuildError("Autoseeker", "engine on");
         }
@@ -353,31 +381,28 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 return statusMap;
             }
 
-            // Convert hex to binary (32 bits)
             long value = Long.parseLong(statusHex, 16);
             String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
 
             // Parse bits according to protocol (0 = active)
-            // Based on Appendix 1 table in the PDF
-
             // First byte (bits 24-31)
-            statusMap.put("saveStatus", binary.charAt(31) == '0');          // bit 0
-            statusMap.put("removeAlarm", binary.charAt(30) == '0');         // bit 1
-            statusMap.put("supplementaryData", binary.charAt(29) == '0');   // bit 2
-            statusMap.put("cutFuelElectricity", binary.charAt(28) == '0');  // bit 3
-            statusMap.put("batteryRemoveAlarm", binary.charAt(27) == '0');  // bit 4
+            statusMap.put(LocationMetadataConstants.SAVE_STATUS, binary.charAt(31) == '0');
+            statusMap.put(LocationMetadataConstants.REMOVE_ALARM, binary.charAt(30) == '0');
+            statusMap.put(LocationMetadataConstants.SUPPLEMENTARY_DATA, binary.charAt(29) == '0');
+            statusMap.put(LocationMetadataConstants.CUT_FUEL_ELECTRICITY, binary.charAt(28) == '0');
+            statusMap.put(LocationMetadataConstants.BATTERY_REMOVE_ALARM, binary.charAt(27) == '0');
 
             // Second byte (bits 16-23)
-            statusMap.put("shakeAlarm", binary.charAt(23) == '0');          // bit 8
-            statusMap.put("setFence", binary.charAt(22) == '0');            // bit 9
-            statusMap.put("accClose", binary.charAt(21) == '0');            // bit 10
+            statusMap.put(LocationMetadataConstants.SHAKE_ALARM, binary.charAt(23) == '0');
+            statusMap.put(LocationMetadataConstants.SET_FENCE, binary.charAt(22) == '0');
+            statusMap.put(LocationMetadataConstants.ACC_CLOSE, binary.charAt(21) == '0');
 
             // Third byte (bits 8-15)
-            statusMap.put("useBackupBattery", binary.charAt(15) == '0');    // bit 16
-            statusMap.put("openLock", binary.charAt(14) == '0');            // bit 17
+            statusMap.put(LocationMetadataConstants.USE_BACKUP_BATTERY, binary.charAt(15) == '0');
+            statusMap.put(LocationMetadataConstants.OPEN_LOCK, binary.charAt(14) == '0');
 
             // Fourth byte (bits 0-7)
-            statusMap.put("engineStatus", binary.charAt(7) == '0');         // bit 24
+            statusMap.put(LocationMetadataConstants.ENGINE_STATUS, binary.charAt(7) == '0');
 
         } catch (Exception e) {
             log.warn("Error parsing vehicle status: {}", e.getMessage());

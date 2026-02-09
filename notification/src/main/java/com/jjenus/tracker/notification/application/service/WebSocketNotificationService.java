@@ -6,6 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class WebSocketNotificationService implements NotificationService {
     
@@ -57,7 +60,6 @@ public class WebSocketNotificationService implements NotificationService {
     private Object createWebSocketMessage(Notification notification) {
         return new WebSocketNotificationMessage(
             notification.getNotificationId(),
-            notification.getAlertId(),
             notification.getTitle(),
             notification.getMessage(),
             notification.getChannel().name(),
@@ -68,22 +70,20 @@ public class WebSocketNotificationService implements NotificationService {
     // WebSocket message DTO
     private static class WebSocketNotificationMessage {
         private final String notificationId;
-        private final String alertId;
         private final String title;
         private final String message;
         private final String channel;
         private final long timestamp;
-        
+        private Map<String, Object> meta = new HashMap<>();
+
         public WebSocketNotificationMessage(
             String notificationId,
-            String alertId,
             String title,
             String message,
             String channel,
             long timestamp
         ) {
             this.notificationId = notificationId;
-            this.alertId = alertId;
             this.title = title;
             this.message = message;
             this.channel = channel;
@@ -91,10 +91,16 @@ public class WebSocketNotificationService implements NotificationService {
         }
         
         public String getNotificationId() { return notificationId; }
-        public String getAlertId() { return alertId; }
         public String getTitle() { return title; }
         public String getMessage() { return message; }
         public String getChannel() { return channel; }
         public long getTimestamp() { return timestamp; }
+        public Map<String, Object> getMeta() {
+            return meta;
+        }
+
+        public void setMeta(Map<String, Object> meta) {
+            this.meta = meta;
+        }
     }
 }
