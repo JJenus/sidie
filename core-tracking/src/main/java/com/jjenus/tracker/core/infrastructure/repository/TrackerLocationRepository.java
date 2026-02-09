@@ -3,6 +3,7 @@ package com.jjenus.tracker.core.infrastructure.repository;
 import com.jjenus.tracker.core.domain.entity.TrackerLocation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -36,4 +37,6 @@ public interface TrackerLocationRepository extends JpaRepository<TrackerLocation
     @Query("SELECT tl FROM TrackerLocation tl WHERE tl.accStatus = false " +
            "AND tl.recordedAt >= :startTime")
     List<TrackerLocation> findAccOffEvents(@Param("startTime") Instant startTime);
+
+    Page<TrackerLocation> findAll(Specification<TrackerLocation> spec, Pageable pageable);
 }

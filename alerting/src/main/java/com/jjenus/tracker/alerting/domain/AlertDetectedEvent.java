@@ -10,16 +10,18 @@ public class AlertDetectedEvent extends DomainEvent {
     private final String ruleKey;
     private final AlertType alertType;
     private final String vehicleId;
+    private final String trackerId;
     private final String message;
     private final AlertSeverity severity;
     private final Instant alertTimestamp;
     private final LocationPoint location;
     
-    public AlertDetectedEvent(String ruleKey, AlertType alertType, String vehicleId, String message,
+    public AlertDetectedEvent(String ruleKey, AlertType alertType, String vehicleId, String trackerId, String message,
                               AlertSeverity severity, LocationPoint location) {
         this.ruleKey = ruleKey;
         this.alertType = alertType;
         this.vehicleId = vehicleId;
+        this.trackerId = trackerId;
         this.message = message;
         this.severity = severity;
         this.alertTimestamp = Instant.now();
@@ -34,4 +36,8 @@ public class AlertDetectedEvent extends DomainEvent {
     public AlertSeverity getSeverity() { return severity; }
     public Instant getAlertTimestamp() { return alertTimestamp; }
     public LocationPoint getLocation() { return location; }
+
+    public String getTrackerId() {
+        return trackerId;
+    }
 }

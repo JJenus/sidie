@@ -1,16 +1,20 @@
 package com.jjenus.tracker.alerting.application.service;
 
+import com.jjenus.tracker.alerting.domain.entity.TrackerAlert;
+import com.jjenus.tracker.alerting.exception.AlertException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.jjenus.tracker.alerting.infrastructure.repository.TrackerAlertRepository;
 import org.springframework.cache.annotation.Cacheable;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
-public static class AlertQueryService {
+public  class AlertQueryService {
   private final TrackerAlertRepository alertRepository;
 
   public AlertQueryService(TrackerAlertRepository alertRepository) {

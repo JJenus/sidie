@@ -27,7 +27,8 @@ public class DeviceDataProcessor {
             LocationDataEvent event = new LocationDataEvent(
                 packet.deviceId(),
                 location,
-                parser.getProtocolName()
+                parser.getProtocolName(),
+                packet.rawData()
             );
 
             eventPublisher.publish(event);

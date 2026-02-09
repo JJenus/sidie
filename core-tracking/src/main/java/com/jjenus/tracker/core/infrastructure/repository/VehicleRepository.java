@@ -1,6 +1,9 @@
 package com.jjenus.tracker.core.infrastructure.repository;
 
 import com.jjenus.tracker.core.domain.entity.Vehicle;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -31,4 +34,6 @@ public interface VehicleRepository extends JpaRepository<Vehicle, String> {
     boolean existsByDeviceId(String deviceId);
     
     boolean existsByLicensePlate(String licensePlate);
+
+    Page<Vehicle> findAll(Specification<Vehicle> spec, Pageable pageable);
 }

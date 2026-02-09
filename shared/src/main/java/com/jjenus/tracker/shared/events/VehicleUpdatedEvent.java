@@ -10,19 +10,19 @@ import java.util.Map;
 public class VehicleUpdatedEvent extends DomainEvent {
     private final String vehicleId;
     private final LocationPoint newLocation;
-    private final Map<String, Object> metaData;
+    private final String trackerId;
 
 
     @JsonCreator
-    public VehicleUpdatedEvent(@JsonProperty("vehicleId")String vehicleId, @JsonProperty("newLocation") LocationPoint newLocation, Map<String, Object> metaData) {
+    public VehicleUpdatedEvent(@JsonProperty("vehicleId") String vehicleId, @JsonProperty("newLocation") LocationPoint newLocation, String trackerId) {
         this.vehicleId = vehicleId;
         this.newLocation = newLocation;
-        this.metaData = metaData;
+        this.trackerId = trackerId;
     }
 
     public String getVehicleId() {
         return vehicleId;
     }
-    public Map<String, Object> getMetaData() { return metaData; }
+    public String getTrackerId() { return trackerId; }
     public LocationPoint getNewLocation() { return newLocation; }
 }

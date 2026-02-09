@@ -1,10 +1,11 @@
 package com.jjenus.tracker.alerting.application;
 
 import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
+import com.jjenus.tracker.alerting.application.service.AlertRuleQueryService;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
-import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
+import com.jjenus.tracker.alerting.domain.factory.AlertRuleFactory;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
@@ -20,18 +21,21 @@ public class AlertingEngine {
     private final AlertRuleQueryService ruleQueryService;
     private final EventPublisher eventPublisher;
     private final AlertRuleFactory alertRuleFactory;
+    private final AlertRuleEvaluationService alertRuleEvaluationService;
     private final Logger logger = LoggerFactory.getLogger(AlertingEngine.class);
 
     public AlertingEngine(
             EventPublisher eventPublisher,
             AlertRuleFactory alertRuleFactory,
-            AlertRuleQueryService ruleQueryService) {
+            AlertRuleQueryService ruleQueryService, AlertRuleEvaluationService alertRuleEvaluationService) {
         this.ruleQueryService = ruleQueryService;
         this.eventPublisher = eventPublisher;
         this.alertRuleFactory = alertRuleFactory;
+        this.alertRuleEvaluationService = alertRuleEvaluationService;
     }
 
-    public void processVehicleUpdate(String vehicleId, LocationPoint newLocation) {
+//    TODO: get or upload new location on db for position based alerts
+    public void processVehicleUpdate(String trackerId, String vehicleId, LocationPoint newLocation) {
         if (vehicleId == null || newLocation == null) {
             throw new ValidationException(
                     "ALERT_INVALID_INPUT",
@@ -54,7 +58,7 @@ public class AlertingEngine {
                     continue;
                 }
                 
-                AlertDetectedEvent alert = domainRule.evaluate(vehicleId, newLocation);
+                AlertDetectedEvent alert = alertRuleEvaluationService.evaluateRule(domainRule, vehicleId, newLocation);
 
                 if (alert != null) {
                     logger.info("Alert triggered: {} for vehicle {}",

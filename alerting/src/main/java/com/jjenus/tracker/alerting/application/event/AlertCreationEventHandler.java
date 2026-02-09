@@ -51,7 +51,7 @@ public class AlertCreationEventHandler {
             // Create the alert
             AlertResponse alertResponse = alertService.processAutomatedAlert(
                 event.getVehicleId(),
-                "system", // trackerId - could be extracted from event if available
+                event.getTrackerId(),
                 event.getAlertType(),
                 event.getSeverity(),
                 event.getMessage(),
@@ -59,7 +59,7 @@ public class AlertCreationEventHandler {
             );
 
             AlertRaisedEvent alertRaisedEvent = new AlertRaisedEvent(
-                    alertResponse.getAlertId().toString(),
+                    alertResponse.getAlertId(),
                     event.getRuleKey(),
                     alertResponse.getVehicleId(),
                     event.getAlertType().name(),
@@ -68,7 +68,7 @@ public class AlertCreationEventHandler {
                     event.getAlertTimestamp(),
                     alertResponse.getLatitude(),
                     alertResponse.getLongitude(),
-                    alertResponse.getSpeedKmh().doubleValue(),
+                    alertResponse.getSpeedKmh(),
                     metadata
             );
 
@@ -78,16 +78,5 @@ public class AlertCreationEventHandler {
         } catch (Exception e) {
             logger.error("Failed to process alert event: {}", event.getRuleKey(), e);
         }
-    }
-
-    // Additional event handlers for other alert-related events
-    @JmsListener(
-            destination = "tracking.events.vehicleupdatedevent",
-            containerFactory = "topicJmsListenerContainerFactory"
-    )
-    public void handleVehicleUpdateForAlertCheck(@Payload com.jjenus.tracker.shared.events.VehicleUpdatedEvent event) {
-        // This could trigger additional alert checks based on vehicle updates
-        // For example, check for no-movement alerts, etc.
-        logger.debug("Vehicle update received for alert checking: {}", event.getVehicleId());
     }
 }

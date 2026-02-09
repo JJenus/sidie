@@ -1,12 +1,14 @@
 package com.jjenus.tracker.shared.domain;
 
 import java.time.Instant;
+import java.util.Map;
 
 public record LocationPoint(
     double latitude,
     double longitude,
     float speedKmh,
-    Instant timestamp
+    Instant timestamp,
+    Map<String, Object> metadata
 ) {
     public boolean isValid() {
         return latitude >= -90 && latitude <= 90 &&

@@ -11,33 +11,23 @@ public class LocationDataEvent extends DomainEvent {
     private final String deviceId;
     private final LocationPoint location;
     private final String protocol;
-    private final Map<String, Object> metaData;
+    private final String rawData;
 
     @JsonCreator
     public LocationDataEvent(
             @JsonProperty("deviceId") String deviceId,
             @JsonProperty("location") LocationPoint location,
             @JsonProperty("protocol") String protocol,
-            @JsonProperty("metaData") Map<String, Object> metaData) {
+            @JsonProperty("rawData") String rawData) {
         super(); // This calls DomainEvent constructor
         this.deviceId = deviceId;
         this.location = location;
         this.protocol = protocol;
-        this.metaData = metaData != null ? metaData : new HashMap<>();
-    }
-
-    // Convenience constructor
-    public LocationDataEvent(String deviceId, LocationPoint location, String protocol) {
-        this(deviceId, location, protocol, new HashMap<>());
+        this.rawData = rawData;
     }
 
     // Getters
     public String getDeviceId() { return deviceId; }
     public LocationPoint getLocation() { return location; }
     public String getProtocol() { return protocol; }
-    public Map<String, Object> getMetaData() { return metaData; }
-
-    public void addMetaData(String key, Object value) {
-        this.metaData.put(key, value);
-    }
 }

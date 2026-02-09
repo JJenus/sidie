@@ -41,7 +41,7 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             return switch (protocolType) {
                 case "V1" -> parseHeartPackPacket(parts);
                 case "V4" -> parseCommandResponsePacket(parts);
-                default -> throw new ProtocolParseException("Unknown protocol type: " + protocolType);
+                default -> parseGenericPacket(parts);
             };
 
         } catch (Exception e) {
@@ -52,7 +52,6 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     private LocationPoint parseHeartPackPacket(String[] parts) throws ProtocolParseException {
         try {
             // Format: *HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#
-
             if (parts.length < 17) {
                 throw new ProtocolParseException("Incomplete heart pack packet");
             }
@@ -95,31 +94,48 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 log.debug("GPS data not valid (validity={})", validity);
             }
 
-            // Parse additional network information if available
+            // Create metadata map and populate with all extra fields
+            Map<String, Object> metadata = new HashMap<>();
+
+            // Add basic fields to metadata
+            metadata.put("validity", validity);
+            metadata.put("heading", parseHeading(directionStr));
+            metadata.put("vehicleStatus", vehicleStatus);
+            metadata.put("protocol_type", "V1");
+
+            // Parse vehicle status bits if available
+            if (vehicleStatus != null && !vehicleStatus.isEmpty()) {
+                Map<String, Boolean> statusBits = parseVehicleStatus(vehicleStatus);
+                metadata.putAll(statusBits);
+            }
+
+            // Add network information to metadata
             if (parts.length > 13) {
-                String mcc = parts[13];
-                String mnc = parts[14];
-                String lac = parts[15];
-                String cellId = parts[16];
+                metadata.put("mcc", parts[13]);
+                metadata.put("mnc", parts[14]);
+                metadata.put("lac", parts[15]);
+                metadata.put("cellId", parts[16]);
+            }
 
-                log.debug("Network info: MCC={}, MNC={}, LAC={}, CellID={}",
-                        mcc, mnc, lac, cellId);
-
-                // Parse GPS/GSM signal and voltage if available
-                if (parts.length > 19) {
-                    int gpsSignal = Integer.parseInt(parts[17]);
-                    int gsmSignal = Integer.parseInt(parts[18]);
-                    int voltage = Integer.parseInt(parts[19]);
-
-                    log.debug("Signal info: GPS={}, GSM={}, Voltage={}",
-                            gpsSignal, gsmSignal, voltage);
+            // Add GPS/GSM signal and voltage to metadata
+            if (parts.length > 19) {
+                try {
+                    metadata.put("gpsSignal", Integer.parseInt(parts[17]));
+                    metadata.put("gsmSignal", Integer.parseInt(parts[18]));
+                    metadata.put("voltage", Integer.parseInt(parts[19]));
+                } catch (NumberFormatException e) {
+                    log.warn("Failed to parse signal/voltage data: {}", e.getMessage());
                 }
             }
 
-            log.debug("Parsed Autoseeker location: lat={}, lon={}, speed={} km/h, time={}, status={}",
-                    latitude, longitude, speedKmh, timestamp, vehicleStatus);
+            // Add any additional fields to metadata
+            for (int i = 20; i < parts.length; i++) {
+                metadata.put("extra_" + (i - 20), parts[i]);
+            }
 
-            return new LocationPoint(latitude, longitude, speedKmh, timestamp);
+            log.debug("Parsed Autoseeker location with {} metadata entries", metadata.size());
+
+            return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
 
         } catch (Exception e) {
             throw new ProtocolParseException("Failed to parse heart pack packet: " + e.getMessage());
@@ -131,12 +147,10 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             // Format varies by command, e.g.:
             // *HQ,8168000005,V4,D1,30,65535,062108,062025,A,2235.0086,N,11354.3668,E,000.00,000,160716,FFFFBBFF,460,00,10342,3721#
             // *HQ,8168000005,V4,S20,DONE,061158,061116,A,2235.0086,N,11354.3668,E,000.00,000,160716F7FFBBFF,460,00,10342,3721#
-
             if (parts.length < 15) {
                 throw new ProtocolParseException("Incomplete command response packet");
             }
 
-            String deviceId = parts[1];
             String commandCode = parts[3];
             String status = parts[4];
 
@@ -147,13 +161,13 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             // Different response formats for different commands
             if ("D1".equals(commandCode)) {
                 // D1 format: V4,D1,30,65535,062108,062025,A,...
-                responseTime = parts[5];  // 062108
-                gpsTime = parts[6];       // 062025
+                responseTime = parts[5];
+                gpsTime = parts[6];
                 gpsDataStartIndex = 7;
             } else if ("S20".equals(commandCode)) {
                 // S20 format: V4,S20,DONE,061158,061116,A,...
                 responseTime = parts[4];  // DONE (but actually it's status)
-                gpsTime = parts[5];       // 061158
+                gpsTime = parts[5];
                 gpsDataStartIndex = 6;
             } else {
                 // Default format for other commands
@@ -161,6 +175,14 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 gpsTime = parts[5];
                 gpsDataStartIndex = 6;
             }
+
+            // Create metadata map
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("command_code", commandCode);
+            metadata.put("command_status", status);
+            metadata.put("response_time", responseTime);
+            metadata.put("gps_time", gpsTime);
+            metadata.put("protocol_type", "V4");
 
             // Parse GPS data if available
             if (parts.length > gpsDataStartIndex + 9) {
@@ -171,7 +193,7 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 String lonDir = parts[gpsDataStartIndex + 4];
                 String speedStr = parts[gpsDataStartIndex + 5];
                 String directionStr = parts[gpsDataStartIndex + 6];
-                String dateStatus = parts[gpsDataStartIndex + 7]; // May contain date and status combined
+                String dateStatus = parts[gpsDataStartIndex + 7];
 
                 // Parse latitude
                 double latitude = parseDDMMtoDecimal(latStr);
@@ -189,10 +211,18 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 float speedKnots = Float.parseFloat(speedStr);
                 float speedKmh = speedKnots * 1.852f;
 
-                // Extract date from combined field (e.g., "160716F7FFBBFF")
+                // Extract date from combined field
                 String dateStr;
+                String statusHex = "";
                 if (dateStatus.length() >= 6) {
                     dateStr = dateStatus.substring(0, 6);
+                    if (dateStatus.length() > 6) {
+                        statusHex = dateStatus.substring(6);
+                        metadata.put("vehicleStatus", statusHex);
+                        // Parse status bits
+                        Map<String, Boolean> statusBits = parseVehicleStatus(statusHex);
+                        metadata.putAll(statusBits);
+                    }
                 } else {
                     dateStr = getCurrentDateString();
                 }
@@ -200,14 +230,26 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 // Parse timestamp
                 Instant timestamp = parseDateTime(dateStr, gpsTime);
 
-                log.debug("Command response parsed: cmd={}, status={}, lat={}, lon={}, speed={} km/h",
-                        commandCode, status, latitude, longitude, speedKmh);
+                // Add more metadata
+                metadata.put("validity", validity);
+                metadata.put("heading", parseHeading(directionStr));
 
-                return new LocationPoint(latitude, longitude, speedKmh, timestamp);
+                // Add network information if available
+                if (parts.length > gpsDataStartIndex + 10) {
+                    int networkStart = gpsDataStartIndex + 10;
+                    if (parts.length > networkStart) metadata.put("mcc", parts[networkStart]);
+                    if (parts.length > networkStart + 1) metadata.put("mnc", parts[networkStart + 1]);
+                    if (parts.length > networkStart + 2) metadata.put("lac", parts[networkStart + 2]);
+                    if (parts.length > networkStart + 3) metadata.put("cellId", parts[networkStart + 3]);
+                }
+
+                log.debug("Command response parsed with {} metadata entries", metadata.size());
+
+                return new LocationPoint(latitude, longitude, speedKmh, timestamp, metadata);
             } else {
-                // No GPS data in response, use current time
+                // No GPS data in response
                 log.debug("Command response without GPS data: cmd={}, status={}", commandCode, status);
-                return new LocationPoint(0.0, 0.0, 0.0f, Instant.now());
+                return new LocationPoint(0.0, 0.0, 0.0f, Instant.now(), metadata);
             }
 
         } catch (Exception e) {
@@ -215,13 +257,24 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         }
     }
 
+    private LocationPoint parseGenericPacket(String[] parts) {
+        // Create metadata map for generic packets
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("protocol_type", parts[2]);
+        metadata.put("packet_type", "generic");
+
+        // Add all parts as metadata for debugging
+        for (int i = 0; i < parts.length; i++) {
+            metadata.put("part_" + i, parts[i]);
+        }
+
+        return new LocationPoint(0.0, 0.0, 0.0f, Instant.now(), metadata);
+    }
+
     private double parseDDMMtoDecimal(String ddmm) {
         try {
-            // Handle formats like "2234.9273" or "22349273"
             String normalized = ddmm;
             if (ddmm.length() == 8 && !ddmm.contains(".")) {
-                // Format: DDMMmmm (e.g., 22349273)
-                // Insert decimal point at appropriate position
                 normalized = ddmm.substring(0, 4) + "." + ddmm.substring(4);
             }
 
@@ -232,6 +285,14 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         } catch (NumberFormatException e) {
             log.warn("Failed to parse DDMM coordinate: {}", ddmm);
             return 0.0;
+        }
+    }
+
+    private Float parseHeading(String directionStr) {
+        try {
+            return Float.parseFloat(directionStr);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
@@ -258,9 +319,7 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     @Override
     public String buildFuelCutCommand(String deviceId) {
         try {
-            // Autoseeker fuel cut command format: *HQ,IMEI,S20,HHMMSS,1,3,10,3,5,5,3,5,3,5,3,5#
             String timeStr = getCurrentTimeString();
-            // Pattern: 1 (static disable), then timing pattern
             String command = String.format("*HQ,%s,S20,%s,1,3,10,3,5,5,3,5,3,5,3,5#", deviceId, timeStr);
             return command;
 
@@ -272,7 +331,6 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     @Override
     public String buildEngineOnCommand(String deviceId) {
         try {
-            // Autoseeker fuel restore command: *HQ,IMEI,S20,HHMMSS,0,0#
             String timeStr = getCurrentTimeString();
             String command = String.format("*HQ,%s,S20,%s,0,0#", deviceId, timeStr);
             return command;
@@ -285,39 +343,6 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     @Override
     public String getProtocolName() {
         return "Autoseeker";
-    }
-
-    // Additional utility methods
-    public Map<String, Object> parseExtendedData(String[] parts) {
-        Map<String, Object> extendedData = new HashMap<>();
-
-        try {
-            if (parts.length > 12) {
-                extendedData.put("vehicleStatus", parts[12]);
-            }
-
-            if (parts.length > 13) {
-                extendedData.put("mcc", parts[13]);
-                extendedData.put("mnc", parts[14]);
-                extendedData.put("lac", parts[15]);
-                extendedData.put("cellId", parts[16]);
-            }
-
-            if (parts.length > 17) {
-                try {
-                    extendedData.put("gpsSignal", Integer.parseInt(parts[17]));
-                    extendedData.put("gsmSignal", Integer.parseInt(parts[18]));
-                    extendedData.put("voltage", Integer.parseInt(parts[19]));
-                } catch (NumberFormatException e) {
-                    // Ignore if can't parse
-                }
-            }
-
-        } catch (Exception e) {
-            log.warn("Error parsing extended data: {}", e.getMessage());
-        }
-
-        return extendedData;
     }
 
     public Map<String, Boolean> parseVehicleStatus(String statusHex) {

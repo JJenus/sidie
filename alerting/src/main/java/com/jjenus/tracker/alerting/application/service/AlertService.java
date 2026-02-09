@@ -306,7 +306,7 @@ public class AlertService {
 
     @Transactional
     @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
-    public void processAutomatedAlert(String vehicleId, String trackerId,
+    public AlertResponse processAutomatedAlert(String vehicleId, String trackerId,
                                       AlertType alertType, AlertSeverity severity,
                                       String message, Map<String, Object> metadata) {
 
@@ -318,12 +318,14 @@ public class AlertService {
         request.setMessage(message);
         request.setMetadata(metadata);
 
-        createAlert(request);
+        AlertResponse response = createAlert(request);
 
         // Notify relevant systems about critical alerts
         if (severity == AlertSeverity.CRITICAL) {
             notifyCriticalAlert(vehicleId, alertType, message);
         }
+
+        return response;
     }
 
     private void notifyCriticalAlert(String vehicleId, AlertType alertType, String message) {

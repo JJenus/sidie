@@ -2,6 +2,7 @@ package com.jjenus.tracker.core.infrastructure.repository;
 
 import com.jjenus.tracker.core.domain.entity.Tracker;
 import com.jjenus.tracker.core.domain.enums.TrackerStatus;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +15,7 @@ import java.util.Optional;
 @Repository
 public interface TrackerRepository extends JpaRepository<Tracker, String> {
     
-    Optional<Tracker> findByDeviceId(String deviceId);
+    Optional<Tracker> findByTrackerId(String deviceId);
     
 //    Optional<Tracker> findByImei(String imei);
     
@@ -27,8 +28,6 @@ public interface TrackerRepository extends JpaRepository<Tracker, String> {
     
     @Query("SELECT t FROM Tracker t WHERE t.batteryLevel < :threshold")
     List<Tracker> findTrackersWithLowBattery(@Param("threshold") float threshold);
-    
-    boolean existsByDeviceId(String deviceId);
-    
-//    boolean existsByImei(String imei);
+
+    boolean existsBySimNumber(String simNumber);
 }

@@ -27,7 +27,7 @@ public class AlertEventHandler {
             logger.info("Alert Processing received LOCATION update for device {}", event.getVehicleId());
             logger.debug("Processing vehicle update for {}", event.getEventId());
 
-             alertingEngine.processVehicleUpdate(event.getVehicleId(), event.getNewLocation());
+             alertingEngine.processVehicleUpdate(event.getTrackerId(), event.getVehicleId(), event.getNewLocation());
         } catch (Exception e) {
             logger.error("Failed to process vehicle update for {}",
                     event.getEventId(), e);

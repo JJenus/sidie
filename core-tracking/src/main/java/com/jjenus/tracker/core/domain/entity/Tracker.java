@@ -2,24 +2,24 @@ package com.jjenus.tracker.core.domain.entity;
 
 import com.jjenus.tracker.core.domain.enums.TrackerStatus;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "trackers")
+@Getter
+@Setter
 public class Tracker {
-    
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     @Column(name = "tracker_id", length = 50)
     private String trackerId;
-    
-    @Column(name = "device_id", length = 50, unique = true)
-    private String deviceId;
-
-    //    device_id == imei
-//    @Column(name = "imei", length = 20, unique = true)
-//    private String imei;
     
     @Column(name = "model", length = 100)
     private String model;
@@ -97,61 +97,5 @@ public class Tracker {
     public TrackerLocation getLatestLocation() {
         return locations.isEmpty() ? null : locations.get(0);
     }
-    
-    // Getters and Setters
-    public String getTrackerId() { return trackerId; }
-    public void setTrackerId(String trackerId) { this.trackerId = trackerId; }
-    
-    public String getDeviceId() { return deviceId; }
-    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
 
-//    device_id == imei
-//    public String getImei() { return imei; }
-//    public void setImei(String imei) { this.imei = imei; }
-    
-    public String getModel() { return model; }
-    public void setModel(String model) { this.model = model; }
-    
-    public String getProtocol() { return protocol; }
-    public void setProtocol(String protocol) { this.protocol = protocol; }
-    
-    public Boolean getIsOnline() { return isOnline; }
-    public void setIsOnline(Boolean isOnline) { this.isOnline = isOnline; }
-    
-    public Instant getLastSeen() { return lastSeen; }
-    public void setLastSeen(Instant lastSeen) { this.lastSeen = lastSeen; }
-    
-    public TrackerStatus getStatus() { return status; }
-    public void setStatus(TrackerStatus status) { this.status = status; }
-    
-    public Vehicle getVehicle() { return vehicle; }
-    public void setVehicle(Vehicle vehicle) { this.vehicle = vehicle; }
-    
-    public List<TrackerLocation> getLocations() { return locations; }
-    public void setLocations(List<TrackerLocation> locations) { this.locations = locations; }
-    
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-    
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
-    
-    // Additional getters/setters
-    public String getFirmwareVersion() { return firmwareVersion; }
-    public void setFirmwareVersion(String firmwareVersion) { this.firmwareVersion = firmwareVersion; }
-    
-    public String getSimNumber() { return simNumber; }
-    public void setSimNumber(String simNumber) { this.simNumber = simNumber; }
-    
-    public Float getBatteryLevel() { return batteryLevel; }
-    public void setBatteryLevel(Float batteryLevel) { this.batteryLevel = batteryLevel; }
-    
-    public Integer getSignalStrength() { return signalStrength; }
-    public void setSignalStrength(Integer signalStrength) { this.signalStrength = signalStrength; }
-    
-    public List<TrackerRawData> getRawDataEntries() { return rawDataEntries; }
-    public void setRawDataEntries(List<TrackerRawData> rawDataEntries) { this.rawDataEntries = rawDataEntries; }
-    
-    public List<DeviceCommand> getCommands() { return commands; }
-    public void setCommands(List<DeviceCommand> commands) { this.commands = commands; }
 }
