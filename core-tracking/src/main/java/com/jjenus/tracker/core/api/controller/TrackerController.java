@@ -38,6 +38,30 @@ public class TrackerController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping
+    @Operation(summary = "Get paginated list of trackers")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Paginated list of trackers returned")
+    })
+    public ResponseEntity<PagedResponse<TrackerResponse>> getTrackers(
+            @Parameter(description = "Page number (0-based)")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size")
+            @RequestParam(defaultValue = "20") int size,
+
+            @Parameter(description = "Sort field (e.g. trackerId, lastSeen, batteryLevel)")
+            @RequestParam(defaultValue = "trackerId") String sortBy,
+
+            @Parameter(description = "Sort direction (ASC or DESC)")
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+
+        PagedResponse<TrackerResponse> response =
+                trackerQueryService.getTrackersList(page, size, sortBy, sortDirection);
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{trackerId}")
     @Operation(summary = "Get tracker by ID")
     @ApiResponses(value = {

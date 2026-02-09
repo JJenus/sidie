@@ -27,9 +27,9 @@ public interface TrackerLocationRepository extends JpaRepository<TrackerLocation
         @Param("startTime") Instant startTime,
         @Param("endTime") Instant endTime);
     
-    @Query("SELECT tl FROM TrackerLocation tl WHERE tl.tracker.deviceId = :deviceId " +
+    @Query("SELECT tl FROM TrackerLocation tl WHERE tl.tracker.trackerId = :trackerId " +
            "ORDER BY tl.recordedAt DESC LIMIT 1")
-    TrackerLocation findLatestByDeviceId(@Param("deviceId") String deviceId);
+    TrackerLocation findLatestByTrackerId(@Param("trackerId") String trackerId);
     
     @Query("SELECT COUNT(tl) FROM TrackerLocation tl WHERE tl.tracker.trackerId = :trackerId")
     Long countByTrackerId(@Param("trackerId") String trackerId);

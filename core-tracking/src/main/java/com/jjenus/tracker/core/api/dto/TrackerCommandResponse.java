@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.Instant;
 
 @Data
-public class DeviceCommandResponse {
+public class TrackerCommandResponse {
     private Long commandId;
     private String trackerId;
     private CommandType commandType;

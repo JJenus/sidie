@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class DeviceCommandRequest {
+public class TrackerCommandRequest {
     @NotBlank(message = "Tracker ID is required")
     private String trackerId;
 

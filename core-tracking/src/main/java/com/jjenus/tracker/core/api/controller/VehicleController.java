@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -86,6 +87,28 @@ public class VehicleController {
             @Parameter(description = "Vehicle ID") @PathVariable String vehicleId) {
         vehicleCommandService.deleteVehicle(vehicleId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping
+    @Operation(summary = "Get list of vehicles (paginated)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "List of vehicles returned"),
+    })
+    public ResponseEntity<PagedResponse<VehicleResponse>> getVehicles(
+            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Sort field") @RequestParam(defaultValue = "vehicleId") String sortBy,
+            @Parameter(description = "Sort direction (ASC/DESC)") @RequestParam(defaultValue = "ASC") String sortDirection) {
+
+        VehicleSearchRequest searchRequest = new VehicleSearchRequest();
+        searchRequest.setPage(page);
+        searchRequest.setSize(size);
+        searchRequest.setSortBy(sortBy);
+        searchRequest.setSortDirection(Sort.Direction.fromString(sortDirection));
+
+        // No filters applied → full list
+        PagedResponse<VehicleResponse> response = vehicleQueryService.searchVehicles(searchRequest);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/search")

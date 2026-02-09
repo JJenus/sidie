@@ -2,9 +2,11 @@
 package com.jjenus.tracker.core.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.Data;
 
 import java.time.Instant;
 
+@Data
 public class LocationResponse {
     private Double latitude;
     private Double longitude;

@@ -16,7 +16,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
-@RequestMapping("/alerts/rules")
+@RequestMapping("/api/v1//alerts/rules")
 @Tag(name = "Alert Rules", description = "Alert rule management endpoints")
 public class AlertRuleController {
 

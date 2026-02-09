@@ -16,9 +16,7 @@ import java.util.Optional;
 public interface TrackerRepository extends JpaRepository<Tracker, String> {
     
     Optional<Tracker> findByTrackerId(String deviceId);
-    
-//    Optional<Tracker> findByImei(String imei);
-    
+
     List<Tracker> findByIsOnline(boolean isOnline);
     
     List<Tracker> findByStatus(TrackerStatus status);

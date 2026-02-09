@@ -1,10 +1,10 @@
 package com.jjenus.tracker.core.application.service;
 
-import com.jjenus.tracker.core.api.dto.DeviceCommandResponse;
+import com.jjenus.tracker.core.api.dto.TrackerCommandResponse;
 import com.jjenus.tracker.core.api.dto.PagedResponse;
-import com.jjenus.tracker.core.domain.entity.DeviceCommand;
+import com.jjenus.tracker.core.domain.entity.TrackerCommand;
 import com.jjenus.tracker.core.domain.enums.CommandStatus;
-import com.jjenus.tracker.core.infrastructure.repository.DeviceCommandRepository;
+import com.jjenus.tracker.core.infrastructure.repository.TrackerCommandRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -24,31 +24,31 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class DeviceCommandQueryService {
+public class TrackerComQueryService {
 
-    private final DeviceCommandRepository commandRepository;
+    private final TrackerCommandRepository commandRepository;
     private final ModelMapper modelMapper;
 
     @Cacheable(value = "commands", key = "#commandId", unless = "#result == null")
-    public DeviceCommandResponse getCommand(Long commandId) {
+    public TrackerCommandResponse getCommand(Long commandId) {
         log.debug("Cache miss - Fetching command: {}", commandId);
-        DeviceCommand command = commandRepository.findById(commandId)
+        TrackerCommand command = commandRepository.findById(commandId)
                 .orElseThrow(() -> new IllegalArgumentException("Command not found: " + commandId));
         return toResponse(command);
     }
 
     @Cacheable(value = "commands", key = "'tracker_' + #trackerId + '_' + #page + '_' + #size")
-    public PagedResponse<DeviceCommandResponse> getCommandsByTracker(String trackerId, int page, int size) {
+    public PagedResponse<TrackerCommandResponse> getCommandsByTracker(String trackerId, int page, int size) {
         log.debug("Cache miss - Fetching commands for tracker: {}", trackerId);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<DeviceCommand> commands = commandRepository.findByTrackerTrackerId(trackerId, pageable);
+        Page<TrackerCommand> commands = commandRepository.findByTrackerTrackerId(trackerId, pageable);
 
         return new PagedResponse<>(commands.map(this::toResponse));
     }
 
     @Cacheable(value = "commands", key = "'status_' + #status")
-    public List<DeviceCommandResponse> getCommandsByStatus(CommandStatus status) {
+    public List<TrackerCommandResponse> getCommandsByStatus(CommandStatus status) {
         log.debug("Cache miss - Fetching commands by status: {}", status);
         return commandRepository.findByStatus(status).stream()
                 .map(this::toResponse)
@@ -56,7 +56,7 @@ public class DeviceCommandQueryService {
     }
 
     @Cacheable(value = "commands", key = "'trackerStatus_' + #trackerId + '_' + #status")
-    public List<DeviceCommandResponse> getCommandsByTrackerAndStatus(String trackerId, CommandStatus status) {
+    public List<TrackerCommandResponse> getCommandsByTrackerAndStatus(String trackerId, CommandStatus status) {
         log.debug("Cache miss - Fetching commands for tracker {} with status {}", trackerId, status);
         return commandRepository.findByTrackerTrackerIdAndStatus(trackerId, status).stream()
                 .map(this::toResponse)
@@ -64,17 +64,17 @@ public class DeviceCommandQueryService {
     }
 
     @Cacheable(value = "commands", key = "'pendingRetryable_' + #cutoffTime")
-    public List<DeviceCommandResponse> getPendingAndRetryableCommands(Instant cutoffTime) {
+    public List<TrackerCommandResponse> getPendingAndRetryableCommands(Instant cutoffTime) {
         log.debug("Cache miss - Fetching pending and retryable commands");
         return commandRepository.findPendingAndRetryableCommands(cutoffTime).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    @Cacheable(value = "commands", key = "'recentDevice_' + #deviceId")
-    public List<DeviceCommandResponse> getRecentCommandsByDeviceId(String deviceId) {
-        log.debug("Cache miss - Fetching recent commands for device: {}", deviceId);
-        return commandRepository.findRecentCommandsByDeviceId(deviceId).stream()
+    @Cacheable(value = "commands", key = "'recentTracker_' + #trackerId")
+    public List<TrackerCommandResponse> getRecentCommandsByTrackerId(String trackerId) {
+        log.debug("Cache miss - Fetching recent commands for tracker: {}", trackerId);
+        return commandRepository.findRecentCommandsByTrackerId(trackerId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -85,8 +85,8 @@ public class DeviceCommandQueryService {
         return commandRepository.countPendingCommands(trackerId);
     }
 
-    private DeviceCommandResponse toResponse(DeviceCommand command) {
-        DeviceCommandResponse response = modelMapper.map(command, DeviceCommandResponse.class);
+    private TrackerCommandResponse toResponse(TrackerCommand command) {
+        TrackerCommandResponse response = modelMapper.map(command, TrackerCommandResponse.class);
         response.setTrackerId(command.getTracker().getTrackerId());
         return response;
     }

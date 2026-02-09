@@ -61,7 +61,7 @@ public class Tracker {
     private List<TrackerRawData> rawDataEntries = new ArrayList<>();
     
     @OneToMany(mappedBy = "tracker", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<DeviceCommand> commands = new ArrayList<>();
+    private List<TrackerCommand> commands = new ArrayList<>();
     
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();

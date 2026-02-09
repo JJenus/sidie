@@ -98,10 +98,10 @@ public class LocationQueryService {
         return new PagedResponse<>(page.map(this::toResponse));
     }
 
-    @Cacheable(value = "locations", key = "'latestDevice_' + #deviceId", unless = "#result == null")
-    public LocationResponse getLatestLocationByDeviceId(String deviceId) {
-        log.debug("Cache miss - Fetching latest location for device: {}", deviceId);
-        TrackerLocation location = locationRepository.findLatestByDeviceId(deviceId);
+    @Cacheable(value = "locations", key = "'latestDevice_' + #trackerId", unless = "#result == null")
+    public LocationResponse getLatestLocationByTrackerId(String trackerId) {
+        log.debug("Cache miss - Fetching latest location for device: {}", trackerId);
+        TrackerLocation location = locationRepository.findLatestByTrackerId(trackerId);
         return location != null ? toResponse(location) : null;
     }
 

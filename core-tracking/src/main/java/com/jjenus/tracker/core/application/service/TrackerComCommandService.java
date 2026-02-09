@@ -1,11 +1,11 @@
 package com.jjenus.tracker.core.application.service;
 
-import com.jjenus.tracker.core.api.dto.DeviceCommandRequest;
-import com.jjenus.tracker.core.api.dto.DeviceCommandResponse;
-import com.jjenus.tracker.core.domain.entity.DeviceCommand;
+import com.jjenus.tracker.core.api.dto.TrackerCommandRequest;
+import com.jjenus.tracker.core.api.dto.TrackerCommandResponse;
+import com.jjenus.tracker.core.domain.entity.TrackerCommand;
 import com.jjenus.tracker.core.domain.entity.Tracker;
 import com.jjenus.tracker.core.domain.enums.CommandStatus;
-import com.jjenus.tracker.core.infrastructure.repository.DeviceCommandRepository;
+import com.jjenus.tracker.core.infrastructure.repository.TrackerCommandRepository;
 import com.jjenus.tracker.core.infrastructure.repository.TrackerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,11 +22,11 @@ import java.util.List;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class DeviceCommandCommandService {
+public class TrackerComCommandService {
 
-    private final DeviceCommandRepository commandRepository;
+    private final TrackerCommandRepository commandRepository;
     private final TrackerRepository trackerRepository;
-    private final DeviceCommandQueryService commandQueryService;
+    private final TrackerComQueryService commandQueryService;
     private final ModelMapper modelMapper;
 
     @Caching(evict = {
@@ -35,17 +35,17 @@ public class DeviceCommandCommandService {
             @CacheEvict(value = "commands", key = "'trackerStatus_' + #request.trackerId + '_PENDING'"),
             @CacheEvict(value = "commandStats", key = "'pendingCount_' + #request.trackerId")
     })
-    public DeviceCommandResponse createCommand(DeviceCommandRequest request) {
+    public TrackerCommandResponse createCommand(TrackerCommandRequest request) {
         log.info("Creating command for tracker: {}", request.getTrackerId());
 
         Tracker tracker = trackerRepository.findById(request.getTrackerId())
                 .orElseThrow(() -> new IllegalArgumentException("Tracker not found: " + request.getTrackerId()));
 
-        DeviceCommand command = modelMapper.map(request, DeviceCommand.class);
+        TrackerCommand command = modelMapper.map(request, TrackerCommand.class);
         command.setTracker(tracker);
         command.setStatus(CommandStatus.PENDING);
 
-        DeviceCommand saved = commandRepository.save(command);
+        TrackerCommand saved = commandRepository.save(command);
 
         log.info("Command created: {} for tracker: {}", saved.getCommandId(), tracker.getTrackerId());
         return commandQueryService.getCommand(saved.getCommandId());
@@ -58,14 +58,14 @@ public class DeviceCommandCommandService {
             @CacheEvict(value = "commands", key = "'trackerStatus_*'"),
             @CacheEvict(value = "commandStats", allEntries = true)
     })
-    public DeviceCommandResponse markAsSent(Long commandId) {
+    public TrackerCommandResponse markAsSent(Long commandId) {
         log.info("Marking command as sent: {}", commandId);
 
-        DeviceCommand command = commandRepository.findById(commandId)
+        TrackerCommand command = commandRepository.findById(commandId)
                 .orElseThrow(() -> new IllegalArgumentException("Command not found: " + commandId));
 
         command.markAsSent();
-        DeviceCommand saved = commandRepository.save(command);
+        TrackerCommand saved = commandRepository.save(command);
 
         log.info("Command marked as sent: {}", commandId);
         return commandQueryService.getCommand(saved.getCommandId());
@@ -79,14 +79,14 @@ public class DeviceCommandCommandService {
             @CacheEvict(value = "commands", key = "'recentDevice_*'"),
             @CacheEvict(value = "commandStats", allEntries = true)
     })
-    public DeviceCommandResponse markAsDelivered(Long commandId, String response) {
+    public TrackerCommandResponse markAsDelivered(Long commandId, String response) {
         log.info("Marking command as delivered: {}", commandId);
 
-        DeviceCommand command = commandRepository.findById(commandId)
+        TrackerCommand command = commandRepository.findById(commandId)
                 .orElseThrow(() -> new IllegalArgumentException("Command not found: " + commandId));
 
         command.markAsDelivered(response);
-        DeviceCommand saved = commandRepository.save(command);
+        TrackerCommand saved = commandRepository.save(command);
 
         log.info("Command marked as delivered: {}", commandId);
         return commandQueryService.getCommand(saved.getCommandId());
@@ -100,14 +100,14 @@ public class DeviceCommandCommandService {
             @CacheEvict(value = "commands", key = "'pendingRetryable_*'"),
             @CacheEvict(value = "commandStats", allEntries = true)
     })
-    public DeviceCommandResponse markAsFailed(Long commandId, String error) {
+    public TrackerCommandResponse markAsFailed(Long commandId, String error) {
         log.info("Marking command as failed: {}", commandId);
 
-        DeviceCommand command = commandRepository.findById(commandId)
+        TrackerCommand command = commandRepository.findById(commandId)
                 .orElseThrow(() -> new IllegalArgumentException("Command not found: " + commandId));
 
         command.markAsFailed(error);
-        DeviceCommand saved = commandRepository.save(command);
+        TrackerCommand saved = commandRepository.save(command);
 
         log.info("Command marked as failed: {}", commandId);
         return commandQueryService.getCommand(saved.getCommandId());
@@ -120,10 +120,10 @@ public class DeviceCommandCommandService {
             @CacheEvict(value = "commands", key = "'trackerStatus_*'"),
             @CacheEvict(value = "commandStats", allEntries = true)
     })
-    public DeviceCommandResponse retryCommand(Long commandId) {
+    public TrackerCommandResponse retryCommand(Long commandId) {
         log.info("Retrying command: {}", commandId);
 
-        DeviceCommand command = commandRepository.findById(commandId)
+        TrackerCommand command = commandRepository.findById(commandId)
                 .orElseThrow(() -> new IllegalArgumentException("Command not found: " + commandId));
 
         if (!command.canRetry()) {
@@ -132,7 +132,7 @@ public class DeviceCommandCommandService {
 
         command.incrementRetryCount();
         command.setStatus(CommandStatus.PENDING);
-        DeviceCommand saved = commandRepository.save(command);
+        TrackerCommand saved = commandRepository.save(command);
 
         log.info("Command retry initiated: {}", commandId);
         return commandQueryService.getCommand(saved.getCommandId());
@@ -171,9 +171,9 @@ public class DeviceCommandCommandService {
     public void processRetryableCommands(Instant cutoffTime) {
         log.info("Processing retryable commands");
 
-        List<DeviceCommand> retryableCommands = commandRepository.findPendingAndRetryableCommands(cutoffTime);
+        List<TrackerCommand> retryableCommands = commandRepository.findPendingAndRetryableCommands(cutoffTime);
 
-        for (DeviceCommand command : retryableCommands) {
+        for (TrackerCommand command : retryableCommands) {
             if (command.canRetry()) {
                 command.incrementRetryCount();
                 command.setStatus(CommandStatus.PENDING);

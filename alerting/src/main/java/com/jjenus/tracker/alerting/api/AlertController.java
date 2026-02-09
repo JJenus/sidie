@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/alerts")
+@RequestMapping("/api/v1//alerts")
 @Tag(name = "Alerts", description = "Alert management endpoints")
 public class AlertController {
 

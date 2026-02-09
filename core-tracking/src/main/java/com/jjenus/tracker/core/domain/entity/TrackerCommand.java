@@ -7,7 +7,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "device_commands")
-public class DeviceCommand {
+public class TrackerCommand {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

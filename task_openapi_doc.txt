@@ -1,0 +1,98 @@
+You are an expert Spring Boot developer fixing OpenAPI documentation issues.
+
+Task:
+Go through **all** REST controllers in the project (everything under `com.jjenus.tracker.core.api.controller`) and **add explicit `@Parameter(name = "...")`** to every `@RequestParam` and `@PathVariable` that currently lacks a `name` attribute in its `@Parameter` annotation (or has no `@Parameter` at all).
+
+Rules to follow strictly:
+1. **Do NOT** remove or change any existing code logic, method bodies, imports, or annotations (except adding to `@Parameter`).
+2. **Only add or update `@Parameter` annotations** on method parameters annotated with `@RequestParam`, `@PathVariable`, or `@ModelAttribute` (when used as query params).
+3. For every `@RequestParam` or `@PathVariable`:
+   - If it already has `@Parameter(description = "...")` but **no `name=`**, **add** `name = "actualParamName"` matching the variable name or the `@RequestParam`/`@PathVariable` value.
+   - If it has **no `@Parameter` at all**, **add** a complete `@Parameter` with:
+     - `name = "..."` (use the actual HTTP parameter name)
+     - `description = "..."` (write a short, clear description based on context/parameter name)
+     - Keep any existing `required`, `defaultValue`, `schema`, etc. if present
+4. Use **meaningful descriptions** — look at the parameter name and method context (e.g. "Page number (0-based)", "Unique tracker identifier", "Cutoff timestamp in ISO 8601 format").
+5. For `@ModelAttribute` parameters used for query/filtering (like `VehicleSearchRequest`, `TripSearchRequest`, etc.):
+   - Add `@ParameterObject` annotation on the parameter (if springdoc supports it) OR document it clearly with `@Parameter(description = "Search/filter criteria as query parameters")`
+6. **Do NOT** touch `@RequestBody` parameters — they are not causing argN issues.
+7. Preserve all existing `@Operation`, `@ApiResponses`, `@ApiResponse`, `@Tag`, etc.
+8. After changes, the generated OpenAPI spec should no longer contain `arg0`, `arg1`, `argN` for query/path parameters.
+
+Examples of desired changes:
+
+Before:
+```java
+@RequestParam(defaultValue = "0") int page,
+@RequestParam(defaultValue = "20") int size,
+```
+
+After:
+```java
+@Parameter(name = "page", description = "Page number (0-based)")
+@RequestParam(defaultValue = "0") int page,
+
+@Parameter(name = "size", description = "Number of items per page")
+@RequestParam(defaultValue = "20") int size,
+```
+
+Before:
+```java
+@RequestParam Instant cutoffTime
+```
+
+After:
+```java
+@Parameter(name = "cutoffTime", description = "Cutoff time in ISO 8601 format")
+@RequestParam Instant cutoffTime
+```
+
+Before:
+```java
+@ModelAttribute VehicleSearchRequest request
+```
+
+After (preferred):
+```java
+@ParameterObject
+@Parameter(description = "Search and filter criteria")
+@ModelAttribute VehicleSearchRequest request
+```
+
+Process:
+1. Start with `VehicleController.java`, then `TrackerController.java`, then continue to all other controllers (Alerts, Geofences, Trips, Locations, Notifications, Commands, etc.).
+2. Make the minimal change needed to eliminate `argN` names.
+3. Output the **modified files** one by one, showing only the changed methods (or full file if many changes).
+
+Begin with VehicleController and TrackerController first, then proceed to the rest.
+
+Start now.
+```
+
+### Even shorter version (if you want it more concise)
+
+```
+Fix all controllers to eliminate `arg0`, `arg1`, `argN` in OpenAPI spec:
+
+For every method parameter annotated with `@RequestParam` or `@PathVariable`:
+- Add or update `@Parameter(name = "realName", description = "...")`
+- Use the actual HTTP parameter name for `name=`
+- Write clear, short descriptions
+- Do NOT change any logic, imports, or other annotations
+- For `@ModelAttribute` query DTOs, add `@ParameterObject` if possible
+
+Process controllers in this order:
+1. VehicleController
+2. TrackerController
+3. All other controllers (Trips, Locations, Alerts, Geofences, Commands, Notifications, etc.)
+
+Show each modified method or file after you update it.
+
+Go!
+```
+
+### Bonus tips to include
+
+- “Respect existing `@Parameter` — only add `name=` if missing”
+- “Use the variable name as the default `name` unless overridden by `@RequestParam("customName")`”
+- “If springdoc version supports it, prefer `@ParameterObject` for DTO query params”

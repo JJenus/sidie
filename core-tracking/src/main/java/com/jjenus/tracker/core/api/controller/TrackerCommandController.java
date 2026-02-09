@@ -1,10 +1,10 @@
 package com.jjenus.tracker.core.api.controller;
 
-import com.jjenus.tracker.core.api.dto.DeviceCommandRequest;
-import com.jjenus.tracker.core.api.dto.DeviceCommandResponse;
+import com.jjenus.tracker.core.api.dto.TrackerCommandRequest;
+import com.jjenus.tracker.core.api.dto.TrackerCommandResponse;
 import com.jjenus.tracker.core.api.dto.PagedResponse;
-import com.jjenus.tracker.core.application.service.DeviceCommandCommandService;
-import com.jjenus.tracker.core.application.service.DeviceCommandQueryService;
+import com.jjenus.tracker.core.application.service.TrackerComCommandService;
+import com.jjenus.tracker.core.application.service.TrackerComQueryService;
 import com.jjenus.tracker.core.domain.enums.CommandStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,21 +23,21 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/commands")
 @RequiredArgsConstructor
-@Tag(name = "Device Commands", description = "Device command management APIs")
-public class DeviceCommandController {
+@Tag(name = "Tracker Commands", description = "Tracker command management APIs")
+public class TrackerCommandController {
 
-    private final DeviceCommandQueryService commandQueryService;
-    private final DeviceCommandCommandService commandCommandService;
+    private final TrackerComQueryService commandQueryService;
+    private final TrackerComCommandService commandCommandService;
 
     @PostMapping
-    @Operation(summary = "Create a new device command")
+    @Operation(summary = "Create a new tracker command")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Command created"),
             @ApiResponse(responseCode = "400", description = "Invalid input"),
             @ApiResponse(responseCode = "404", description = "Tracker not found")
     })
-    public ResponseEntity<DeviceCommandResponse> createCommand(@Valid @RequestBody DeviceCommandRequest request) {
-        DeviceCommandResponse response = commandCommandService.createCommand(request);
+    public ResponseEntity<TrackerCommandResponse> createCommand(@Valid @RequestBody TrackerCommandRequest request) {
+        TrackerCommandResponse response = commandCommandService.createCommand(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -47,52 +47,52 @@ public class DeviceCommandController {
             @ApiResponse(responseCode = "200", description = "Command found"),
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
-    public ResponseEntity<DeviceCommandResponse> getCommand(
+    public ResponseEntity<TrackerCommandResponse> getCommand(
             @Parameter(description = "Command ID") @PathVariable Long commandId) {
-        DeviceCommandResponse response = commandQueryService.getCommand(commandId);
+        TrackerCommandResponse response = commandQueryService.getCommand(commandId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/tracker/{trackerId}")
     @Operation(summary = "Get commands for tracker")
-    public ResponseEntity<PagedResponse<DeviceCommandResponse>> getCommandsByTracker(
+    public ResponseEntity<PagedResponse<TrackerCommandResponse>> getCommandsByTracker(
             @Parameter(description = "Tracker ID") @PathVariable String trackerId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        PagedResponse<DeviceCommandResponse> response = commandQueryService.getCommandsByTracker(trackerId, page, size);
+        PagedResponse<TrackerCommandResponse> response = commandQueryService.getCommandsByTracker(trackerId, page, size);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/status/{status}")
     @Operation(summary = "Get commands by status")
-    public ResponseEntity<List<DeviceCommandResponse>> getCommandsByStatus(
+    public ResponseEntity<List<TrackerCommandResponse>> getCommandsByStatus(
             @Parameter(description = "Command status") @PathVariable CommandStatus status) {
-        List<DeviceCommandResponse> response = commandQueryService.getCommandsByStatus(status);
+        List<TrackerCommandResponse> response = commandQueryService.getCommandsByStatus(status);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/tracker/{trackerId}/status/{status}")
     @Operation(summary = "Get commands for tracker by status")
-    public ResponseEntity<List<DeviceCommandResponse>> getCommandsByTrackerAndStatus(
+    public ResponseEntity<List<TrackerCommandResponse>> getCommandsByTrackerAndStatus(
             @Parameter(description = "Tracker ID") @PathVariable String trackerId,
             @Parameter(description = "Command status") @PathVariable CommandStatus status) {
-        List<DeviceCommandResponse> response = commandQueryService.getCommandsByTrackerAndStatus(trackerId, status);
+        List<TrackerCommandResponse> response = commandQueryService.getCommandsByTrackerAndStatus(trackerId, status);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/pending-retryable")
     @Operation(summary = "Get pending and retryable commands")
-    public ResponseEntity<List<DeviceCommandResponse>> getPendingAndRetryableCommands(
+    public ResponseEntity<List<TrackerCommandResponse>> getPendingAndRetryableCommands(
             @Parameter(description = "Cutoff time (ISO 8601)") @RequestParam Instant cutoffTime) {
-        List<DeviceCommandResponse> response = commandQueryService.getPendingAndRetryableCommands(cutoffTime);
+        List<TrackerCommandResponse> response = commandQueryService.getPendingAndRetryableCommands(cutoffTime);
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/device/{deviceId}/recent")
-    @Operation(summary = "Get recent commands by device ID")
-    public ResponseEntity<List<DeviceCommandResponse>> getRecentCommandsByDeviceId(
-            @Parameter(description = "Device ID") @PathVariable String deviceId) {
-        List<DeviceCommandResponse> response = commandQueryService.getRecentCommandsByDeviceId(deviceId);
+    @GetMapping("/tracker/{trackerId}/recent")
+    @Operation(summary = "Get recent commands by tracker ID")
+    public ResponseEntity<List<TrackerCommandResponse>> getRecentCommandsByTrackerId(
+            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+        List<TrackerCommandResponse> response = commandQueryService.getRecentCommandsByTrackerId(trackerId);
         return ResponseEntity.ok(response);
     }
 
@@ -110,9 +110,9 @@ public class DeviceCommandController {
             @ApiResponse(responseCode = "200", description = "Command marked as sent"),
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
-    public ResponseEntity<DeviceCommandResponse> markAsSent(
+    public ResponseEntity<TrackerCommandResponse> markAsSent(
             @Parameter(description = "Command ID") @PathVariable Long commandId) {
-        DeviceCommandResponse response = commandCommandService.markAsSent(commandId);
+        TrackerCommandResponse response = commandCommandService.markAsSent(commandId);
         return ResponseEntity.ok(response);
     }
 
@@ -122,10 +122,10 @@ public class DeviceCommandController {
             @ApiResponse(responseCode = "200", description = "Command marked as delivered"),
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
-    public ResponseEntity<DeviceCommandResponse> markAsDelivered(
+    public ResponseEntity<TrackerCommandResponse> markAsDelivered(
             @Parameter(description = "Command ID") @PathVariable Long commandId,
             @RequestParam String responseData) {
-        DeviceCommandResponse response = commandCommandService.markAsDelivered(commandId, responseData);
+        TrackerCommandResponse response = commandCommandService.markAsDelivered(commandId, responseData);
         return ResponseEntity.ok(response);
     }
 
@@ -135,10 +135,10 @@ public class DeviceCommandController {
             @ApiResponse(responseCode = "200", description = "Command marked as failed"),
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
-    public ResponseEntity<DeviceCommandResponse> markAsFailed(
+    public ResponseEntity<TrackerCommandResponse> markAsFailed(
             @Parameter(description = "Command ID") @PathVariable Long commandId,
             @RequestParam String error) {
-        DeviceCommandResponse response = commandCommandService.markAsFailed(commandId, error);
+        TrackerCommandResponse response = commandCommandService.markAsFailed(commandId, error);
         return ResponseEntity.ok(response);
     }
 
@@ -149,9 +149,9 @@ public class DeviceCommandController {
             @ApiResponse(responseCode = "400", description = "Command cannot be retried"),
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
-    public ResponseEntity<DeviceCommandResponse> retryCommand(
+    public ResponseEntity<TrackerCommandResponse> retryCommand(
             @Parameter(description = "Command ID") @PathVariable Long commandId) {
-        DeviceCommandResponse response = commandCommandService.retryCommand(commandId);
+        TrackerCommandResponse response = commandCommandService.retryCommand(commandId);
         return ResponseEntity.ok(response);
     }
 

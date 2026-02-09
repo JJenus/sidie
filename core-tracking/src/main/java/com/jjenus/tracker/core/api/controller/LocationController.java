@@ -56,11 +56,11 @@ public class LocationController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/device/{deviceId}/latest")
-    @Operation(summary = "Get latest location by device ID")
-    public ResponseEntity<LocationResponse> getLatestLocationByDeviceId(
-            @Parameter(description = "Device ID") @PathVariable String deviceId) {
-        LocationResponse response = locationQueryService.getLatestLocationByDeviceId(deviceId);
+    @GetMapping("/tracker/{trackerId}/latest")
+    @Operation(summary = "Get latest location by tracker ID")
+    public ResponseEntity<LocationResponse> getLatestLocationByTrackerId(
+            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+        LocationResponse response = locationQueryService.getLatestLocationByTrackerId(trackerId);
         return response != null ? ResponseEntity.ok(response) : ResponseEntity.notFound().build();
     }
 
@@ -89,7 +89,6 @@ public class LocationController {
     })
     public ResponseEntity<LocationResponse> recordLocation(
             @RequestParam String trackerId,
-            @RequestParam String deviceId,
             @RequestParam Double latitude,
             @RequestParam Double longitude,
             @RequestParam(required = false) Float speedKmh,

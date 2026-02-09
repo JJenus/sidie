@@ -82,4 +82,28 @@ public class TrackerQueryService {
 
         return response;
     }
+
+    @Cacheable(value = "trackers",
+            key = "'list_page_' + #page + '_size_' + #size + '_sort_' + #sortBy + '_' + #sortDirection",
+            unless = "#result == null")
+    public PagedResponse<TrackerResponse> getTrackersList(
+            int page,
+            int size,
+            String sortBy,
+            String sortDirection) {
+
+        log.debug("Cache miss - Fetching trackers list: page={}, size={}, sort={} {}",
+                page, size, sortDirection, sortBy);
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.fromString(sortDirection), sortBy)
+        );
+
+        Page<Tracker> pageResult = trackerRepository.findAll(pageable);
+        Page<TrackerResponse> mappedPage = pageResult.map(this::toResponse);
+
+        return new PagedResponse<>(mappedPage);
+    }
 }
