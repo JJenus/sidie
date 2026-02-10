@@ -174,7 +174,7 @@ public class AlertController {
     @Operation(summary = "Get recent alerts for a vehicle")
     public ResponseEntity<List<AlertResponse>> getVehicleRecentAlerts(
             @PathVariable String vehicleId,
-            @Parameter(description = "Maximum number of alerts to return")
+            @Parameter(name = "limit", description = "Maximum number of alerts to return")
             @RequestParam(defaultValue = "10") int limit) {
 
         List<AlertResponse> response = alertService.getRecentAlerts(vehicleId, limit);
