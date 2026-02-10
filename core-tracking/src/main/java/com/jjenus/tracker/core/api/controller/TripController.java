@@ -32,7 +32,8 @@ public class TripController {
             @ApiResponse(responseCode = "404", description = "Trip not found")
     })
     public ResponseEntity<TripResponse> getTrip(
-            @Parameter(description = "Trip ID") @PathVariable String tripId) {
+            @Parameter(name = "tripId", description = "Trip ID") 
+            @PathVariable String tripId) {
         TripResponse response = tripQueryService.getTrip(tripId);
         return ResponseEntity.ok(response);
     }
@@ -44,7 +45,8 @@ public class TripController {
             @ApiResponse(responseCode = "404", description = "No active trip found")
     })
     public ResponseEntity<TripResponse> getActiveTrip(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId) {
         TripResponse response = tripQueryService.getActiveTrip(vehicleId);
         return ResponseEntity.ok(response);
     }
@@ -52,7 +54,8 @@ public class TripController {
     @GetMapping("/vehicle/{vehicleId}")
     @Operation(summary = "Get all trips for vehicle")
     public ResponseEntity<List<TripResponse>> getVehicleTrips(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId) {
         List<TripResponse> response = tripQueryService.getVehicleTrips(vehicleId);
         return ResponseEntity.ok(response);
     }
@@ -60,7 +63,8 @@ public class TripController {
     @GetMapping("/search")
     @Operation(summary = "Search trips with filters")
     public ResponseEntity<PagedResponse<TripResponse>> searchTrips(
-            @Parameter(description = "Search criteria") @ModelAttribute TripSearchRequest request) {
+            @Parameter(description = "Search criteria") 
+            @ModelAttribute TripSearchRequest request) {
         PagedResponse<TripResponse> response = tripQueryService.searchTrips(request);
         return ResponseEntity.ok(response);
     }
@@ -75,9 +79,14 @@ public class TripController {
     @GetMapping("/vehicle/{vehicleId}/statistics")
     @Operation(summary = "Get trip statistics for vehicle")
     public ResponseEntity<TripStatisticsResponse> getTripStatistics(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId,
-            @Parameter(description = "Start time (ISO 8601)") @RequestParam Instant startTime,
-            @Parameter(description = "End time (ISO 8601)") @RequestParam Instant endTime) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId,
+            
+            @Parameter(name = "startTime", description = "Start time (ISO 8601)") 
+            @RequestParam Instant startTime,
+            
+            @Parameter(name = "endTime", description = "End time (ISO 8601)") 
+            @RequestParam Instant endTime) {
         TripStatisticsResponse response = tripQueryService.getTripStatistics(vehicleId, startTime, endTime);
         return ResponseEntity.ok(response);
     }
@@ -85,9 +94,14 @@ public class TripController {
     @GetMapping("/vehicle/{vehicleId}/total-distance")
     @Operation(summary = "Get total distance for vehicle in period")
     public ResponseEntity<Float> getTotalDistanceForPeriod(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId,
-            @Parameter(description = "Start time (ISO 8601)") @RequestParam Instant startTime,
-            @Parameter(description = "End time (ISO 8601)") @RequestParam Instant endTime) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId,
+            
+            @Parameter(name = "startTime", description = "Start time (ISO 8601)") 
+            @RequestParam Instant startTime,
+            
+            @Parameter(name = "endTime", description = "End time (ISO 8601)") 
+            @RequestParam Instant endTime) {
         Float distance = tripQueryService.getTotalDistanceForPeriod(vehicleId, startTime, endTime);
         return ResponseEntity.ok(distance);
     }
@@ -99,8 +113,11 @@ public class TripController {
             @ApiResponse(responseCode = "404", description = "No active trip found")
     })
     public ResponseEntity<Void> endActiveTrip(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId,
-            @Parameter(description = "End reason") @RequestParam TripEndReason reason) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId,
+            
+            @Parameter(name = "reason", description = "End reason") 
+            @RequestParam TripEndReason reason) {
         tripCommandService.endActiveTripForVehicle(vehicleId, reason);
         return ResponseEntity.ok().build();
     }
@@ -112,7 +129,10 @@ public class TripController {
             @ApiResponse(responseCode = "404", description = "Trip not found")
     })
     public ResponseEntity<Void> updateTripDistance(
-            @Parameter(description = "Trip ID") @PathVariable String tripId,
+            @Parameter(name = "tripId", description = "Trip ID") 
+            @PathVariable String tripId,
+            
+            @Parameter(name = "distanceKm", description = "Distance in kilometers") 
             @RequestParam float distanceKm) {
         tripCommandService.updateTripDistance(tripId, distanceKm);
         return ResponseEntity.ok().build();
@@ -125,7 +145,10 @@ public class TripController {
             @ApiResponse(responseCode = "404", description = "Trip not found")
     })
     public ResponseEntity<Void> updateTripFuelConsumption(
-            @Parameter(description = "Trip ID") @PathVariable String tripId,
+            @Parameter(name = "tripId", description = "Trip ID") 
+            @PathVariable String tripId,
+            
+            @Parameter(name = "fuelLiters", description = "Fuel consumption in liters") 
             @RequestParam float fuelLiters) {
         tripCommandService.updateTripFuelConsumption(tripId, fuelLiters);
         return ResponseEntity.ok().build();

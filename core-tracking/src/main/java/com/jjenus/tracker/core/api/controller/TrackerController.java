@@ -44,16 +44,16 @@ public class TrackerController {
             @ApiResponse(responseCode = "200", description = "Paginated list of trackers returned")
     })
     public ResponseEntity<PagedResponse<TrackerResponse>> getTrackers(
-            @Parameter(description = "Page number (0-based)")
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size,
 
-            @Parameter(description = "Sort field (e.g. trackerId, lastSeen, batteryLevel)")
+            @Parameter(name = "sortBy", description = "Sort field (e.g. trackerId, lastSeen, batteryLevel)")
             @RequestParam(defaultValue = "trackerId") String sortBy,
 
-            @Parameter(description = "Sort direction (ASC or DESC)")
+            @Parameter(name = "sortDirection", description = "Sort direction (ASC or DESC)")
             @RequestParam(defaultValue = "ASC") String sortDirection) {
 
         PagedResponse<TrackerResponse> response =
@@ -69,7 +69,8 @@ public class TrackerController {
             @ApiResponse(responseCode = "404", description = "Tracker not found")
     })
     public ResponseEntity<TrackerResponse> getTracker(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         TrackerResponse response = trackerQueryService.getTracker(trackerId);
         return ResponseEntity.ok(response);
     }
@@ -81,7 +82,8 @@ public class TrackerController {
             @ApiResponse(responseCode = "404", description = "Tracker not found")
     })
     public ResponseEntity<TrackerResponse> getTrackerByDeviceId(
-            @Parameter(description = "Device ID") @PathVariable String deviceId) {
+            @Parameter(name = "deviceId", description = "Device ID") 
+            @PathVariable String deviceId) {
         TrackerResponse response = trackerQueryService.getTrackerByTrackerId(deviceId);
         return ResponseEntity.ok(response);
     }
@@ -94,7 +96,8 @@ public class TrackerController {
             @ApiResponse(responseCode = "400", description = "Invalid input")
     })
     public ResponseEntity<TrackerResponse> updateTracker(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId,
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId,
             @Valid @RequestBody TrackerUpdateRequest request) {
         TrackerResponse response = trackerCommandService.updateTracker(trackerId, request);
         return ResponseEntity.ok(response);
@@ -107,7 +110,8 @@ public class TrackerController {
             @ApiResponse(responseCode = "404", description = "Tracker not found")
     })
     public ResponseEntity<Void> deleteTracker(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         trackerCommandService.deleteTracker(trackerId);
         return ResponseEntity.noContent().build();
     }
@@ -122,7 +126,7 @@ public class TrackerController {
     @GetMapping("/stale-connections")
     @Operation(summary = "Get stale trackers")
     public ResponseEntity<List<TrackerResponse>> getStaleConnections(
-            @Parameter(description = "Cutoff time (ISO 8601)")
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)")
             @RequestParam Instant cutoffTime) {
         List<TrackerResponse> response = trackerQueryService.getStaleConnections(cutoffTime);
         return ResponseEntity.ok(response);
@@ -131,7 +135,7 @@ public class TrackerController {
     @GetMapping("/low-battery")
     @Operation(summary = "Get trackers with low battery")
     public ResponseEntity<List<TrackerResponse>> getTrackersWithLowBattery(
-            @Parameter(description = "Battery threshold percentage")
+            @Parameter(name = "threshold", description = "Battery threshold percentage")
             @RequestParam(defaultValue = "20") float threshold) {
         List<TrackerResponse> response = trackerQueryService.getTrackersWithLowBattery(threshold);
         return ResponseEntity.ok(response);
@@ -144,7 +148,8 @@ public class TrackerController {
             @ApiResponse(responseCode = "404", description = "Tracker not found")
     })
     public ResponseEntity<TrackerResponse> updateTrackerStatus(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId,
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId,
             @Valid @RequestBody TrackerStatusRequest request) {
         TrackerResponse response = trackerCommandService.updateTrackerStatus(trackerId, request);
         return ResponseEntity.ok(response);
@@ -153,7 +158,7 @@ public class TrackerController {
     @PostMapping("/mark-stale-offline")
     @Operation(summary = "Mark stale trackers as offline")
     public ResponseEntity<Void> markStaleTrackersOffline(
-            @Parameter(description = "Cutoff time (ISO 8601)")
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)")
             @RequestParam Instant cutoffTime) {
         trackerCommandService.markStaleTrackersOffline(cutoffTime);
         return ResponseEntity.ok().build();

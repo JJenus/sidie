@@ -16,7 +16,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1//alerts/rules")
+@RequestMapping("/api/v1/alerts/rules")
 @Tag(name = "Alert Rules", description = "Alert rule management endpoints")
 public class AlertRuleController {
 
@@ -40,25 +40,25 @@ public class AlertRuleController {
     @GetMapping
     @Operation(summary = "Get all alert rules with pagination and filtering")
     public ResponseEntity<PagedResponse<AlertRuleResponse>> getAllRules(
-            @Parameter(description = "Page number (0-based)")
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size,
 
-            @Parameter(description = "Sort field")
+            @Parameter(name = "sortBy", description = "Sort field")
             @RequestParam(defaultValue = "createdAt") String sortBy,
 
-            @Parameter(description = "Sort direction")
+            @Parameter(name = "sortDirection", description = "Sort direction")
             @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection,
 
-            @Parameter(description = "Search term for rule name")
+            @Parameter(name = "search", description = "Search term for rule name")
             @RequestParam(required = false) String search,
 
-            @Parameter(description = "Filter by rule type")
+            @Parameter(name = "ruleType", description = "Filter by rule type")
             @RequestParam(required = false) AlertRuleType ruleType,
 
-            @Parameter(description = "Filter by enabled status")
+            @Parameter(name = "enabled", description = "Filter by enabled status")
             @RequestParam(required = false) Boolean enabled) {
 
         SearchRequest searchRequest = new SearchRequest();
@@ -76,19 +76,19 @@ public class AlertRuleController {
     @GetMapping("/enabled")
     @Operation(summary = "Get all enabled alert rules with pagination")
     public ResponseEntity<PagedResponse<AlertRuleResponse>> getEnabledRules(
-            @Parameter(description = "Page number (0-based)")
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size,
 
-            @Parameter(description = "Sort field")
+            @Parameter(name = "sortBy", description = "Sort field")
             @RequestParam(defaultValue = "priority") String sortBy,
 
-            @Parameter(description = "Sort direction")
+            @Parameter(name = "sortDirection", description = "Sort direction")
             @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection,
 
-            @Parameter(description = "Search term for rule name")
+            @Parameter(name = "search", description = "Search term for rule name")
             @RequestParam(required = false) String search) {
 
         SearchRequest searchRequest = new SearchRequest();
@@ -116,13 +116,16 @@ public class AlertRuleController {
 
     @GetMapping("/{ruleKey}")
     @Operation(summary = "Get alert rule by key")
-    public ResponseEntity<AlertRuleResponse> getRuleByKey(@PathVariable String ruleKey) {
+    public ResponseEntity<AlertRuleResponse> getRuleByKey(
+            @Parameter(name = "ruleKey", description = "Rule key identifier")
+            @PathVariable String ruleKey) {
         return ResponseEntity.ok(ruleQueryService.getRuleByKey(ruleKey));
     }
 
     @PutMapping("/{ruleKey}")
     @Operation(summary = "Update an existing alert rule")
     public ResponseEntity<AlertRuleResponse> updateRule(
+            @Parameter(name = "ruleKey", description = "Rule key identifier")
             @PathVariable String ruleKey,
             @Valid @RequestBody UpdateAlertRuleRequest request) {
         return ResponseEntity.ok(ruleCommandService.updateRule(ruleKey, request));
@@ -131,20 +134,26 @@ public class AlertRuleController {
     @DeleteMapping("/{ruleKey}")
     @Operation(summary = "Delete an alert rule")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteRule(@PathVariable String ruleKey) {
+    public void deleteRule(
+            @Parameter(name = "ruleKey", description = "Rule key identifier")
+            @PathVariable String ruleKey) {
         ruleCommandService.deleteRule(ruleKey);
     }
 
     @PatchMapping("/{ruleKey}/enable")
     @Operation(summary = "Enable an alert rule")
-    public ResponseEntity<Void> enableRule(@PathVariable String ruleKey) {
+    public ResponseEntity<Void> enableRule(
+            @Parameter(name = "ruleKey", description = "Rule key identifier")
+            @PathVariable String ruleKey) {
         ruleCommandService.enableRule(ruleKey);
         return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/{ruleKey}/disable")
     @Operation(summary = "Disable an alert rule")
-    public ResponseEntity<Void> disableRule(@PathVariable String ruleKey) {
+    public ResponseEntity<Void> disableRule(
+            @Parameter(name = "ruleKey", description = "Rule key identifier")
+            @PathVariable String ruleKey) {
         ruleCommandService.disableRule(ruleKey);
         return ResponseEntity.ok().build();
     }
@@ -187,7 +196,8 @@ public class AlertRuleController {
 
     @PostMapping("/batch/enable")
     @Operation(summary = "Enable multiple alert rules")
-    public ResponseEntity<Void> batchEnableRules(@RequestBody List<String> ruleKeys) {
+    public ResponseEntity<Void> batchEnableRules(
+            @RequestBody List<String> ruleKeys) {
         ruleCommandService.batchEnableRules(new java.util.HashSet<>(ruleKeys));
         return ResponseEntity.ok().build();
     }

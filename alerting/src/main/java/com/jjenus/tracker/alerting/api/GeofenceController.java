@@ -38,28 +38,27 @@ public class GeofenceController {
     }
 
     @GetMapping
-    @Operation(
-      summary = "Search geofences with pagination and filtering")
+    @Operation(summary = "Search geofences with pagination and filtering")
     public ResponseEntity<PagedResponse<GeofenceResponse>> searchGeofences(
-            @Parameter(description = "Page number (0-based)")
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size,
 
-            @Parameter(description = "Sort field")
+            @Parameter(name = "sortBy", description = "Sort field")
             @RequestParam(defaultValue = "createdAt") String sortBy,
 
-            @Parameter(description = "Sort direction")
+            @Parameter(name = "sortDirection", description = "Sort direction")
             @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection,
 
-            @Parameter(description = "Search term for geofence name")
+            @Parameter(name = "search", description = "Search term for geofence name")
             @RequestParam(required = false) String search,
 
-            @Parameter(description = "Filter by vehicle ID")
+            @Parameter(name = "vehicleId", description = "Filter by vehicle ID")
             @RequestParam(required = false) String vehicleId,
 
-            @Parameter(description = "Filter by active status")
+            @Parameter(name = "active", description = "Filter by active status")
             @RequestParam(required = false) Boolean active) {
 
         SearchRequest searchRequest = new SearchRequest();
@@ -77,17 +76,19 @@ public class GeofenceController {
     @GetMapping("/vehicle/{vehicleId}")
     @Operation(summary = "Get all geofences for a vehicle with pagination")
     public ResponseEntity<PagedResponse<GeofenceResponse>> getVehicleGeofences(
+            @Parameter(name = "vehicleId", description = "Vehicle ID")
             @PathVariable String vehicleId,
-            @Parameter(description = "Page number (0-based)")
+            
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size,
 
-            @Parameter(description = "Sort field")
+            @Parameter(name = "sortBy", description = "Sort field")
             @RequestParam(defaultValue = "name") String sortBy,
 
-            @Parameter(description = "Sort direction")
+            @Parameter(name = "sortDirection", description = "Sort direction")
             @RequestParam(defaultValue = "ASC") Sort.Direction sortDirection) {
 
         SearchRequest searchRequest = new SearchRequest();
@@ -101,7 +102,9 @@ public class GeofenceController {
 
     @GetMapping("/vehicle/{vehicleId}/list")
     @Operation(summary = "Get all geofences for a vehicle (without pagination)")
-    public ResponseEntity<List<GeofenceResponse>> getVehicleGeofencesList(@PathVariable String vehicleId) {
+    public ResponseEntity<List<GeofenceResponse>> getVehicleGeofencesList(
+            @Parameter(name = "vehicleId", description = "Vehicle ID")
+            @PathVariable String vehicleId) {
         List<Geofence> geofences = geofenceQueryService.getVehicleGeofences(vehicleId);
         return ResponseEntity.ok(geofences.stream()
                 .map(this::toResponse)
@@ -111,17 +114,19 @@ public class GeofenceController {
     @GetMapping("/vehicle/{vehicleId}/active")
     @Operation(summary = "Get active geofences for a vehicle with pagination")
     public ResponseEntity<PagedResponse<GeofenceResponse>> getActiveVehicleGeofences(
+            @Parameter(name = "vehicleId", description = "Vehicle ID")
             @PathVariable String vehicleId,
-            @Parameter(description = "Page number (0-based)")
+            
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size,
 
-            @Parameter(description = "Sort field")
+            @Parameter(name = "sortBy", description = "Sort field")
             @RequestParam(defaultValue = "name") String sortBy,
 
-            @Parameter(description = "Sort direction")
+            @Parameter(name = "sortDirection", description = "Sort direction")
             @RequestParam(defaultValue = "ASC") Sort.Direction sortDirection) {
 
         SearchRequest searchRequest = new SearchRequest();
@@ -135,7 +140,9 @@ public class GeofenceController {
 
     @GetMapping("/vehicle/{vehicleId}/active/list")
     @Operation(summary = "Get active geofences for a vehicle (without pagination)")
-    public ResponseEntity<List<GeofenceResponse>> getActiveVehicleGeofencesList(@PathVariable String vehicleId) {
+    public ResponseEntity<List<GeofenceResponse>> getActiveVehicleGeofencesList(
+            @Parameter(name = "vehicleId", description = "Vehicle ID")
+            @PathVariable String vehicleId) {
         List<Geofence> geofences = geofenceQueryService.getActiveGeofences(vehicleId);
         return ResponseEntity.ok(geofences.stream()
                 .map(this::toResponse)
@@ -144,7 +151,9 @@ public class GeofenceController {
 
     @GetMapping("/{geofenceId}")
     @Operation(summary = "Get geofence by ID")
-    public ResponseEntity<GeofenceResponse> getGeofenceById(@PathVariable Long geofenceId) {
+    public ResponseEntity<GeofenceResponse> getGeofenceById(
+            @Parameter(name = "geofenceId", description = "Geofence ID")
+            @PathVariable Long geofenceId) {
         Geofence geofence = geofenceQueryService.getGeofenceById(geofenceId);
         return ResponseEntity.ok(toResponse(geofence));
     }
@@ -152,6 +161,7 @@ public class GeofenceController {
     @PutMapping("/{geofenceId}")
     @Operation(summary = "Update a geofence")
     public ResponseEntity<GeofenceResponse> updateGeofence(
+            @Parameter(name = "geofenceId", description = "Geofence ID")
             @PathVariable Long geofenceId,
             @Valid @RequestBody UpdateGeofenceRequest request) {
         Geofence updates = convertToEntity(request);
@@ -162,15 +172,22 @@ public class GeofenceController {
     @DeleteMapping("/{geofenceId}")
     @Operation(summary = "Delete a geofence")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteGeofence(@PathVariable Long geofenceId) {
+    public void deleteGeofence(
+            @Parameter(name = "geofenceId", description = "Geofence ID")
+            @PathVariable Long geofenceId) {
         geofenceCommandService.deleteGeofence(geofenceId);
     }
 
     @PostMapping("/check-violations")
     @Operation(summary = "Check for geofence violations (for testing)")
     public ResponseEntity<Void> checkGeofenceViolations(
+            @Parameter(name = "vehicleId", description = "Vehicle ID")
             @RequestParam String vehicleId,
+            
+            @Parameter(name = "latitude", description = "Latitude coordinate")
             @RequestParam Double latitude,
+            
+            @Parameter(name = "longitude", description = "Longitude coordinate")
             @RequestParam Double longitude) {
         geofenceCommandService.checkGeofenceViolations(vehicleId, latitude, longitude);
         return ResponseEntity.ok().build();

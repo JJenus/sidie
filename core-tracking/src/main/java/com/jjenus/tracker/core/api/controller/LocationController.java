@@ -35,7 +35,8 @@ public class LocationController {
             @ApiResponse(responseCode = "404", description = "Location not found")
     })
     public ResponseEntity<LocationResponse> getLocation(
-            @Parameter(description = "Location ID") @PathVariable Long locationId) {
+            @Parameter(name = "locationId", description = "Location ID") 
+            @PathVariable Long locationId) {
         LocationResponse response = locationQueryService.getLocation(locationId);
         return ResponseEntity.ok(response);
     }
@@ -43,7 +44,8 @@ public class LocationController {
     @GetMapping("/tracker/{trackerId}")
     @Operation(summary = "Get locations for tracker")
     public ResponseEntity<List<LocationResponse>> getTrackerLocations(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         List<LocationResponse> response = locationQueryService.getTrackerLocations(trackerId);
         return ResponseEntity.ok(response);
     }
@@ -51,7 +53,8 @@ public class LocationController {
     @GetMapping("/search")
     @Operation(summary = "Search locations with filters")
     public ResponseEntity<PagedResponse<LocationResponse>> searchLocations(
-            @Parameter(description = "Search criteria") @ModelAttribute LocationSearchRequest request) {
+            @Parameter(description = "Search criteria") 
+            @ModelAttribute LocationSearchRequest request) {
         PagedResponse<LocationResponse> response = locationQueryService.searchLocations(request);
         return ResponseEntity.ok(response);
     }
@@ -59,7 +62,8 @@ public class LocationController {
     @GetMapping("/tracker/{trackerId}/latest")
     @Operation(summary = "Get latest location by tracker ID")
     public ResponseEntity<LocationResponse> getLatestLocationByTrackerId(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         LocationResponse response = locationQueryService.getLatestLocationByTrackerId(trackerId);
         return response != null ? ResponseEntity.ok(response) : ResponseEntity.notFound().build();
     }
@@ -67,7 +71,8 @@ public class LocationController {
     @GetMapping("/tracker/{trackerId}/count")
     @Operation(summary = "Get location count for tracker")
     public ResponseEntity<Long> getLocationCountByTracker(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         Long count = locationQueryService.getLocationCountByTracker(trackerId);
         return ResponseEntity.ok(count);
     }
@@ -75,7 +80,8 @@ public class LocationController {
     @GetMapping("/acc-off-events")
     @Operation(summary = "Get ACC off events")
     public ResponseEntity<List<LocationResponse>> getAccOffEvents(
-            @Parameter(description = "Start time (ISO 8601)") @RequestParam Instant startTime) {
+            @Parameter(name = "startTime", description = "Start time (ISO 8601)") 
+            @RequestParam Instant startTime) {
         List<LocationResponse> response = locationQueryService.getAccOffEvents(startTime);
         return ResponseEntity.ok(response);
     }
@@ -88,10 +94,19 @@ public class LocationController {
             @ApiResponse(responseCode = "404", description = "Tracker not found")
     })
     public ResponseEntity<LocationResponse> recordLocation(
+            @Parameter(name = "trackerId", description = "Tracker ID")
             @RequestParam String trackerId,
+            
+            @Parameter(name = "latitude", description = "Latitude coordinate")
             @RequestParam Double latitude,
+            
+            @Parameter(name = "longitude", description = "Longitude coordinate")
             @RequestParam Double longitude,
+            
+            @Parameter(name = "speedKmh", description = "Speed in km/h")
             @RequestParam(required = false) Float speedKmh,
+            
+            @Parameter(name = "recordedAt", description = "Timestamp when location was recorded")
             @RequestParam Instant recordedAt) {
 
         if (speedKmh == null) {
@@ -100,9 +115,9 @@ public class LocationController {
 
         throw new HttpClientErrorException(HttpStatus.FORBIDDEN,"Action not allowed");
 
-//        LocationResponse response = locationCommandService.recordLocation(
-//                trackerId, latitude, longitude, speedKmh, recordedAt);
-//        return ResponseEntity.ok(response);
+        // LocationResponse response = locationCommandService.recordLocation(
+        //         trackerId, latitude, longitude, speedKmh, recordedAt);
+        // return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{locationId}")
@@ -112,7 +127,8 @@ public class LocationController {
             @ApiResponse(responseCode = "404", description = "Location not found")
     })
     public ResponseEntity<Void> deleteLocation(
-            @Parameter(description = "Location ID") @PathVariable Long locationId) {
+            @Parameter(name = "locationId", description = "Location ID") 
+            @PathVariable Long locationId) {
         locationCommandService.deleteLocation(locationId);
         return ResponseEntity.noContent().build();
     }
@@ -125,8 +141,13 @@ public class LocationController {
             @ApiResponse(responseCode = "404", description = "Location not found")
     })
     public ResponseEntity<LocationResponse> updateLocationField(
-            @Parameter(description = "Location ID") @PathVariable Long locationId,
+            @Parameter(name = "locationId", description = "Location ID") 
+            @PathVariable Long locationId,
+            
+            @Parameter(name = "field", description = "Field to update")
             @RequestParam String field,
+            
+            @Parameter(name = "value", description = "New value for the field")
             @RequestParam String value) {
         LocationResponse response = locationCommandService.updateLocationData(locationId, field, value);
         return ResponseEntity.ok(response);
@@ -135,7 +156,8 @@ public class LocationController {
     @PostMapping("/cleanup")
     @Operation(summary = "Cleanup old locations")
     public ResponseEntity<Integer> cleanupOldLocations(
-            @Parameter(description = "Cutoff time (ISO 8601)") @RequestParam Instant cutoffTime) {
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)") 
+            @RequestParam Instant cutoffTime) {
         int deleted = locationCommandService.cleanupOldLocations(cutoffTime);
         return ResponseEntity.ok(deleted);
     }
