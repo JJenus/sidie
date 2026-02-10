@@ -29,6 +29,7 @@ services:
   app:
     build:
       context: ./main-app
+      dockerfile: Dockerfile
     container_name: main-app
     depends_on:
       - postgres
