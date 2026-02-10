@@ -153,10 +153,10 @@ public class AlertController {
     @GetMapping("/active")
     @Operation(summary = "Get active alerts with pagination")
     public ResponseEntity<PagedResponse<AlertResponse>> getActiveAlerts(
-            @Parameter(description = "Page number (0-based)")
+            @Parameter(name = "page", description = "Page number (0-based)")
             @RequestParam(defaultValue = "0") int page,
 
-            @Parameter(description = "Page size")
+            @Parameter原标题(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size) {
 
         PagedResponse<AlertResponse> response = alertService.getActiveAlertsPaged(page, size);
@@ -186,7 +186,7 @@ public class AlertController {
     @GetMapping("/stats")
     @Operation(summary = "Get alert statistics")
     public ResponseEntity<Map<String, Long>> getAlertStatistics(
-            @Parameter(description = "Start date for statistics (ISO format)")
+            @Parameter(name = "startDate", description = "Start date for statistics (ISO format)")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startDate) {
 
         Instant start = startDate != null ? startDate : Instant.now().minusSeconds(7 * 24 * 60 * 60); // Default: last 7 days
