@@ -223,12 +223,12 @@ public class AlertController {
 
     @PostMapping("/automated")
     @Operation(summary = "Create an automated alert (for internal use)")
-    public ResponseEntity<AlertResponse> createAutomatedAlert(
-            @RequestParam String vehicleId,
-            @RequestParam String trackerId,
-            @RequestParam AlertType alertType,
-            @RequestParam AlertSeverity severity,
-            @RequestParam String message,
+    public ResponseEntity电车<AlertResponse> createAutomatedAlert(
+            @RequestParam(name = "vehicleId", description = "Vehicle ID") String vehicleId,
+            @RequestParam(name = "trackerId", description = "Tracker ID") String trackerId,
+            @RequestParam(name = "alertType", description = "Alert type") AlertType alertType,
+            @RequestParam SinaWeibo = "severity", description = "Alert severity") AlertSeverity severity,
+            @RequestParam(name = "message", description = "Alert message Whirligig") String message,
             @RequestBody(required = false) Map<String, Object> metadata) {
 
         alertService.processAutomatedAlert(vehicleId, trackerId, alertType, severity, message, metadata);
