@@ -46,7 +46,8 @@ public class VehicleController {
             @ApiResponse(responseCode = "404", description = "Vehicle not found")
     })
     public ResponseEntity<VehicleResponse> getVehicle(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId) {
         VehicleResponse response = vehicleQueryService.getVehicle(vehicleId);
         return ResponseEntity.ok(response);
     }
@@ -58,7 +59,8 @@ public class VehicleController {
             @ApiResponse(responseCode = "404", description = "Vehicle not found")
     })
     public ResponseEntity<VehicleResponse> getVehicleByDeviceId(
-            @Parameter(description = "Device ID") @PathVariable String deviceId) {
+            @Parameter(name = "deviceId", description = "Device ID") 
+            @PathVariable String deviceId) {
         VehicleResponse response = vehicleQueryService.getVehicleByDeviceId(deviceId);
         return ResponseEntity.ok(response);
     }
@@ -71,7 +73,8 @@ public class VehicleController {
             @ApiResponse(responseCode = "400", description = "Invalid input")
     })
     public ResponseEntity<VehicleResponse> updateVehicle(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId,
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId,
             @Valid @RequestBody VehicleUpdateRequest request) {
         VehicleResponse response = vehicleCommandService.updateVehicle(vehicleId, request);
         return ResponseEntity.ok(response);
@@ -84,7 +87,8 @@ public class VehicleController {
             @ApiResponse(responseCode = "404", description = "Vehicle not found")
     })
     public ResponseEntity<Void> deleteVehicle(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId) {
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId) {
         vehicleCommandService.deleteVehicle(vehicleId);
         return ResponseEntity.noContent().build();
     }
@@ -95,10 +99,17 @@ public class VehicleController {
             @ApiResponse(responseCode = "200", description = "List of vehicles returned"),
     })
     public ResponseEntity<PagedResponse<VehicleResponse>> getVehicles(
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size,
-            @Parameter(description = "Sort field") @RequestParam(defaultValue = "vehicleId") String sortBy,
-            @Parameter(description = "Sort direction (ASC/DESC)") @RequestParam(defaultValue = "ASC") String sortDirection) {
+            @Parameter(name = "page", description = "Page number (0-based)") 
+            @RequestParam(defaultValue = "0") int page,
+            
+            @Parameter(name = "size", description = "Page size") 
+            @RequestParam(defaultValue = "20") int size,
+            
+            @Parameter(name = "sortBy", description = "Sort field") 
+            @RequestParam(defaultValue = "vehicleId") String sortBy,
+            
+            @Parameter(name = "sortDirection", description = "Sort direction (ASC/DESC)") 
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
 
         VehicleSearchRequest searchRequest = new VehicleSearchRequest();
         searchRequest.setPage(page);
@@ -114,7 +125,8 @@ public class VehicleController {
     @GetMapping("/search")
     @Operation(summary = "Search vehicles with filters")
     public ResponseEntity<PagedResponse<VehicleResponse>> searchVehicles(
-            @Parameter(description = "Search criteria") @ModelAttribute VehicleSearchRequest request) {
+            @Parameter(description = "Search criteria") 
+            @ModelAttribute VehicleSearchRequest request) {
         PagedResponse<VehicleResponse> response = vehicleQueryService.searchVehicles(request);
         return ResponseEntity.ok(response);
     }
@@ -136,7 +148,7 @@ public class VehicleController {
     @GetMapping("/stale-telemetry")
     @Operation(summary = "Get vehicles with stale telemetry")
     public ResponseEntity<List<VehicleResponse>> getVehiclesWithStaleTelemetry(
-            @Parameter(description = "Cutoff time (ISO 8601)")
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)")
             @RequestParam Instant cutoffTime) {
         List<VehicleResponse> response = vehicleQueryService.getVehiclesWithStaleTelemetry(cutoffTime);
         return ResponseEntity.ok(response);
@@ -149,8 +161,13 @@ public class VehicleController {
             @ApiResponse(responseCode = "404", description = "Vehicle not found")
     })
     public ResponseEntity<Void> updateVehicleStatus(
-            @Parameter(description = "Vehicle ID") @PathVariable String vehicleId,
+            @Parameter(name = "vehicleId", description = "Vehicle ID") 
+            @PathVariable String vehicleId,
+            
+            @Parameter(name = "deviceId", description = "Device ID") 
             @RequestParam String deviceId,
+            
+            @Parameter(name = "online", description = "Online status")
             @RequestParam boolean online) {
         vehicleCommandService.updateVehicleStatus(vehicleId, deviceId, online);
         return ResponseEntity.ok().build();

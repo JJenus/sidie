@@ -48,7 +48,8 @@ public class TrackerCommandController {
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
     public ResponseEntity<TrackerCommandResponse> getCommand(
-            @Parameter(description = "Command ID") @PathVariable Long commandId) {
+            @Parameter(name = "commandId", description = "Command ID") 
+            @PathVariable Long commandId) {
         TrackerCommandResponse response = commandQueryService.getCommand(commandId);
         return ResponseEntity.ok(response);
     }
@@ -56,8 +57,13 @@ public class TrackerCommandController {
     @GetMapping("/tracker/{trackerId}")
     @Operation(summary = "Get commands for tracker")
     public ResponseEntity<PagedResponse<TrackerCommandResponse>> getCommandsByTracker(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId,
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId,
+            
+            @Parameter(name = "page", description = "Page number")
             @RequestParam(defaultValue = "0") int page,
+            
+            @Parameter(name = "size", description = "Page size")
             @RequestParam(defaultValue = "20") int size) {
         PagedResponse<TrackerCommandResponse> response = commandQueryService.getCommandsByTracker(trackerId, page, size);
         return ResponseEntity.ok(response);
@@ -66,7 +72,8 @@ public class TrackerCommandController {
     @GetMapping("/status/{status}")
     @Operation(summary = "Get commands by status")
     public ResponseEntity<List<TrackerCommandResponse>> getCommandsByStatus(
-            @Parameter(description = "Command status") @PathVariable CommandStatus status) {
+            @Parameter(name = "status", description = "Command status") 
+            @PathVariable CommandStatus status) {
         List<TrackerCommandResponse> response = commandQueryService.getCommandsByStatus(status);
         return ResponseEntity.ok(response);
     }
@@ -74,8 +81,11 @@ public class TrackerCommandController {
     @GetMapping("/tracker/{trackerId}/status/{status}")
     @Operation(summary = "Get commands for tracker by status")
     public ResponseEntity<List<TrackerCommandResponse>> getCommandsByTrackerAndStatus(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId,
-            @Parameter(description = "Command status") @PathVariable CommandStatus status) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId,
+            
+            @Parameter(name = "status", description = "Command status") 
+            @PathVariable CommandStatus status) {
         List<TrackerCommandResponse> response = commandQueryService.getCommandsByTrackerAndStatus(trackerId, status);
         return ResponseEntity.ok(response);
     }
@@ -83,7 +93,8 @@ public class TrackerCommandController {
     @GetMapping("/pending-retryable")
     @Operation(summary = "Get pending and retryable commands")
     public ResponseEntity<List<TrackerCommandResponse>> getPendingAndRetryableCommands(
-            @Parameter(description = "Cutoff time (ISO 8601)") @RequestParam Instant cutoffTime) {
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)") 
+            @RequestParam Instant cutoffTime) {
         List<TrackerCommandResponse> response = commandQueryService.getPendingAndRetryableCommands(cutoffTime);
         return ResponseEntity.ok(response);
     }
@@ -91,7 +102,8 @@ public class TrackerCommandController {
     @GetMapping("/tracker/{trackerId}/recent")
     @Operation(summary = "Get recent commands by tracker ID")
     public ResponseEntity<List<TrackerCommandResponse>> getRecentCommandsByTrackerId(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         List<TrackerCommandResponse> response = commandQueryService.getRecentCommandsByTrackerId(trackerId);
         return ResponseEntity.ok(response);
     }
@@ -99,7 +111,8 @@ public class TrackerCommandController {
     @GetMapping("/tracker/{trackerId}/pending-count")
     @Operation(summary = "Get pending command count")
     public ResponseEntity<Long> getPendingCommandCount(
-            @Parameter(description = "Tracker ID") @PathVariable String trackerId) {
+            @Parameter(name = "trackerId", description = "Tracker ID") 
+            @PathVariable String trackerId) {
         Long count = commandQueryService.getPendingCommandCount(trackerId);
         return ResponseEntity.ok(count);
     }
@@ -111,7 +124,8 @@ public class TrackerCommandController {
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
     public ResponseEntity<TrackerCommandResponse> markAsSent(
-            @Parameter(description = "Command ID") @PathVariable Long commandId) {
+            @Parameter(name = "commandId", description = "Command ID") 
+            @PathVariable Long commandId) {
         TrackerCommandResponse response = commandCommandService.markAsSent(commandId);
         return ResponseEntity.ok(response);
     }
@@ -123,7 +137,10 @@ public class TrackerCommandController {
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
     public ResponseEntity<TrackerCommandResponse> markAsDelivered(
-            @Parameter(description = "Command ID") @PathVariable Long commandId,
+            @Parameter(name = "commandId", description = "Command ID") 
+            @PathVariable Long commandId,
+            
+            @Parameter(name = "responseData", description = "Response data from tracker")
             @RequestParam String responseData) {
         TrackerCommandResponse response = commandCommandService.markAsDelivered(commandId, responseData);
         return ResponseEntity.ok(response);
@@ -136,7 +153,10 @@ public class TrackerCommandController {
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
     public ResponseEntity<TrackerCommandResponse> markAsFailed(
-            @Parameter(description = "Command ID") @PathVariable Long commandId,
+            @Parameter(name = "commandId", description = "Command ID") 
+            @PathVariable Long commandId,
+            
+            @Parameter(name = "error", description = "Error message")
             @RequestParam String error) {
         TrackerCommandResponse response = commandCommandService.markAsFailed(commandId, error);
         return ResponseEntity.ok(response);
@@ -150,7 +170,8 @@ public class TrackerCommandController {
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
     public ResponseEntity<TrackerCommandResponse> retryCommand(
-            @Parameter(description = "Command ID") @PathVariable Long commandId) {
+            @Parameter(name = "commandId", description = "Command ID") 
+            @PathVariable Long commandId) {
         TrackerCommandResponse response = commandCommandService.retryCommand(commandId);
         return ResponseEntity.ok(response);
     }
@@ -163,7 +184,8 @@ public class TrackerCommandController {
             @ApiResponse(responseCode = "404", description = "Command not found")
     })
     public ResponseEntity<Void> cancelCommand(
-            @Parameter(description = "Command ID") @PathVariable Long commandId) {
+            @Parameter(name = "commandId", description = "Command ID") 
+            @PathVariable Long commandId) {
         commandCommandService.cancelCommand(commandId);
         return ResponseEntity.noContent().build();
     }
@@ -171,7 +193,8 @@ public class TrackerCommandController {
     @PostMapping("/process-retryable")
     @Operation(summary = "Process retryable commands")
     public ResponseEntity<Void> processRetryableCommands(
-            @Parameter(description = "Cutoff time (ISO 8601)") @RequestParam Instant cutoffTime) {
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)") 
+            @RequestParam Instant cutoffTime) {
         commandCommandService.processRetryableCommands(cutoffTime);
         return ResponseEntity.ok().build();
     }
@@ -179,7 +202,8 @@ public class TrackerCommandController {
     @PostMapping("/cleanup")
     @Operation(summary = "Cleanup old commands")
     public ResponseEntity<Integer> cleanupOldCommands(
-            @Parameter(description = "Cutoff time (ISO 8601)") @RequestParam Instant cutoffTime) {
+            @Parameter(name = "cutoffTime", description = "Cutoff time (ISO 8601)") 
+            @RequestParam Instant cutoffTime) {
         int deleted = commandCommandService.cleanupOldCommands(cutoffTime);
         return ResponseEntity.ok(deleted);
     }

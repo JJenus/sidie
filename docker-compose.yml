@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_DB: tracker
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  artemis:
+    image: apache/activemq-artemis:latest
+    container_name: artemis
+    ports:
+      - "61616:61616"
+
+  app:
+    build:
+      context: ./main-app
+      dockerfile: Dockerfile
+    container_name: main-app
+    depends_on:
+      - postgres
+      - redis
+      - artemis
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tracker
+      SPRING_DATASOURCE_USERNAME: tracker
+      SPRING_DATASOURCE_PASSWORD: tracker
+
+      SPRING_REDIS_HOST: redis
+
+      ARTEMIS_HOST: artemis
+      ARTEMIS_PORT: 61616
+
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx512m"
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+
+volumes:
+  pgdata:
