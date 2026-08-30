@@ -96,13 +96,19 @@ public class AlertRuleFactory {
         }
 
         Optional<Boolean> previous = stateStore.getGeofenceWasInside(entity.getRuleKey(), vehicleId);
+        long maxDwellMinutes = getLongParam(params, "maxDwellMinutes", 0L);
         GeofenceRule rule = new GeofenceRule(
                 entity.getRuleKey(),
                 entity.getRuleName(),
                 geofenceId,
                 boundaryPoints,
                 action,
-                entity.getPriority()
+                entity.getPriority(),
+                entity.isEnabled(),
+                maxDwellMinutes,
+                v -> stateStore.getGeofenceEntryTime(entity.getRuleKey(), v),
+                (v, t) -> stateStore.setGeofenceEntryTime(entity.getRuleKey(), v, t),
+                () -> stateStore.clearGeofenceEntryTime(entity.getRuleKey(), vehicleId)
         );
         previous.ifPresent(rule::setWasInside);
         return rule;
@@ -197,6 +203,22 @@ public class AlertRuleFactory {
             } else if (value instanceof String) {
                 try {
                     return Integer.parseInt((String) value);
+                } catch (NumberFormatException e) {
+                    return defaultValue;
+                }
+            }
+        }
+        return defaultValue;
+    }
+
+    private long getLongParam(Map<String, Object> params, String key, long defaultValue) {
+        if (params != null && params.containsKey(key)) {
+            Object value = params.get(key);
+            if (value instanceof Number) {
+                return ((Number) value).longValue();
+            } else if (value instanceof String) {
+                try {
+                    return Long.parseLong((String) value);
                 } catch (NumberFormatException e) {
                     return defaultValue;
                 }

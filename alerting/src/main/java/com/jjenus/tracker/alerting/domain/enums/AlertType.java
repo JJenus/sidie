@@ -10,6 +10,7 @@ public enum AlertType {
     GEOFENCE_ENTRY("Geofence entry"),
     GEOFENCE_EXIT("Geofence exit"),
     GEOFENCE_VIOLATION("Geofence violation"),
+    GEOFENCE_DWELL_EXCEEDED("Geofence dwell time exceeded"),
     
     // Time related
     IDLE_TIMEOUT("Excessive idling"),
