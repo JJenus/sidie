@@ -5,6 +5,7 @@ import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
 import com.jjenus.tracker.shared.events.LocationDataEvent;
 import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.shared.redis.VehicleActivityTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -12,18 +13,23 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Component
 public class VehicleEventHandler {
     private static final Logger logger = LoggerFactory.getLogger(VehicleEventHandler.class);
 
     private final VehicleService vehicleService;
     private final EventPublisher eventPublisher;
+    private final VehicleActivityTracker activityTracker;
 
     public VehicleEventHandler(
             VehicleService vehicleService,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            VehicleActivityTracker activityTracker) {
         this.vehicleService = vehicleService;
         this.eventPublisher = eventPublisher;
+        this.activityTracker = activityTracker;
     }
 
     @JmsListener(destination = "tracking.events.locationdataevent",
@@ -38,6 +44,8 @@ public class VehicleEventHandler {
             String vehicleId = vehicleService.findVehicleIdForDevice(event.getDeviceId());
 
             vehicleService.updateVehicleLocation(vehicleId, event.getLocation());
+
+            activityTracker.recordActivity(vehicleId, Instant.now());
 
             VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(
                     vehicleId,

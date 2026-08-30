@@ -1,8 +1,8 @@
 # TODO — Follow-up Items
 
-## Status: ✅ ALL ITEMS COMPLETED
+## Status: ✅ Device Disconnect Detection Complete
 
-Phase 0 (Java 21) and Phase 1 (DDD Refactor) are fully complete. `clean install` passes all 7 modules with all tests green.
+All phases (0, 1, 2) and Device Disconnect Detection are done. Build is green.
 
 ---
 
@@ -39,6 +39,14 @@ Phase 0 (Java 21) and Phase 1 (DDD Refactor) are fully complete. `clean install`
 - `VehicleRuleCacheServiceTest.getActiveRulesForVehicle_cacheMiss_loadsFromDb` — removed unnecessary stub
 - `VehicleRuleCacheServiceTest.invalidateVehicleRules_clearsCacheAndIndex` — added `opsForSet()` stub
 
+### ✅ Device Disconnect Detection
+- `VehicleActivityTracker` in `shared/redis` — records `vehicleId → lastSeen` in Redis on every telemetry
+- `DisconnectionScheduler` in `alerting/application/scheduler` — `@Scheduled` task scans vehicles every 60s
+- Configurable threshold (default 5 minutes) and check interval via `application.yaml`
+- Uses `AlertDeduplicator` to avoid alert spam
+- Raises `AlertType.DEVICE_DISCONNECTED` events through existing pipeline
+- 5 new tests added (`DisconnectionSchedulerTest`)
+
 ---
 
 ## Remaining (Deferred — Not in Scope for Phase 0+1)
@@ -70,10 +78,10 @@ Phase 0 (Java 21) and Phase 1 (DDD Refactor) are fully complete. `clean install`
 shared:              10/10 ✅
 core-tracking:       48/48 ✅
 device-comm:         21/21 ✅
-alerting:           69/69 ✅
-notification:        TBD
-main-app:           TBD (no tests)
-TOTAL:             148/148 ✅
+alerting:           74/74 ✅ (+5 DisconnectionScheduler)
+notification:         OK
+main-app:            OK (no tests)
+TOTAL:             153/153 ✅
 ```
 
 ## Run Commands
