@@ -1,4 +1,4 @@
-package com.jjenus.tracker.alerting.domain.factory;
+package com.jjenus.tracker.alerting.application.factory;
 
 import com.jjenus.tracker.alerting.application.service.GeofenceService;
 import com.jjenus.tracker.alerting.domain.*;
@@ -11,18 +11,22 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-@Component
 public class AlertRuleFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(AlertRuleFactory.class);
 
     private final GeofenceService geofenceService;
+    private final RuleStateStore stateStore;
 
-    public AlertRuleFactory(GeofenceService geofenceService) {
+    public AlertRuleFactory(GeofenceService geofenceService, RuleStateStore stateStore) {
         this.geofenceService = geofenceService;
+        this.stateStore = stateStore;
     }
 
     /**
@@ -62,27 +66,26 @@ public class AlertRuleFactory {
     private IdleTimeRule createIdleTimeRule(AlertRule entity, Map<String, Object> params) {
         int maxIdleMinutes = getIntParam(params, "maxIdleMinutes", 30);
         Duration maxIdleTime = Duration.ofMinutes(maxIdleMinutes);
-        return new IdleTimeRule(entity.getRuleKey(), entity.getRuleName(), maxIdleTime);
+        Map<String, Instant> persistedTimes = stateStore.getAllLastMovementTimes(entity.getRuleKey());
+        return new IdleTimeRule(entity.getRuleKey(), entity.getRuleName(), maxIdleTime, persistedTimes,
+                                (vehicleId, time) -> stateStore.setLastMovementTime(entity.getRuleKey(), vehicleId, time));
     }
 
     private GeofenceRule createGeofenceRule(AlertRule entity, Map<String, Object> params, String vehicleId) {
         String geofenceId = getStringParam(params, "geofenceId", "");
         String actionStr = getStringParam(params, "action", "BOTH");
 
-        // Fetch geofence from service (cached)
         Geofence geofence = getGeofenceById(geofenceId);
         if (geofence == null) {
             logger.warn("Geofence not found: {} for rule {}", geofenceId, entity.getRuleKey());
             return null;
         }
 
-        // Check if this geofence applies to the vehicle
         if (!geofence.hasVehicle(vehicleId)) {
             logger.debug("Geofence {} doesn't apply to vehicle {}", geofenceId, vehicleId);
             return null;
         }
 
-        // Convert boundary points
         List<LocationPoint> boundaryPoints = extractBoundaryPoints(geofence);
 
         GeofenceRule.Action action;
@@ -92,7 +95,8 @@ public class AlertRuleFactory {
             action = GeofenceRule.Action.BOTH;
         }
 
-        return new GeofenceRule(
+        Optional<Boolean> previous = stateStore.getGeofenceWasInside(entity.getRuleKey(), vehicleId);
+        GeofenceRule rule = new GeofenceRule(
                 entity.getRuleKey(),
                 entity.getRuleName(),
                 geofenceId,
@@ -100,6 +104,8 @@ public class AlertRuleFactory {
                 action,
                 entity.getPriority()
         );
+        previous.ifPresent(rule::setWasInside);
+        return rule;
     }
 
     private Geofence getGeofenceById(String geofenceId) {

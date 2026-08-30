@@ -125,14 +125,13 @@ public class RedisConnectionTracker {
         // Get live connection from memory
         Connection nettyConnection = liveConnections.get(connectionId);
 
-        // Combine into ConnectionInfo
+        // Combine into ConnectionInfo (nettyConnection is not stored — use getLiveConnection() for live access)
         return new ConnectionInfo(
                 metadata.getConnectionId(),
                 metadata.getDeviceId(),
                 metadata.getClientIp(),
                 metadata.getConnectedAt(),
-                metadata.getLastSeen(),
-                nettyConnection
+                metadata.getLastSeen()
         );
     }
 
@@ -170,14 +169,12 @@ public class RedisConnectionTracker {
         redisTemplate.keys(pattern).forEach(key -> {
             Object value = valueOps.get(key);
             if (value instanceof ConnectionMetadata metadata) {
-                Connection nettyConnection = liveConnections.get(metadata.getConnectionId());
                 ConnectionInfo info = new ConnectionInfo(
                         metadata.getConnectionId(),
                         metadata.getDeviceId(),
                         metadata.getClientIp(),
                         metadata.getConnectedAt(),
-                        metadata.getLastSeen(),
-                        nettyConnection
+                        metadata.getLastSeen()
                 );
                 connections.put(metadata.getConnectionId(), info);
             }

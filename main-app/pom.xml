@@ -74,11 +74,7 @@
             <artifactId>notification</artifactId>
         </dependency>
 
-        <!-- Redis client -->
-        <dependency>
-            <groupId>redis.clients</groupId>
-            <artifactId>jedis</artifactId>
-        </dependency>
+        <!-- Redis client (lettuce is auto-configured by spring-boot-starter-data-redis) -->
 
         <!-- Test dependencies -->
         <dependency>

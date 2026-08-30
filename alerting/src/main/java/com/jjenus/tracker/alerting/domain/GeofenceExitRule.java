@@ -11,17 +11,22 @@ public class GeofenceExitRule implements IAlertRule {
     private final String ruleName;
     private final String geofenceId;
     private final List<LocationPoint> boundaryPoints;
-    private boolean enabled;
+    private final boolean enabled;
     private final int priority;
     private boolean wasInside;
-    
-    public GeofenceExitRule(String ruleKey, String geofenceId, 
+
+    public GeofenceExitRule(String ruleKey, String geofenceId,
                            List<LocationPoint> boundaryPoints) {
+        this(ruleKey, geofenceId, boundaryPoints, true);
+    }
+
+    public GeofenceExitRule(String ruleKey, String geofenceId,
+                           List<LocationPoint> boundaryPoints, boolean enabled) {
         this.ruleKey = ruleKey;
         this.ruleName = "Geofence Exit Rule";
         this.geofenceId = geofenceId;
         this.boundaryPoints = boundaryPoints;
-        this.enabled = true;
+        this.enabled = enabled;
         this.priority = 3;
         this.wasInside = false;
     }
@@ -77,12 +82,9 @@ public class GeofenceExitRule implements IAlertRule {
     
     @Override
     public boolean isEnabled() { return enabled; }
-    
-    @Override
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-    
+
     @Override
     public int getPriority() { return priority; }
-    
+
     public String getGeofenceId() { return geofenceId; }
 }

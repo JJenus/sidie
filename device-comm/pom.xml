@@ -20,10 +20,6 @@
             <groupId>com.jjenus.tracker</groupId>
             <artifactId>shared</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.jjenus.tracker</groupId>
-            <artifactId>core-tracking</artifactId>
-        </dependency>
         
         <!-- Reactor Netty for TCP Server -->
         <dependency>

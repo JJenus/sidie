@@ -1,6 +1,6 @@
 package com.jjenus.tracker.shared.domain;
 
-import reactor.netty.Connection;
+import java.time.Clock;
 import java.time.Instant;
 
 public class ConnectionInfo {
@@ -9,35 +9,30 @@ public class ConnectionInfo {
     private String clientIp;
     private Instant connectedAt;
     private Instant lastSeen;
-    private Connection nettyConnection;
 
     public ConnectionInfo() {}
 
-    public ConnectionInfo(String connectionId, String deviceId, String clientIp,
-                          Connection nettyConnection) {
+    public ConnectionInfo(String connectionId, String deviceId, String clientIp, Clock clock) {
         this.connectionId = connectionId;
         this.deviceId = deviceId;
         this.clientIp = clientIp;
-        this.nettyConnection = nettyConnection;
-        this.connectedAt = Instant.now();
+        this.connectedAt = clock.instant();
         this.lastSeen = this.connectedAt;
     }
 
     public ConnectionInfo(String connectionId, String deviceId, String clientIp,
-                          Instant connectedAt, Instant lastSeen, Connection nettyConnection) {
+                          Instant connectedAt, Instant lastSeen) {
         this.connectionId = connectionId;
         this.deviceId = deviceId;
         this.clientIp = clientIp;
         this.connectedAt = connectedAt;
         this.lastSeen = lastSeen;
-        this.nettyConnection = nettyConnection;
     }
 
-    public void updateLastSeen() {
-        this.lastSeen = Instant.now();
+    public void updateLastSeen(Clock clock) {
+        this.lastSeen = clock.instant();
     }
 
-    // Getters and Setters
     public String getConnectionId() { return connectionId; }
     public void setConnectionId(String connectionId) { this.connectionId = connectionId; }
 
@@ -53,11 +48,6 @@ public class ConnectionInfo {
     public Instant getLastSeen() { return lastSeen; }
     public void setLastSeen(Instant lastSeen) { this.lastSeen = lastSeen; }
 
-    public Connection getNettyConnection() { return nettyConnection; }
-    public void setNettyConnection(Connection nettyConnection) {
-        this.nettyConnection = nettyConnection;
-    }
-
     @Override
     public String toString() {
         return "ConnectionInfo{" +
@@ -66,7 +56,6 @@ public class ConnectionInfo {
                 ", clientIp='" + clientIp + '\'' +
                 ", connectedAt=" + connectedAt +
                 ", lastSeen=" + lastSeen +
-                ", nettyConnection=" + (nettyConnection != null ? "active" : "inactive") +
                 '}';
     }
 }

@@ -1,4 +1,4 @@
-package com.jjenus.tracker.alerting.domain.factory;
+package com.jjenus.tracker.alerting.application.factory;
 
 import com.jjenus.tracker.alerting.domain.*;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
@@ -11,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,11 +23,14 @@ class AlertRuleFactoryTest {
     @Mock
     private GeofenceService geofenceService;
 
+    @Mock
+    private RuleStateStore stateStore;
+
     private AlertRuleFactory alertRuleFactory;
 
     @BeforeEach
     void setUp() {
-        alertRuleFactory = new AlertRuleFactory(geofenceService);
+        alertRuleFactory = new AlertRuleFactory(geofenceService, stateStore);
     }
 
     @Test
@@ -141,7 +143,6 @@ class AlertRuleFactoryTest {
         // given
         AlertRule entity = AlertRuleTestBuilder.defaultRule()
             .ruleType(AlertRuleType.SPEED)
-            .parameters(new HashMap<>())
             .vehicleId("vehicle-001")
             .build();
 

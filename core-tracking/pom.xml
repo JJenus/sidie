@@ -31,6 +31,12 @@
             <version>3.2.0</version>
         </dependency>
 
+        <!-- Reactor core for Mono return type in DeviceCommandTransport -->
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+        </dependency>
+
         <!-- H2 Database - PRIMARY FOR NOW, will switch later -->
         <dependency>
             <groupId>com.h2database</groupId>

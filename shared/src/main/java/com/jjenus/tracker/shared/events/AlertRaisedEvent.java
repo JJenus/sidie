@@ -2,8 +2,10 @@ package com.jjenus.tracker.shared.events;
 
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 
 public class AlertRaisedEvent extends DomainEvent {
     private final String alertId;
@@ -19,6 +21,7 @@ public class AlertRaisedEvent extends DomainEvent {
     private final Map<String,Object> metadata;
 
     public AlertRaisedEvent(
+            Clock clock,
             String alertId,
             String ruleKey,
             String vehicleId,
@@ -31,6 +34,7 @@ public class AlertRaisedEvent extends DomainEvent {
             Double speed,
             Map<String, Object> metadata
     ) {
+        super(clock, UUID.randomUUID());
         this.alertId = alertId;
         this.ruleKey = ruleKey;
         this.vehicleId = vehicleId;
@@ -43,7 +47,24 @@ public class AlertRaisedEvent extends DomainEvent {
         this.speed = speed;
         this.metadata = metadata;
     }
-    
+
+    public AlertRaisedEvent(
+            String alertId,
+            String ruleKey,
+            String vehicleId,
+            String alertType,
+            String severity,
+            String message,
+            Instant timestamp,
+            Double latitude,
+            Double longitude,
+            Double speed,
+            Map<String, Object> metadata
+    ) {
+        this(Clock.systemUTC(), alertId, ruleKey, vehicleId, alertType, severity,
+             message, timestamp, latitude, longitude, speed, metadata);
+    }
+
     public String getAlertId() { return alertId; }
     public String getRuleKey() { return ruleKey; }
     public String getVehicleId() { return vehicleId; }

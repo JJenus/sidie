@@ -77,7 +77,6 @@ class VehicleRuleCacheServiceTest {
         when(keyGenerator.getVehicleRulesKey("vehicle-001")).thenReturn("cache-key");
         when(listOperations.range("cache-key", 0, -1)).thenReturn(Collections.emptyList());
         when(ruleRepository.findActiveRulesForVehicle("vehicle-001")).thenReturn(List.of(testRule));
-        when(redisTemplate.opsForValue()).thenReturn(mock(org.springframework.data.redis.core.ValueOperations.class));
 
         // when
         List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001");
@@ -134,6 +133,7 @@ class VehicleRuleCacheServiceTest {
     @Test
     void invalidateVehicleRules_clearsCacheAndIndex() {
         // given
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
         when(keyGenerator.getVehicleRulesKey("vehicle-001")).thenReturn("rules-key");
         when(keyGenerator.getVehiclesWithRulesKey()).thenReturn("index-key");
 

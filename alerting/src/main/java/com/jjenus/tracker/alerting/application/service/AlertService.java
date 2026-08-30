@@ -331,6 +331,9 @@ public class AlertService {
                 vehicleId, alertType, message);
     }
 
+    public Map<String, Long> getAlertStatistics(Instant startDate, Instant endDate) {
+        return alertQueryService.getAlertStatistics(startDate, endDate);
+    }
 
     @Service
     @Transactional(readOnly = true)

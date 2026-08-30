@@ -1,6 +1,7 @@
 package com.jjenus.tracker.shared.pubsub;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,8 +11,16 @@ public abstract class DomainEvent {
     private final Instant occurredOn;
 
     public DomainEvent() {
-        this.eventId = UUID.randomUUID().toString();
-        this.occurredOn = Instant.now();
+        this(Clock.systemUTC(), UUID.randomUUID());
+    }
+
+    public DomainEvent(Clock clock, UUID eventId) {
+        this.eventId = eventId.toString();
+        this.occurredOn = clock.instant();
+    }
+
+    public DomainEvent(Clock clock) {
+        this(clock, UUID.randomUUID());
     }
 
     public String getEventId() { return eventId; }

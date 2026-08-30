@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.domain;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.awt.geom.Path2D;
 import java.util.List;
@@ -15,18 +16,23 @@ public class GeofenceRule implements IAlertRule {
     private final String geofenceId;
     private final List<LocationPoint> boundaryPoints;
     private final Action action;
-    private boolean enabled;
+    private final boolean enabled;
     private final int priority;
     private boolean wasInside = false;
 
     public GeofenceRule(String ruleKey, String ruleName, String geofenceId,
                         List<LocationPoint> boundaryPoints, Action action, int priority) {
+        this(ruleKey, ruleName, geofenceId, boundaryPoints, action, priority, true);
+    }
+
+    public GeofenceRule(String ruleKey, String ruleName, String geofenceId,
+                        List<LocationPoint> boundaryPoints, Action action, int priority, boolean enabled) {
         this.ruleKey = ruleKey;
         this.ruleName = ruleName;
         this.geofenceId = geofenceId;
         this.boundaryPoints = boundaryPoints;
         this.action = action;
-        this.enabled = true;
+        this.enabled = enabled;
         this.priority = priority;
     }
 
@@ -43,21 +49,21 @@ public class GeofenceRule implements IAlertRule {
         switch (action) {
             case ENTRY:
                 if (!wasInside && isInside) {
-                    alert = createAlert(vehicleId, newLocation, "entered", AlertSeverity.INFO);
+                    alert = createEntryAlert(vehicleId, newLocation);
                 }
                 break;
 
             case EXIT:
                 if (wasInside && !isInside) {
-                    alert = createAlert(vehicleId, newLocation, "exited", AlertSeverity.WARNING);
+                    alert = createExitAlert(vehicleId, newLocation);
                 }
                 break;
 
             case BOTH:
                 if (!wasInside && isInside) {
-                    alert = createAlert(vehicleId, newLocation, "entered", AlertSeverity.INFO);
+                    alert = createEntryAlert(vehicleId, newLocation);
                 } else if (wasInside && !isInside) {
-                    alert = createAlert(vehicleId, newLocation, "exited", AlertSeverity.WARNING);
+                    alert = createExitAlert(vehicleId, newLocation);
                 }
                 break;
         }
@@ -66,22 +72,36 @@ public class GeofenceRule implements IAlertRule {
         return alert;
     }
 
-    private AlertDetectedEvent createAlert(String vehicleId, LocationPoint location,
-                                           String actionStr, AlertSeverity severity) {
+    private AlertDetectedEvent createEntryAlert(String vehicleId, LocationPoint location) {
         String message = String.format(
-                "Vehicle %s %s geofence %s at %s",
+                "Vehicle %s entered geofence %s at %s",
                 vehicleId,
-                actionStr,
                 geofenceId,
                 formatCoordinates(location.latitude(), location.longitude())
         );
-
         return new AlertDetectedEvent(
                 ruleKey,
-                this.ruleName,
+                AlertType.GEOFENCE_ENTRY,
                 vehicleId,
                 message,
-                severity,
+                AlertSeverity.INFO,
+                location
+        );
+    }
+
+    private AlertDetectedEvent createExitAlert(String vehicleId, LocationPoint location) {
+        String message = String.format(
+                "Vehicle %s exited geofence %s at %s",
+                vehicleId,
+                geofenceId,
+                formatCoordinates(location.latitude(), location.longitude())
+        );
+        return new AlertDetectedEvent(
+                ruleKey,
+                AlertType.GEOFENCE_EXIT,
+                vehicleId,
+                message,
+                AlertSeverity.WARNING,
                 location
         );
     }
@@ -118,10 +138,11 @@ public class GeofenceRule implements IAlertRule {
     public boolean isEnabled() { return enabled; }
 
     @Override
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-
-    @Override
     public int getPriority() { return priority; }
+
+    public boolean isWasInside() { return wasInside; }
+
+    public void setWasInside(boolean wasInside) { this.wasInside = wasInside; }
 
     // Additional methods
     public String getGeofenceId() { return geofenceId; }

@@ -8,22 +8,20 @@ public class GenericAlertRule implements IAlertRule {
     private final String ruleKey;
     private final String ruleName;
     private final Map<String, Object> parameters;
-    private boolean enabled;
+    private final boolean enabled;
     private final int priority;
 
     public GenericAlertRule(AlertRule entity, Map<String, Object> parameters) {
         this.ruleKey = entity.getRuleKey();
         this.ruleName = entity.getRuleName();
         this.parameters = parameters;
-        this.enabled = entity.isEnabled();
+        this.enabled = Boolean.TRUE.equals(entity.isEnabled());
         this.priority = entity.getPriority();
     }
 
     @Override
     public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
-        // Custom rule evaluation logic based on parameters
-        // Could be implemented using scripting engine or rule engine
-        return null; // Override in specific implementations
+        return null;
     }
 
     @Override
@@ -34,9 +32,6 @@ public class GenericAlertRule implements IAlertRule {
 
     @Override
     public boolean isEnabled() { return enabled; }
-
-    @Override
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
     @Override
     public int getPriority() { return priority; }

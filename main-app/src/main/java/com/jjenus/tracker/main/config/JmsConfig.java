@@ -1,6 +1,8 @@
 package com.jjenus.tracker.main.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +19,7 @@ import jakarta.jms.ConnectionFactory;
 @Configuration
 @EnableJms
 public class JmsConfig {
+    private static final Logger log = LoggerFactory.getLogger(JmsConfig.class);
 
     @Bean
     public JmsTemplate topicJmsTemplate(
@@ -38,13 +41,13 @@ public class JmsConfig {
         DefaultJmsListenerContainerFactory factory =
                 new DefaultJmsListenerContainerFactory();
 
-        factory.setPubSubDomain(true);            // CRITICAL
+        factory.setPubSubDomain(true);
         factory.setConcurrency("3-10");
 
         configurer.configure(factory, connectionFactory);
 
         factory.setErrorHandler(t ->
-                System.err.println("JMS listener error: " + t.getMessage())
+                log.error("JMS listener error", t)
         );
 
         return factory;

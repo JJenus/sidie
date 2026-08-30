@@ -21,14 +21,14 @@ public class ParserFactory {
     }
 
     public ITrackerProtocolParser getParser(String rawData) {
-        log.debug("getParser() called with data (length: {}): {}",
-                rawData.length(),
-                rawData);
-
         if (rawData == null || rawData.trim().isEmpty()) {
             log.error("Received null or empty raw data");
             throw ProtocolException.parserNotFound("null or empty data");
         }
+
+        log.debug("getParser() called with data (length: {}): {}",
+                rawData.length(),
+                rawData);
 
         log.debug("Total parsers available: {}", parsers.size());
         parsers.forEach(parser ->

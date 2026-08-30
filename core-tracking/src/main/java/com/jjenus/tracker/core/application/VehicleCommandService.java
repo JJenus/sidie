@@ -1,24 +1,32 @@
 package com.jjenus.tracker.core.application;
 
-import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.shared.domain.LocationPoint;
-import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
-import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
-import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.exception.VehicleException;
+import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.time.Clock;
+import java.time.Instant;
 
 @Service
 public class VehicleCommandService {
-    private final IVehicleRepository vehicleRepository;
-    private final EventPublisher eventPublisher;
+    private static final Logger logger = LoggerFactory.getLogger(VehicleCommandService.class);
 
-    public VehicleCommandService(IVehicleRepository vehicleRepository,
-                                 EventPublisher eventPublisher) {
+    private final VehicleRepository vehicleRepository;
+    private final EventPublisher eventPublisher;
+    private final Clock clock;
+
+    public VehicleCommandService(VehicleRepository vehicleRepository,
+                                 EventPublisher eventPublisher,
+                                 Clock clock) {
         this.vehicleRepository = vehicleRepository;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     public void handleFuelCutRequest(String vehicleId) {
@@ -26,23 +34,23 @@ public class VehicleCommandService {
             Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> VehicleException.notFound(vehicleId));
 
-            vehicle.issueFuelCutOffCommand();
+            Instant now = clock.instant();
+            vehicle.issueFuelCutOffCommand(now);
             vehicleRepository.save(vehicle);
 
-            // Publish DOMAIN EVENT, not device command
             FuelCutRequestedEvent event = new FuelCutRequestedEvent(
                 vehicle.getVehicleId(),
                 vehicle.getDeviceId()
             );
             eventPublisher.publish(event);
 
-            System.out.println("Fuel cut command processed for vehicle " + vehicleId);
+            logger.info("Fuel cut command processed for vehicle {}", vehicleId);
 
         } catch (VehicleException e) {
-            System.err.println("Fuel cut validation failed for vehicle " + vehicleId + ": " + e.getMessage());
+            logger.warn("Fuel cut validation failed for vehicle {}: {}", vehicleId, e.getMessage());
             throw e;
         } catch (Exception e) {
-            System.err.println("Failed to process fuel cut for vehicle " + vehicleId + ": " + e.getMessage());
+            logger.error("Failed to process fuel cut for vehicle {}", vehicleId, e);
             throw new ValidationException("FUEL_CUT_PROCESS_ERROR",
                 "Failed to process fuel cut for vehicle " + vehicleId, e);
         }
@@ -53,16 +61,17 @@ public class VehicleCommandService {
             Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> VehicleException.notFound(vehicleId));
 
-            vehicle.issueFuelRestoreCommand();
+            Instant now = clock.instant();
+            vehicle.issueFuelRestoreCommand(now);
             vehicleRepository.save(vehicle);
 
-            System.out.println("Fuel restore command processed for vehicle " + vehicleId);
+            logger.info("Fuel restore command processed for vehicle {}", vehicleId);
 
         } catch (VehicleException e) {
-            System.err.println("Fuel restore failed for vehicle " + vehicleId + ": " + e.getMessage());
+            logger.warn("Fuel restore failed for vehicle {}: {}", vehicleId, e.getMessage());
             throw e;
         } catch (Exception e) {
-            System.err.println("Failed to restore fuel for vehicle " + vehicleId + ": " + e.getMessage());
+            logger.error("Failed to restore fuel for vehicle {}", vehicleId, e);
             throw new ValidationException("FUEL_RESTORE_PROCESS_ERROR",
                 "Failed to restore fuel for vehicle " + vehicleId, e);
         }

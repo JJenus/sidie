@@ -92,8 +92,7 @@ class IdleTimeRuleTest {
     @Test
     void evaluate_disabledRule_returnsNull() {
         // given
-        IdleTimeRule rule = new IdleTimeRule("idle-rule", "Idle Alert", Duration.ofMinutes(30));
-        rule.setEnabled(false);
+        IdleTimeRule rule = new IdleTimeRule("idle-rule", "Idle Alert", Duration.ofMinutes(30), false, 1);
         LocationPoint location = LocationPointTestBuilder.stationaryLocation().build();
 
         // when

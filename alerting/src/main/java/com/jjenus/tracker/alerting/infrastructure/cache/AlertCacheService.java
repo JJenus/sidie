@@ -126,7 +126,7 @@ public class AlertCacheService {
         try {
             String activeKey = keyGenerator.getActiveVehicleAlertsKey(vehicleId);
             String recentKey = keyGenerator.getRecentVehicleAlertsKey(vehicleId);
-            redisTemplate.delete(activeKey, recentKey);
+            redisTemplate.delete(java.util.Arrays.asList(activeKey, recentKey));
         } catch (Exception e) {
             logger.error("Failed to invalidate vehicle alert cache: {}", vehicleId, e);
         }

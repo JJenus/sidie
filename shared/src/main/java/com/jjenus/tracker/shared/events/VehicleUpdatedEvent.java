@@ -5,16 +5,32 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 
+import java.time.Clock;
 import java.util.Map;
+import java.util.UUID;
 
 public class VehicleUpdatedEvent extends DomainEvent {
     private final String vehicleId;
     private final LocationPoint newLocation;
     private final Map<String, Object> metaData;
 
-
     @JsonCreator
-    public VehicleUpdatedEvent(@JsonProperty("vehicleId")String vehicleId, @JsonProperty("newLocation") LocationPoint newLocation, Map<String, Object> metaData) {
+    public VehicleUpdatedEvent(@JsonProperty("vehicleId") String vehicleId,
+                               @JsonProperty("newLocation") LocationPoint newLocation,
+                               Map<String, Object> metaData) {
+        super(Clock.systemUTC(), UUID.randomUUID());
+        this.vehicleId = vehicleId;
+        this.newLocation = newLocation;
+        this.metaData = metaData;
+    }
+
+    public VehicleUpdatedEvent(Clock clock, String vehicleId, LocationPoint newLocation) {
+        this(clock, UUID.randomUUID(), vehicleId, newLocation, null);
+    }
+
+    public VehicleUpdatedEvent(Clock clock, UUID eventId, String vehicleId,
+                               LocationPoint newLocation, Map<String, Object> metaData) {
+        super(clock, eventId);
         this.vehicleId = vehicleId;
         this.newLocation = newLocation;
         this.metaData = metaData;

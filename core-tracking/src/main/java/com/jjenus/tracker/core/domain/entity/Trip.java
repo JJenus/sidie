@@ -117,7 +117,7 @@ public class Trip {
         }
     }
     
-    private void calculateStatistics() {
+    public void calculateStatistics() {
         if (startTime != null && endTime != null) {
             Duration duration = Duration.between(startTime, endTime);
             long hours = duration.toHours();
@@ -133,9 +133,21 @@ public class Trip {
                tripPoints.get(tripPoints.size() - 1).getLocation();
     }
     
-    private Float calculateDistance(TrackerLocation loc1, TrackerLocation loc2) {
-        // Simplified distance calculation (Haversine formula would be better)
-        return 0.0f; // Implement actual distance calculation
+    public Float calculateDistance(TrackerLocation loc1, TrackerLocation loc2) {
+        if (loc1 == null || loc2 == null
+                || loc1.getLatitude() == null || loc1.getLongitude() == null
+                || loc2.getLatitude() == null || loc2.getLongitude() == null) {
+            return 0.0f;
+        }
+        double earthRadiusKm = 6371.0;
+        double dLat = Math.toRadians(loc2.getLatitude() - loc1.getLatitude());
+        double dLon = Math.toRadians(loc2.getLongitude() - loc1.getLongitude());
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(loc1.getLatitude()))
+                * Math.cos(Math.toRadians(loc2.getLatitude()))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return (float) (earthRadiusKm * c);
     }
     
     public Duration getDuration() {

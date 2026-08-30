@@ -1,25 +1,28 @@
 package com.jjenus.tracker.core.application;
 
-import com.jjenus.tracker.core.domain.Vehicle;
+import com.jjenus.tracker.core.domain.entity.TrackerLocation;
+import com.jjenus.tracker.core.domain.entity.Vehicle;
+import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
 import com.jjenus.tracker.shared.domain.LocationPoint;
-import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+
 import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleQueryServiceTest {
 
     @Mock
-    private IVehicleRepository vehicleRepository;
+    private VehicleRepository vehicleRepository;
 
     private VehicleQueryService queryService;
     private Vehicle testVehicle1;
@@ -31,147 +34,156 @@ class VehicleQueryServiceTest {
         queryService = new VehicleQueryService(vehicleRepository);
         testTime = Instant.now();
 
-        testVehicle1 = new Vehicle("VEH-001");
-        testVehicle1.processNewTelemetry(new LocationPoint(40.7128, -74.0060, 30.0f, testTime));
+        testVehicle1 = new Vehicle();
+        testVehicle1.setVehicleId("VEH-001");
+        testVehicle1.setCurrentLocation(makeLocation(40.7128, -74.0060, 30.0f));
 
-        testVehicle2 = new Vehicle("VEH-002");
-        testVehicle2.processNewTelemetry(new LocationPoint(34.0522, -118.2437, 0.0f, testTime));
+        testVehicle2 = new Vehicle();
+        testVehicle2.setVehicleId("VEH-002");
+        testVehicle2.setCurrentLocation(makeLocation(34.0522, -118.2437, 0.0f));
+    }
+
+    private TrackerLocation makeLocation(double lat, double lon, float speed) {
+        TrackerLocation loc = new TrackerLocation();
+        loc.setLatitude(lat);
+        loc.setLongitude(lon);
+        loc.setSpeedKmh(speed);
+        loc.setRecordedAt(testTime);
+        return loc;
     }
 
     @Test
-    void testGetVehicleByIdFound() {
+    void getVehicleByIdFound_returnsVehicle() {
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
 
         Optional<Vehicle> result = queryService.getVehicleById("VEH-001");
 
-        assertTrue(result.isPresent());
-        assertEquals("VEH-001", result.get().getVehicleId());
+        assertThat(result).isPresent();
+        assertThat(result.get().getVehicleId()).isEqualTo("VEH-001");
         verify(vehicleRepository, times(1)).findById("VEH-001");
     }
 
     @Test
-    void testGetVehicleByIdNotFound() {
+    void getVehicleByIdNotFound_returnsEmpty() {
         when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
 
         Optional<Vehicle> result = queryService.getVehicleById("VEH-999");
 
-        assertFalse(result.isPresent());
+        assertThat(result).isEmpty();
         verify(vehicleRepository, times(1)).findById("VEH-999");
     }
 
     @Test
-    void testGetAllVehicles() {
+    void getAllVehicles_returnsAll() {
         List<Vehicle> vehicles = Arrays.asList(testVehicle1, testVehicle2);
         when(vehicleRepository.findAll()).thenReturn(vehicles);
 
         List<Vehicle> result = queryService.getAllVehicles();
 
-        assertEquals(2, result.size());
-        assertTrue(result.contains(testVehicle1));
-        assertTrue(result.contains(testVehicle2));
+        assertThat(result).hasSize(2);
+        assertThat(result).contains(testVehicle1, testVehicle2);
         verify(vehicleRepository, times(1)).findAll();
     }
 
     @Test
-    void testGetAllVehiclesEmpty() {
+    void getAllVehiclesEmpty_returnsEmpty() {
         when(vehicleRepository.findAll()).thenReturn(List.of());
 
         List<Vehicle> result = queryService.getAllVehicles();
 
-        assertTrue(result.isEmpty());
+        assertThat(result).isEmpty();
         verify(vehicleRepository, times(1)).findAll();
     }
 
     @Test
-    void testGetCurrentLocationFound() {
+    void getCurrentLocationFound_returnsLocation() {
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
 
         Optional<LocationPoint> result = queryService.getCurrentLocation("VEH-001");
 
-        assertTrue(result.isPresent());
-        assertEquals(40.7128, result.get().latitude(), 0.0001);
-        assertEquals(-74.0060, result.get().longitude(), 0.0001);
-        assertEquals(30.0f, result.get().speedKmh(), 0.1);
+        assertThat(result).isPresent();
+        assertThat(result.get().latitude()).isEqualTo(40.7128);
+        assertThat(result.get().longitude()).isEqualTo(-74.0060);
+        assertThat(result.get().speedKmh()).isEqualTo(30.0f);
         verify(vehicleRepository, times(1)).findById("VEH-001");
     }
 
     @Test
-    void testGetCurrentLocationNotFound() {
+    void getCurrentLocationNotFound_returnsEmpty() {
         when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
 
         Optional<LocationPoint> result = queryService.getCurrentLocation("VEH-999");
 
-        assertFalse(result.isPresent());
+        assertThat(result).isEmpty();
         verify(vehicleRepository, times(1)).findById("VEH-999");
     }
 
     @Test
-    void testIsVehicleMovingTrue() {
+    void isVehicleMovingTrue() {
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
 
         boolean result = queryService.isVehicleMoving("VEH-001");
 
-        assertTrue(result);
+        assertThat(result).isTrue();
         verify(vehicleRepository, times(1)).findById("VEH-001");
     }
 
     @Test
-    void testIsVehicleMovingFalse() {
+    void isVehicleMovingFalse() {
         when(vehicleRepository.findById("VEH-002")).thenReturn(Optional.of(testVehicle2));
 
         boolean result = queryService.isVehicleMoving("VEH-002");
 
-        assertFalse(result);
+        assertThat(result).isFalse();
         verify(vehicleRepository, times(1)).findById("VEH-002");
     }
 
     @Test
-    void testIsVehicleMovingNotFound() {
+    void isVehicleMovingNotFound_returnsFalse() {
         when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
 
         boolean result = queryService.isVehicleMoving("VEH-999");
 
-        assertFalse(result);
+        assertThat(result).isFalse();
         verify(vehicleRepository, times(1)).findById("VEH-999");
     }
 
     @Test
-    void testGetVehicleSpeedMoving() {
+    void getVehicleSpeedMoving() {
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
 
         Optional<Float> result = queryService.getVehicleSpeed("VEH-001");
 
-        assertTrue(result.isPresent());
-        assertEquals(30.0f, result.get(), 0.1);
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(30.0f);
         verify(vehicleRepository, times(1)).findById("VEH-001");
     }
 
     @Test
-    void testGetVehicleSpeedStationary() {
+    void getVehicleSpeedStationary() {
         when(vehicleRepository.findById("VEH-002")).thenReturn(Optional.of(testVehicle2));
 
         Optional<Float> result = queryService.getVehicleSpeed("VEH-002");
 
-        assertTrue(result.isPresent());
-        assertEquals(0.0f, result.get(), 0.1);
+        assertThat(result).isPresent();
+        assertThat(result.get()).isEqualTo(0.0f);
         verify(vehicleRepository, times(1)).findById("VEH-002");
     }
 
     @Test
-    void testGetVehicleSpeedNotFound() {
+    void getVehicleSpeedNotFound_returnsEmpty() {
         when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
 
         Optional<Float> result = queryService.getVehicleSpeed("VEH-999");
 
-        assertFalse(result.isPresent());
+        assertThat(result).isEmpty();
         verify(vehicleRepository, times(1)).findById("VEH-999");
     }
 
     @Test
-    void testQueryMethodsCallRepositoryOnlyOnce() {
+    void queryMethodsCallRepositoryOnlyOnce() {
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
 
-        // Multiple queries should only call repository once each
         queryService.getVehicleById("VEH-001");
         queryService.getCurrentLocation("VEH-001");
         queryService.isVehicleMoving("VEH-001");

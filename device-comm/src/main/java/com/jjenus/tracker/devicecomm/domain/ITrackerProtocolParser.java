@@ -9,5 +9,14 @@ public interface ITrackerProtocolParser {
     String buildFuelCutCommand(String deviceId);
     String buildEngineOnCommand(String deviceId);
     String getProtocolName();
+    PacketType getPacketType();
+    enum PacketType {
+        GPS,
+        LOGIN,
+        HEARTBEAT,
+        COMMAND_RESPONSE,
+        LBS,
+        WIFI,
+        UNKNOWN
+    }
 }
-

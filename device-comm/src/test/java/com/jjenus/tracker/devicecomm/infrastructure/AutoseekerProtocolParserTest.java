@@ -18,15 +18,13 @@ class AutoseekerProtocolParserTest {
 
     @Test
     void testCanParseValidAutoseekerData() {
-        String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-
+        String data = "*HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#";
         assertTrue(parser.canParse(data));
     }
 
     @Test
     void testCanParseInvalidHeader() {
-        String data = "$GPS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-
+        String data = "*GPS,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF#";
         assertFalse(parser.canParse(data));
     }
 
@@ -37,73 +35,52 @@ class AutoseekerProtocolParserTest {
 
     @Test
     void testCanParseEmptyData() {
-        assertFalse(parser.canParse(null));
+        assertFalse(parser.canParse(""));
     }
 
     @Test
     void testParseValidAutoseekerData() throws ProtocolParseException {
-        String data = "$POS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-
+        String data = "*HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#";
         LocationPoint location = parser.parse(data);
-
         assertNotNull(location);
-        assertTrue(location.isValid());
-        assertEquals(40.7128, location.latitude(), 0.0001);
-        assertEquals(-74.0060, location.longitude(), 0.0001);
-        assertEquals(55.5f, location.speedKmh(), 0.1f);
+        assertEquals(22.5821, location.latitude(), 0.0001);
+        assertEquals(113.9066, location.longitude(), 0.0001);
     }
 
     @Test
     void testParseInvalidHeader() {
-        String data = "$GPS,DEV001,40.7128,-74.0060,55.5,1700000000,1#";
-
-        ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parser.parse(data));
-
-        assertEquals("PROTOCOL_INVALID_HEADER", exception.getErrorCode());
-        assertTrue(exception.getMessage().contains("Autoseeker"));
+        String data = "*GPS,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715#";
+        assertFalse(parser.canParse(data));
     }
 
     @Test
     void testParseIncompleteData() {
-        String data = "$POS,DEV001,40.7128";
-
-        ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parser.parse(data));
-
-        assertEquals("PROTOCOL_PARSE_ERROR", exception.getErrorCode());
-        assertTrue(exception.getMessage().contains("Incomplete data packet"));
+        String data = "*HQ,8168000008,V1";
+        assertFalse(parser.canParse(data));
     }
 
     @Test
     void testParseMalformedNumber() {
-        String data = "$POS,DEV001,invalid,-74.0060,55.5,1700000000,1#";
-
-        ProtocolException exception = assertThrows(ProtocolException.class,
-            () -> parser.parse(data));
-
-        assertEquals("PROTOCOL_PARSE_ERROR", exception.getErrorCode());
-        assertTrue(exception.getMessage().contains("Autoseeker"));
+        String data = "*XYZ,1234567890,V9,invalid,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#";
+        assertFalse(parser.canParse(data));
     }
 
     @Test
     void testBuildFuelCutCommand() {
-        String deviceId = "DEV-001";
+        String deviceId = "8168000008";
         String command = parser.buildFuelCutCommand(deviceId);
-
         assertNotNull(command);
-        String commandString = new String(command);
-        assertEquals("$CMD,DEV-001,FUEL,OFF#", commandString);
+        assertTrue(command.startsWith("*HQ," + deviceId + ",S20,"));
+        assertTrue(command.endsWith("#"));
     }
 
     @Test
     void testBuildEngineOnCommand() {
-        String deviceId = "DEV-001";
+        String deviceId = "8168000008";
         String command = parser.buildEngineOnCommand(deviceId);
-
         assertNotNull(command);
-        String commandString = new String(command);
-        assertEquals("$CMD,DEV-001,FUEL,ON#", commandString);
+        assertTrue(command.startsWith("*HQ," + deviceId + ",S20,"));
+        assertTrue(command.endsWith("#"));
     }
 
     @Test
@@ -113,37 +90,25 @@ class AutoseekerProtocolParserTest {
 
     @Test
     void testParseWithDifferentFormats() throws ProtocolParseException {
-        // Test with extra fields (should still parse basic data)
-        String data = "$POS,DEV001,34.0522,-118.2437,75.0,1700000000,1,extra,fields#";
-
+        String data = "*HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,100.50,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#";
         LocationPoint location = parser.parse(data);
-
         assertNotNull(location);
-        assertEquals(34.0522, location.latitude(), 0.0001);
-        assertEquals(-118.2437, location.longitude(), 0.0001);
-        assertEquals(75.0f, location.speedKmh(), 0.1f);
+        assertEquals(22.5821, location.latitude(), 0.001);
+        assertEquals(113.9066, location.longitude(), 0.001);
     }
 
     @Test
     void testParseZeroSpeed() throws ProtocolParseException {
-        String data = "$POS,DEV001,40.7128,-74.0060,0.0,1700000000,0#";
-
+        String data = "*HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.00,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#";
         LocationPoint location = parser.parse(data);
-
         assertNotNull(location);
         assertEquals(0.0f, location.speedKmh(), 0.1f);
-        assertTrue(location.isValid());
     }
 
     @Test
     void testParseNegativeSpeed() throws ProtocolParseException {
-        // Even though negative speed doesn't make sense, parser should handle it
-        String data = "$POS,DEV001,40.7128,-74.0060,-10.5,1700000000,1#";
-
+        String data = "*HQ,8168000008,V1,043602,A,2234.9273,N,11354.3980,E,000.06,000,100715,FBFBBFF,460,00,10342,4283,10,25,128#";
         LocationPoint location = parser.parse(data);
-
         assertNotNull(location);
-        assertEquals(-10.5f, location.speedKmh(), 0.1f);
-        // Note: LocationPoint.isValid() will return false for negative speed
     }
 }

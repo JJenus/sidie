@@ -1,11 +1,10 @@
 package com.jjenus.tracker.core.application;
 
-import com.jjenus.tracker.core.domain.Vehicle;
-import com.jjenus.tracker.shared.domain.LocationPoint;
-import com.jjenus.tracker.core.infrastructure.IVehicleRepository;
-import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
-import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.core.domain.entity.TrackerLocation;
+import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.exception.VehicleException;
+import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
+import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,16 +12,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleCommandServiceTest {
 
     @Mock
-    private IVehicleRepository vehicleRepository;
+    private VehicleRepository vehicleRepository;
 
     @Mock
     private EventPublisher eventPublisher;
@@ -35,17 +39,39 @@ class VehicleCommandServiceTest {
 
     private VehicleCommandService commandService;
     private Vehicle testVehicle;
-    private Instant testTime;
+    private Clock fixedClock;
 
     @BeforeEach
     void setUp() {
-        commandService = new VehicleCommandService(vehicleRepository, eventPublisher);
-        testTime = Instant.now();
-        testVehicle = new Vehicle("VEH-001");
+        fixedClock = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC);
+        commandService = new VehicleCommandService(vehicleRepository, eventPublisher, fixedClock);
+        testVehicle = new Vehicle();
+        testVehicle.setVehicleId("VEH-001");
+        testVehicle.setDeviceId("DEV-001");
+    }
+
+    private void setVehicleStationary(Vehicle v) {
+        TrackerLocation loc = new TrackerLocation();
+        loc.setLatitude(40.7128);
+        loc.setLongitude(-74.0060);
+        loc.setSpeedKmh(0.0f);
+        loc.setRecordedAt(Instant.now(fixedClock));
+        v.setCurrentLocation(loc);
+    }
+
+    private void setVehicleMoving(Vehicle v, float speed) {
+        TrackerLocation loc = new TrackerLocation();
+        loc.setLatitude(40.7128);
+        loc.setLongitude(-74.0060);
+        loc.setSpeedKmh(speed);
+        loc.setRecordedAt(Instant.now(fixedClock));
+        v.setCurrentLocation(loc);
     }
 
     @Test
-    void testHandleFuelCutRequestSuccess() {
+    void handleFuelCutRequestSuccess() {
+        setVehicleStationary(testVehicle);
+
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle));
 
         commandService.handleFuelCutRequest("VEH-001");
@@ -54,46 +80,42 @@ class VehicleCommandServiceTest {
         verify(eventPublisher).publish(eventCaptor.capture());
 
         Vehicle savedVehicle = vehicleCaptor.getValue();
-        assertTrue(savedVehicle.isFuelCutActive());
+        assertThat(savedVehicle.getFuelCutActive()).isTrue();
 
         com.jjenus.tracker.shared.pubsub.DomainEvent publishedEvent = eventCaptor.getValue();
-        assertNotNull(publishedEvent);
+        assertThat(publishedEvent).isNotNull();
     }
 
     @Test
-    void testHandleFuelCutRequestVehicleNotFound() {
+    void handleFuelCutRequestVehicleNotFound() {
         when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
 
-        VehicleException exception = assertThrows(VehicleException.class,
-            () -> commandService.handleFuelCutRequest("VEH-999"));
+        assertThatThrownBy(() -> commandService.handleFuelCutRequest("VEH-999"))
+            .isInstanceOf(VehicleException.class)
+            .satisfies(e -> assertThat(((VehicleException) e).getErrorCode()).isEqualTo("VEHICLE_NOT_FOUND"));
 
-        assertEquals("VEHICLE_NOT_FOUND", exception.getErrorCode());
         verify(vehicleRepository, never()).save(any());
         verify(eventPublisher, never()).publish(any());
     }
 
     @Test
-    void testHandleFuelCutRequestWhenMovingTooFast() {
-        // Setup vehicle that's moving
-        Vehicle movingVehicle = new Vehicle("VEH-001");
-        LocationPoint movingLocation = new LocationPoint(40.7128, -74.0060, 50.0f, testTime);
-        movingVehicle.processNewTelemetry(movingLocation);
+    void handleFuelCutRequestWhenMovingTooFast() {
+        setVehicleMoving(testVehicle, 50.0f);
 
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(movingVehicle));
+        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle));
 
-        VehicleException exception = assertThrows(VehicleException.class,
-            () -> commandService.handleFuelCutRequest("VEH-001"));
+        assertThatThrownBy(() -> commandService.handleFuelCutRequest("VEH-001"))
+            .isInstanceOf(VehicleException.class)
+            .satisfies(e -> assertThat(((VehicleException) e).getErrorCode()).isEqualTo("VEHICLE_FUEL_CUT_MOVING"));
 
-        assertEquals("VEHICLE_FUEL_CUT_MOVING", exception.getErrorCode());
         verify(vehicleRepository, never()).save(any());
         verify(eventPublisher, never()).publish(any());
     }
 
     @Test
-    void testHandleFuelRestoreRequestSuccess() {
-        // Setup vehicle with fuel cut active
-        testVehicle.processNewTelemetry(new LocationPoint(40.7128, -74.0060, 0.0f, testTime));
-        testVehicle.issueFuelCutOffCommand();
+    void handleFuelRestoreRequestSuccess() {
+        setVehicleStationary(testVehicle);
+        testVehicle.setFuelCutActive(true);
 
         when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle));
 
@@ -102,7 +124,6 @@ class VehicleCommandServiceTest {
         verify(vehicleRepository).save(vehicleCaptor.capture());
 
         Vehicle savedVehicle = vehicleCaptor.getValue();
-        assertFalse(savedVehicle.isFuelCutActive());
+        assertThat(savedVehicle.getFuelCutActive()).isFalse();
     }
-
 }

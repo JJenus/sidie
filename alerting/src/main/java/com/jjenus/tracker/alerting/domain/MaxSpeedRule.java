@@ -8,23 +8,23 @@ public class MaxSpeedRule implements IAlertRule {
     private final String ruleKey;
     private final String ruleName;
     private final float thresholdSpeed;
-    private boolean enabled;
+    private final boolean enabled;
     private final int priority;
 
     public MaxSpeedRule(String ruleKey, float thresholdSpeed) {
-        this.ruleKey = ruleKey;
-        this.ruleName = "MAX_SPEED_RULE";
-        this.thresholdSpeed = thresholdSpeed;
-        this.enabled = true;
-        this.priority = 2;
+        this(ruleKey, "MAX_SPEED_RULE", thresholdSpeed, true, 2);
     }
 
     public MaxSpeedRule(String ruleKey, String ruleName, float speedLimit) {
+        this(ruleKey, ruleName, speedLimit, true, 2);
+    }
+
+    public MaxSpeedRule(String ruleKey, String ruleName, float speedLimit, boolean enabled, int priority) {
         this.ruleKey = ruleKey;
         this.ruleName = ruleName;
         this.thresholdSpeed = speedLimit;
-        this.enabled = true;
-        this.priority = 2;
+        this.enabled = enabled;
+        this.priority = priority;
     }
 
     @Override
@@ -71,9 +71,6 @@ public class MaxSpeedRule implements IAlertRule {
 
     @Override
     public boolean isEnabled() { return enabled; }
-
-    @Override
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
     @Override
     public int getPriority() { return priority; }

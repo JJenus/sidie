@@ -2,6 +2,9 @@ package com.jjenus.tracker.shared.events;
 
 import com.jjenus.tracker.shared.pubsub.DomainEvent;
 
+import java.time.Clock;
+import java.util.UUID;
+
 public class NotificationSentEvent extends DomainEvent {
     private final String notificationId;
     private final String alertId;
@@ -9,7 +12,25 @@ public class NotificationSentEvent extends DomainEvent {
     private final String recipient;
     private final boolean success;
     private final String errorMessage;
-    
+
+    public NotificationSentEvent(
+        Clock clock,
+        String notificationId,
+        String alertId,
+        String channel,
+        String recipient,
+        boolean success,
+        String errorMessage
+    ) {
+        super(clock, UUID.randomUUID());
+        this.notificationId = notificationId;
+        this.alertId = alertId;
+        this.channel = channel;
+        this.recipient = recipient;
+        this.success = success;
+        this.errorMessage = errorMessage;
+    }
+
     public NotificationSentEvent(
         String notificationId,
         String alertId,
@@ -18,14 +39,9 @@ public class NotificationSentEvent extends DomainEvent {
         boolean success,
         String errorMessage
     ) {
-        this.notificationId = notificationId;
-        this.alertId = alertId;
-        this.channel = channel;
-        this.recipient = recipient;
-        this.success = success;
-        this.errorMessage = errorMessage;
+        this(Clock.systemUTC(), notificationId, alertId, channel, recipient, success, errorMessage);
     }
-    
+
     public String getNotificationId() { return notificationId; }
     public String getAlertId() { return alertId; }
     public String getChannel() { return channel; }

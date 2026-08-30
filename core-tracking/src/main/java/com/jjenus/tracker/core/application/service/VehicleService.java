@@ -5,7 +5,8 @@ import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import com.jjenus.tracker.core.infrastructure.repository.*;
 import com.jjenus.tracker.shared.domain.LocationPoint;
-import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,61 +16,66 @@ import java.util.Optional;
 
 @Service
 public class VehicleService {
-    
+
+    private static final Logger logger = LoggerFactory.getLogger(VehicleService.class);
+
     private final VehicleRepository vehicleRepository;
     private final TrackerRepository trackerRepository;
     private final TripRepository tripRepository;
     private final TrackerLocationRepository locationRepository;
-    private final ModelMapper modelMapper;
-    
+
     public VehicleService(VehicleRepository vehicleRepository,
                           TrackerRepository trackerRepository,
                           TripRepository tripRepository,
-                          TrackerLocationRepository locationRepository, ModelMapper modelMapper) {
+                          TrackerLocationRepository locationRepository) {
         this.vehicleRepository = vehicleRepository;
         this.trackerRepository = trackerRepository;
         this.tripRepository = tripRepository;
         this.locationRepository = locationRepository;
-        this.modelMapper = modelMapper;
     }
-    
+
     @Transactional
     public Vehicle saveVehicle(Vehicle vehicle) {
         return vehicleRepository.save(vehicle);
     }
-    
+
     @Transactional
     public void updateVehicleAccStatus(String vehicleId, boolean accStatus, Instant timestamp) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
-            .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
-        
+            .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + vehicleId));
+
         vehicle.updateAccStatus(accStatus, timestamp);
         vehicleRepository.save(vehicle);
     }
-    
+
     @Transactional
     public void updateVehicleLocation(String vehicleId, LocationPoint locationPoint) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
-            .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
-        
-        // Update tracker last seen
+            .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + vehicleId));
+
+        TrackerLocation location = new TrackerLocation(
+                locationPoint.latitude(),
+                locationPoint.longitude(),
+                locationPoint.speedKmh(),
+                locationPoint.timestamp()
+        );
+
         if (vehicle.getDeviceId() != null) {
             trackerRepository.findByDeviceId(vehicle.getDeviceId())
                 .ifPresent(tracker -> {
+                    location.setTracker(tracker);
                     tracker.updateLastSeen();
                     trackerRepository.save(tracker);
                 });
         }
 
-        // This is highly inaccurate will get back to this.
-        TrackerLocation location = modelMapper.map(locationPoint, TrackerLocation.class);
+        TrackerLocation saved = locationRepository.save(location);
 
-        // Save location
-        locationRepository.save(location);
-        
-        // Update vehicle
-        vehicle.updateLocation(location);
+        vehicle.updateLocation(saved);
         vehicleRepository.save(vehicle);
+
+        logger.debug("Saved location for vehicle {}: lat={}, lon={}, speed={} km/h",
+                vehicleId, locationPoint.latitude(), locationPoint.longitude(), locationPoint.speedKmh());
     }
     
     @Transactional
@@ -123,16 +129,14 @@ public class VehicleService {
     }
 
     public String findVehicleIdForDevice(String deviceId) {
-        try {
-            Tracker tracker = trackerRepository.findByDeviceId(deviceId).orElseThrow(()-> new IllegalArgumentException("Tracker Not found: "+deviceId));
+        Tracker tracker = trackerRepository.findByDeviceId(deviceId)
+                .orElseThrow(() -> new IllegalArgumentException("Tracker not found: " + deviceId));
 
-            if (tracker.getVehicle() == null) {
-                throw new RuntimeException(String.format("Tracker %s not assigned to a vehicle", deviceId));
-            }
-            return tracker.getVehicle().getVehicleId();
-        } catch (Exception e) {
-//            return a dummy id
-            return "VEH_"+deviceId;
+        Vehicle vehicle = tracker.getVehicle();
+        if (vehicle == null) {
+            throw new IllegalStateException(
+                    String.format("Tracker %s is not assigned to a vehicle", deviceId));
         }
+        return vehicle.getVehicleId();
     }
 }

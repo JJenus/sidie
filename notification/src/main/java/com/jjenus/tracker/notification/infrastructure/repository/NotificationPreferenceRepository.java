@@ -10,7 +10,9 @@ import java.util.List;
 public interface NotificationPreferenceRepository extends JpaRepository<NotificationPreference, Long> {
     
     List<NotificationPreference> findByUserId(String userId);
-    
+
+    List<NotificationPreference> findByAlertType(String alertType);
+
     List<NotificationPreference> findByUserIdAndAlertType(String userId, String alertType);
     
     List<NotificationPreference> findByUserIdAndAlertTypeIn(String userId, List<String> alertTypes);

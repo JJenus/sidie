@@ -12,6 +12,7 @@ import com.jjenus.tracker.alerting.infrastructure.cache.AlertRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
+import com.jjenus.tracker.alerting.infrastructure.cache.GeofenceCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -42,17 +43,32 @@ public class AlertRuleService {
     private final AlertRuleRepository ruleRepository;
     private final AlertRuleCacheService ruleCacheService;
     private final VehicleRuleCacheService vehicleRuleCacheService;
+    private final GeofenceCacheService geofenceCacheService;
+    private final GeofenceRuleValidator geofenceRuleValidator;
+    private final GeofenceService geofenceService;
     private final ObjectMapper objectMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisKeyGenerator keyGenerator;
 
     public AlertRuleService(
             AlertRuleRepository ruleRepository,
             AlertRuleCacheService ruleCacheService,
             VehicleRuleCacheService vehicleRuleCacheService,
-            ObjectMapper objectMapper) {
+            GeofenceCacheService geofenceCacheService,
+            GeofenceRuleValidator geofenceRuleValidator,
+            GeofenceService geofenceService,
+            ObjectMapper objectMapper,
+            RedisTemplate<String, Object> redisTemplate,
+            RedisKeyGenerator keyGenerator) {
         this.ruleRepository = ruleRepository;
         this.ruleCacheService = ruleCacheService;
         this.vehicleRuleCacheService = vehicleRuleCacheService;
+        this.geofenceCacheService = geofenceCacheService;
+        this.geofenceRuleValidator = geofenceRuleValidator;
+        this.geofenceService = geofenceService;
         this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
+        this.keyGenerator = keyGenerator;
     }
 
     // ========== TEMPLATE METHODS ==========

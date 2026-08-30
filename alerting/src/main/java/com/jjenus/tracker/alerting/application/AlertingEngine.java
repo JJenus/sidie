@@ -1,9 +1,13 @@
 package com.jjenus.tracker.alerting.application;
 
+import com.jjenus.tracker.alerting.application.dedup.AlertDeduplicator;
 import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
+import com.jjenus.tracker.alerting.domain.GeofenceRule;
+import com.jjenus.tracker.alerting.domain.RuleStateStore;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
+import com.jjenus.tracker.alerting.application.factory.AlertRuleFactory;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
@@ -20,15 +24,24 @@ public class AlertingEngine {
     private final VehicleRuleCacheService vehicleRuleCacheService;
     private final EventPublisher eventPublisher;
     private final AlertRuleEvaluationService evaluationService;
+    private final AlertRuleFactory ruleFactory;
+    private final RuleStateStore stateStore;
+    private final AlertDeduplicator deduplicator;
     private final Logger logger = LoggerFactory.getLogger(AlertingEngine.class);
 
     public AlertingEngine(
             EventPublisher eventPublisher,
             AlertRuleEvaluationService evaluationService,
-            VehicleRuleCacheService vehicleRuleCacheService) {
+            VehicleRuleCacheService vehicleRuleCacheService,
+            AlertRuleFactory ruleFactory,
+            RuleStateStore stateStore,
+            AlertDeduplicator deduplicator) {
         this.vehicleRuleCacheService = vehicleRuleCacheService;
         this.eventPublisher = eventPublisher;
         this.evaluationService = evaluationService;
+        this.ruleFactory = ruleFactory;
+        this.stateStore = stateStore;
+        this.deduplicator = deduplicator;
     }
 
     public void processVehicleUpdate(String vehicleId, LocationPoint newLocation) {
@@ -39,18 +52,15 @@ public class AlertingEngine {
             );
         }
 
-        // QUICK CHECK 1: Using cached index
         if (!vehicleRuleCacheService.hasRulesCached(vehicleId)) {
             logger.debug("Vehicle {} has no active rules (cached index), skipping", vehicleId);
             return;
         }
 
-        // QUICK CHECK 2: Full cache check
         if (!vehicleRuleCacheService.hasActiveRules(vehicleId)) {
             return;
         }
 
-        // Get pre-sorted rules from Redis cache
         List<AlertRule> vehicleRules = vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId);
 
         if (vehicleRules.isEmpty()) {
@@ -61,13 +71,20 @@ public class AlertingEngine {
 
         for (AlertRule rule : vehicleRules) {
             try {
-                IAlertRule domainRule = convertToDomainRule(rule);
+                IAlertRule domainRule = ruleFactory.createDomainRule(rule, vehicleId);
+                if (domainRule == null) {
+                    continue;
+                }
+
                 AlertDetectedEvent alert = evaluationService.evaluateRule(domainRule, vehicleId, newLocation);
 
-                if (alert != null) {
-                    logger.info("Alert triggered: {} for vehicle {}",
-                            alert.getRuleKey(), vehicleId);
+                if (alert != null && deduplicator.tryAcquire(alert)) {
+                    logger.info("Alert triggered: {} for vehicle {}", alert.getRuleKey(), vehicleId);
                     eventPublisher.publish(alert);
+                }
+
+                if (domainRule instanceof GeofenceRule geo) {
+                    stateStore.setGeofenceWasInside(rule.getRuleKey(), vehicleId, geo.isWasInside());
                 }
             } catch (AlertException e) {
                 logger.error("Alert evaluation error for rule {}: {}", rule.getRuleKey(), e.getMessage());
@@ -77,31 +94,6 @@ public class AlertingEngine {
         }
     }
 
-    private IAlertRule convertToDomainRule(AlertRule entityRule) {
-        return new IAlertRule() {
-            @Override
-            public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
-                return evaluationService.evaluateRule(this, vehicleId, newLocation);
-            }
-
-            @Override
-            public String getRuleKey() { return entityRule.getRuleKey(); }
-
-            @Override
-            public String getRuleName() { return entityRule.getRuleName(); }
-
-            @Override
-            public boolean isEnabled() { return Boolean.TRUE.equals(entityRule.isEnabled()); }
-
-            @Override
-            public void setEnabled(boolean enabled) { entityRule.setIsEnabled(enabled); }
-
-            @Override
-            public int getPriority() { return entityRule.getPriority() != null ? entityRule.getPriority() : 5; }
-        };
-    }
-
-    // Cache management methods
     public void invalidateVehicleCache(String vehicleId) {
         vehicleRuleCacheService.invalidateVehicleRules(vehicleId);
     }
@@ -112,6 +104,6 @@ public class AlertingEngine {
 
     public void refreshVehicleRules(String vehicleId) {
         vehicleRuleCacheService.invalidateVehicleRules(vehicleId);
-        vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId); // Re-cache
+        vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId);
     }
 }

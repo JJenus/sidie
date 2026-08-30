@@ -139,9 +139,9 @@ class GeofenceRuleTest {
             "geofence-1",
             boundary,
             GeofenceRule.Action.BOTH,
-            2
+            2,
+            false
         );
-        rule.setEnabled(false);
 
         // when
         var result = rule.evaluate("vehicle-001",

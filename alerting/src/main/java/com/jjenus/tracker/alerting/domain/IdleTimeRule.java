@@ -5,22 +5,50 @@ import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 public class IdleTimeRule implements IAlertRule {
     private final String ruleKey;
     private final String ruleName;
     private final Duration maxIdleTime;
-    private boolean enabled;
+    private final boolean enabled;
     private final int priority;
 
-    private final java.util.Map<String, Instant> lastMovementTimes = new java.util.HashMap<>();
+    private final Map<String, Instant> lastMovementTimes;
+    private final BiConsumer<String, Instant> persistTime;
 
     public IdleTimeRule(String ruleKey, String ruleName, Duration maxIdleTime) {
+        this(ruleKey, ruleName, maxIdleTime, true, 1,
+             new HashMap<>(),
+             (v, t) -> {});
+    }
+
+    public IdleTimeRule(String ruleKey, String ruleName, Duration maxIdleTime,
+                       boolean enabled, int priority) {
+        this(ruleKey, ruleName, maxIdleTime, enabled, priority,
+             new HashMap<>(),
+             (v, t) -> {});
+    }
+
+    public IdleTimeRule(String ruleKey, String ruleName, Duration maxIdleTime,
+                       Map<String, Instant> persistedTimes,
+                       BiConsumer<String, Instant> persistTime) {
+        this(ruleKey, ruleName, maxIdleTime, true, 1, persistedTimes, persistTime);
+    }
+
+    public IdleTimeRule(String ruleKey, String ruleName, Duration maxIdleTime,
+                       boolean enabled, int priority,
+                       Map<String, Instant> persistedTimes,
+                       BiConsumer<String, Instant> persistTime) {
         this.ruleKey = ruleKey;
         this.ruleName = ruleName;
         this.maxIdleTime = maxIdleTime;
-        this.enabled = true;
-        this.priority = 1;
+        this.enabled = enabled;
+        this.priority = priority;
+        this.lastMovementTimes = new HashMap<>(persistedTimes);
+        this.persistTime = persistTime;
     }
 
     @Override
@@ -30,15 +58,15 @@ public class IdleTimeRule implements IAlertRule {
         Instant now = Instant.now();
         Instant lastMovement = lastMovementTimes.get(vehicleId);
 
-        // Update last movement time if vehicle is moving
         if (newLocation.speedKmh() > 1.0) {
             lastMovementTimes.put(vehicleId, now);
+            persistTime.accept(vehicleId, now);
             return null;
         }
 
-        // If we have no last movement time, set it and return
         if (lastMovement == null) {
             lastMovementTimes.put(vehicleId, now);
+            persistTime.accept(vehicleId, now);
             return null;
         }
 
@@ -77,9 +105,6 @@ public class IdleTimeRule implements IAlertRule {
 
     @Override
     public boolean isEnabled() { return enabled; }
-
-    @Override
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
     @Override
     public int getPriority() { return priority; }

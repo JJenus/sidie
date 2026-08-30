@@ -18,9 +18,10 @@ import java.util.regex.Pattern;
 
 public class GT06ProtocolParser implements ITrackerProtocolParser {
     private static final Pattern GT06_PATTERN = Pattern.compile("^\\*[A-Z]{2},[0-9]{10,20},(V[0-5]|HTBT|S20|D[0-9]+),.*#");
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = 
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
         DateTimeFormatter.ofPattern("ddMMyyHHmmss");
     private final Logger log = LoggerFactory.getLogger(GT06ProtocolParser.class);
+    private volatile String lastParsedType;
     
     @Override
     public LocationPoint parse(String data) throws ProtocolParseException {
@@ -34,6 +35,7 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
             String[] parts = cleanData.split(",");
             
             String protocolType = parts[2]; // V1, V2, V3, V4, V5, HTBT
+            this.lastParsedType = protocolType;
             // Handle command response packets
             if ("V4".equals(protocolType) && parts.length >= 4 && "S20".equals(parts[3])) {
                 return parseCommandResponsePacket(parts);
@@ -340,48 +342,66 @@ public class GT06ProtocolParser implements ITrackerProtocolParser {
     public String getProtocolName() {
         return "GT06";
     }
+
+    @Override
+    public PacketType getPacketType() {
+        if (lastParsedType == null) {
+            return PacketType.UNKNOWN;
+        }
+        return switch (lastParsedType) {
+            case "V1", "V2", "V4" -> PacketType.GPS;
+            case "V0" -> PacketType.LOGIN;
+            case "V3" -> PacketType.LBS;
+            case "V5" -> PacketType.WIFI;
+            case "HTBT" -> PacketType.HEARTBEAT;
+            default -> PacketType.COMMAND_RESPONSE;
+        };
+    }
     
     // Additional utility method to parse vehicle status bits
     public Map<String, Boolean> parseStatusBits(String statusHex) {
         Map<String, Boolean> statusMap = new HashMap<>();
-        
+
         try {
             if (statusHex == null || statusHex.length() != 8) {
                 return statusMap;
             }
-            
-            // Convert hex to binary (32 bits)
+
             long value = Long.parseLong(statusHex, 16);
             String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
-            
-            // Parse bits according to protocol (LSB first, 0 = active)
-            // Byte 4 bits (bits 24-31)
-            statusMap.put("door_open", binary.charAt(31) == '0');          // bit 0
-            statusMap.put("overspeed_alarm", binary.charAt(30) == '0');    // bit 2
-            statusMap.put("fence_in_alarm", binary.charAt(28) == '0');     // bit 4
-            statusMap.put("fence_out_alarm", binary.charAt(25) == '0');    // bit 7
-            
-            // Byte 3 bits (bits 16-23)
-            statusMap.put("gps_status", binary.charAt(22) == '0');         // bit 2
-            statusMap.put("acc_off", binary.charAt(22) == '0');           // bit 2 (same as GPS status?)
-            statusMap.put("sos_alarm", binary.charAt(21) == '0');         // bit 11
-            statusMap.put("vibration_alarm", binary.charAt(19) == '0');   // bit 13
-            statusMap.put("low_battery_alarm", binary.charAt(18) == '0'); // bit 14
-            
-            // Byte 2 bits (bits 8-15)
-            statusMap.put("power_cut_alarm", binary.charAt(12) == '0');   // bit 20
-            
-            // Byte 1 bits (bits 0-7)
-            statusMap.put("vehicle_battery_remove_alarm", binary.charAt(4) == '0');  // bit 4
-            statusMap.put("anti_tamper_alarm", binary.charAt(3) == '0');             // bit 5
-            statusMap.put("cut_off_oil", binary.charAt(2) == '0');                   // bit 6
-            
+
+            // Per the GT06 protocol spec, status is 32 bits LSB-first.
+            // Index 0 = bit 0 (LSB), index 31 = bit 31 (MSB).
+            // Bits are 0 = active, 1 = inactive (per manufacturer).
+            statusMap.put("sos_alarm",                isActive(binary, 0));
+            statusMap.put("overspeed_alarm",          isActive(binary, 1));
+            statusMap.put("route_deviation_alarm",    isActive(binary, 2));
+            statusMap.put("vibration_alarm",          isActive(binary, 3));
+            statusMap.put("low_battery_alarm",        isActive(binary, 4));
+            statusMap.put("power_cut_alarm",          isActive(binary, 5));
+            statusMap.put("fence_in_alarm",           isActive(binary, 6));
+            statusMap.put("fence_out_alarm",          isActive(binary, 7));
+            statusMap.put("acc_off",                  isActive(binary, 8));
+            statusMap.put("acc_on",                   isActive(binary, 9));
+            statusMap.put("gps_status",               isActive(binary, 10));
+            statusMap.put("door_open",                isActive(binary, 11));
+            statusMap.put("cut_off_oil",              isActive(binary, 12));
+            statusMap.put("vehicle_battery_remove",   isActive(binary, 13));
+            statusMap.put("anti_tamper_alarm",        isActive(binary, 14));
+            statusMap.put("engine_status",            isActive(binary, 15));
+
         } catch (Exception e) {
-            // Log error but don't throw
-            System.err.println("Error parsing status bits: " + e.getMessage());
+            log.warn("Error parsing status bits: {}", e.getMessage());
         }
-        
+
         return statusMap;
+    }
+
+    private boolean isActive(String binary, int lsbIndex) {
+        if (lsbIndex < 0 || lsbIndex >= binary.length()) {
+            return false;
+        }
+        return binary.charAt(binary.length() - 1 - lsbIndex) == '0';
     }
 
     private String getCurrentDateString() {

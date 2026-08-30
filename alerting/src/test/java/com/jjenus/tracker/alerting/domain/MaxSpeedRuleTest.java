@@ -65,7 +65,7 @@ class MaxSpeedRuleTest {
         // given
         MaxSpeedRule rule = new MaxSpeedRule("speed-rule", 80.0f);
         LocationPoint location = LocationPointTestBuilder.defaultLocation()
-            .speedKmh(120.0f) // 50% above threshold
+            .speedKmh(121.0f) // exceeds 1.5x threshold
             .build();
 
         // when
@@ -79,8 +79,7 @@ class MaxSpeedRuleTest {
     @Test
     void evaluate_disabledRule_returnsNull() {
         // given
-        MaxSpeedRule rule = new MaxSpeedRule("speed-rule", 80.0f);
-        rule.setEnabled(false);
+        MaxSpeedRule rule = new MaxSpeedRule("speed-rule", "MAX_SPEED_RULE", 80.0f, false, 2);
         LocationPoint location = LocationPointTestBuilder.overspeedLocation()
             .build();
 

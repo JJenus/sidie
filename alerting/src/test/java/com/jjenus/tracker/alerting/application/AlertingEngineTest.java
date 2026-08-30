@@ -1,10 +1,14 @@
 package com.jjenus.tracker.alerting.application;
 
+import com.jjenus.tracker.alerting.application.dedup.AlertDeduplicator;
 import com.jjenus.tracker.alerting.application.service.AlertRuleEvaluationService;
 import com.jjenus.tracker.alerting.domain.AlertDetectedEvent;
 import com.jjenus.tracker.alerting.domain.AlertRuleTestBuilder;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
+import com.jjenus.tracker.alerting.domain.RuleStateStore;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
+import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import com.jjenus.tracker.alerting.application.factory.AlertRuleFactory;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
@@ -34,11 +38,21 @@ class AlertingEngineTest {
     @Mock
     private AlertRuleEvaluationService evaluationService;
 
+    @Mock
+    private AlertRuleFactory ruleFactory;
+
+    @Mock
+    private RuleStateStore stateStore;
+
+    @Mock
+    private AlertDeduplicator deduplicator;
+
     private AlertingEngine alertingEngine;
 
     @BeforeEach
     void setUp() {
-        alertingEngine = new AlertingEngine(eventPublisher, evaluationService, vehicleRuleCacheService);
+        alertingEngine = new AlertingEngine(eventPublisher, evaluationService, vehicleRuleCacheService,
+                ruleFactory, stateStore, deduplicator);
     }
 
     @Test
@@ -112,6 +126,7 @@ class AlertingEngineTest {
 
         AlertDetectedEvent alert = new AlertDetectedEvent(
             "speed-rule",
+            AlertType.OVERSPEED,
             vehicleId,
             "Speed exceeded",
             com.jjenus.tracker.alerting.domain.enums.AlertSeverity.WARNING,
@@ -122,8 +137,19 @@ class AlertingEngineTest {
         when(vehicleRuleCacheService.hasActiveRules(vehicleId)).thenReturn(true);
         when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId))
             .thenReturn(List.of(rule1, rule2));
+        when(ruleFactory.createDomainRule(any(AlertRule.class), eq(vehicleId)))
+            .thenAnswer(inv -> new IAlertRule() {
+                @Override
+                public AlertDetectedEvent evaluate(String v, LocationPoint l) { return alert; }
+                @Override public String getRuleKey() { return "stub"; }
+                @Override public String getRuleName() { return "stub"; }
+                @Override public boolean isEnabled() { return true; }
+                @Override public int getPriority() { return 5; }
+            });
         when(evaluationService.evaluateRule(any(IAlertRule.class), eq(vehicleId), eq(location)))
-            .thenReturn(alert);
+            .thenReturn(alert)
+            .thenReturn(null);
+        when(deduplicator.tryAcquire(any(AlertDetectedEvent.class))).thenReturn(true);
 
         // when
         alertingEngine.processVehicleUpdate(vehicleId, location);
@@ -131,7 +157,7 @@ class AlertingEngineTest {
         // then
         verify(vehicleRuleCacheService).getActiveRulesForVehicle(vehicleId);
         verify(evaluationService, times(2)).evaluateRule(any(), eq(vehicleId), eq(location));
-        verify(eventPublisher).publish(alert);
+        verify(eventPublisher, times(1)).publish(alert);
     }
 
     @Test
@@ -152,6 +178,7 @@ class AlertingEngineTest {
 
         AlertDetectedEvent alert = new AlertDetectedEvent(
             "good-rule",
+            AlertType.IDLE_TIMEOUT,
             vehicleId,
             "Alert triggered",
             com.jjenus.tracker.alerting.domain.enums.AlertSeverity.INFO,
@@ -162,9 +189,19 @@ class AlertingEngineTest {
         when(vehicleRuleCacheService.hasActiveRules(vehicleId)).thenReturn(true);
         when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId))
             .thenReturn(List.of(rule1, rule2));
+        when(ruleFactory.createDomainRule(any(AlertRule.class), eq(vehicleId)))
+            .thenAnswer(inv -> new IAlertRule() {
+                @Override
+                public AlertDetectedEvent evaluate(String v, LocationPoint l) { return alert; }
+                @Override public String getRuleKey() { return "stub"; }
+                @Override public String getRuleName() { return "stub"; }
+                @Override public boolean isEnabled() { return true; }
+                @Override public int getPriority() { return 5; }
+            });
         when(evaluationService.evaluateRule(any(IAlertRule.class), eq(vehicleId), eq(location)))
             .thenThrow(new RuntimeException("Evaluation error"))
             .thenReturn(alert);
+        when(deduplicator.tryAcquire(any(AlertDetectedEvent.class))).thenReturn(true);
 
         // when
         alertingEngine.processVehicleUpdate(vehicleId, location);

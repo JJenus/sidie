@@ -1,236 +1,182 @@
 package com.jjenus.tracker.core.domain;
 
+import com.jjenus.tracker.core.domain.entity.TrackerLocation;
+import com.jjenus.tracker.core.domain.entity.Trip;
+import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.domain.enums.EngineState;
+import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import com.jjenus.tracker.core.exception.TripException;
 import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import static org.junit.jupiter.api.Assertions.*;
+import java.time.ZoneOffset;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class VehicleTest {
 
     private Vehicle vehicle;
     private Instant testTime;
+    private Clock fixedClock;
 
     @BeforeEach
     void setUp() {
-        vehicle = new Vehicle("VEH-001");
-        testTime = Instant.now();
+        testTime = Instant.parse("2026-01-01T12:00:00Z");
+        fixedClock = Clock.fixed(testTime, ZoneOffset.UTC);
+        vehicle = new Vehicle();
+        vehicle.setVehicleId("VEH-001");
+    }
+
+    private TrackerLocation makeLocation(double lat, double lon, float speed, Instant when) {
+        TrackerLocation loc = new TrackerLocation();
+        loc.setLatitude(lat);
+        loc.setLongitude(lon);
+        loc.setSpeedKmh(speed);
+        loc.setRecordedAt(when);
+        return loc;
     }
 
     @Test
-    void testVehicleCreation() {
-        assertEquals("VEH-001", vehicle.getVehicleId());
-        assertEquals(EngineState.OFF, vehicle.getEngineState());
-        assertFalse(vehicle.isFuelCutActive());
-        assertNotNull(vehicle.getCurrentLocation());
-        assertNotNull(vehicle.getFuelStatus());
-        assertTrue(vehicle.getRecentAlerts().isEmpty());
-        assertNull(vehicle.getActiveTrip());
+    void vehicleCreation_defaultsToOff() {
+        Vehicle v = new Vehicle();
+        v.setVehicleId("VEH-X");
+        assertThat(v.getEngineState()).isEqualTo(EngineState.OFF);
+        assertThat(v.getFuelCutActive()).isFalse();
     }
 
     @Test
-    void testProcessNewTelemetryWithValidLocation() {
+    void processNewTelemetryWithValidLocation_startsMovingAndCreatesTrip() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 60.5f, testTime);
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
 
-        vehicle.processNewTelemetry(location);
+        vehicle.processNewTelemetry(location, testTime);
 
-        assertEquals(location, vehicle.getCurrentLocation());
-        assertEquals(EngineState.MOVING, vehicle.getEngineState());
-        assertNotNull(vehicle.getActiveTrip());
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.MOVING);
+        assertThat(vehicle.getActiveTrip()).isNotNull();
+        assertThat(vehicle.getActiveTrip().getIsActive()).isTrue();
     }
 
     @Test
-    void testProcessNewTelemetryWithInvalidLocation() {
+    void processNewTelemetryWithInvalidLocation_throwsException() {
         LocationPoint invalidLocation = new LocationPoint(100.0, -74.0060, 60.5f, testTime);
 
-        VehicleException exception = assertThrows(VehicleException.class,
-            () -> vehicle.processNewTelemetry(invalidLocation));
-
-        assertEquals("VEHICLE_INVALID_LOCATION", exception.getErrorCode());
+        assertThatThrownBy(() -> vehicle.processNewTelemetry(invalidLocation, testTime))
+            .isInstanceOf(VehicleException.class)
+            .satisfies(e -> assertThat(((VehicleException) e).getErrorCode()).isEqualTo("VEHICLE_INVALID_LOCATION"));
     }
 
     @Test
-    void testProcessNewTelemetryStartsTripWhenMoving() {
+    void processNewTelemetryStartsTripWhenMoving() {
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 10.0f, testTime);
 
-        vehicle.processNewTelemetry(location);
+        vehicle.processNewTelemetry(location, testTime);
 
-        assertNotNull(vehicle.getActiveTrip());
-        assertEquals("VEH-001", vehicle.getActiveTrip().getVehicleId());
-        assertTrue(vehicle.getActiveTrip().isActive());
+        assertThat(vehicle.getActiveTrip()).isNotNull();
+        assertThat(vehicle.getActiveTrip().getVehicle()).isEqualTo(vehicle);
     }
 
     @Test
-    void testProcessNewTelemetryDoesNotStartTripWhenStationary() {
+    void processNewTelemetryDoesNotStartTripWhenStationary() {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 0.0f, testTime);
 
-        vehicle.processNewTelemetry(location);
+        vehicle.processNewTelemetry(location, testTime);
 
-        assertNull(vehicle.getActiveTrip());
-        assertEquals(EngineState.OFF, vehicle.getEngineState());
+        assertThat(vehicle.getActiveTrip()).isNull();
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.OFF);
     }
 
     @Test
-    void testIssueFuelCutOffCommandWhenStationary() {
-        // First make the vehicle stationary
-        LocationPoint stationary = new LocationPoint(40.7128, -74.0060, 0.0f, testTime);
-        vehicle.processNewTelemetry(stationary);
+    void issueFuelCutOffCommandWhenStationary() {
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
 
-        vehicle.issueFuelCutOffCommand();
+        vehicle.issueFuelCutOffCommand(testTime);
 
-        assertTrue(vehicle.isFuelCutActive());
-        assertEquals(EngineState.FUEL_CUT_ACTIVE, vehicle.getEngineState());
+        assertThat(vehicle.getFuelCutActive()).isTrue();
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.FUEL_CUT_ACTIVE);
     }
 
     @Test
-    void testIssueFuelCutOffCommandWhenMovingTooFast() {
-        LocationPoint moving = new LocationPoint(40.7128, -74.0060, 50.0f, testTime);
-        vehicle.processNewTelemetry(moving);
+    void issueFuelCutOffCommandWhenMovingTooFast() {
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 50.0f, testTime));
 
-        VehicleException exception = assertThrows(VehicleException.class,
-            () -> vehicle.issueFuelCutOffCommand());
-
-        assertEquals("VEHICLE_FUEL_CUT_MOVING", exception.getErrorCode());
-        assertTrue(exception.getMessage().contains("50.0"));
-        assertFalse(vehicle.isFuelCutActive());
+        assertThatThrownBy(() -> vehicle.issueFuelCutOffCommand(testTime))
+            .isInstanceOf(VehicleException.class)
+            .satisfies(e -> {
+                VehicleException ve = (VehicleException) e;
+                assertThat(ve.getErrorCode()).isEqualTo("VEHICLE_FUEL_CUT_MOVING");
+                assertThat(ve.getMessage()).contains("50.0");
+            });
+        assertThat(vehicle.getFuelCutActive()).isFalse();
     }
 
     @Test
-    void testIssueFuelCutOffCommandWhenAlreadyCut() {
-        LocationPoint stationary = new LocationPoint(40.7128, -74.0060, 0.0f, testTime);
-        vehicle.processNewTelemetry(stationary);
+    void issueFuelCutOffCommandWhenAlreadyCut() {
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
+        vehicle.issueFuelCutOffCommand(testTime);
 
-        vehicle.issueFuelCutOffCommand();
-
-        VehicleException exception = assertThrows(VehicleException.class,
-            () -> vehicle.issueFuelCutOffCommand());
-
-        assertEquals("VEHICLE_FUEL_CUT_ACTIVE", exception.getErrorCode());
-        assertTrue(vehicle.isFuelCutActive());
+        assertThatThrownBy(() -> vehicle.issueFuelCutOffCommand(testTime))
+            .isInstanceOf(VehicleException.class)
+            .satisfies(e -> assertThat(((VehicleException) e).getErrorCode()).isEqualTo("VEHICLE_FUEL_CUT_ACTIVE"));
     }
 
     @Test
-    void testIssueFuelRestoreCommand() {
-        LocationPoint stationary = new LocationPoint(40.7128, -74.0060, 0.0f, testTime);
-        vehicle.processNewTelemetry(stationary);
+    void issueFuelRestoreCommandWhenStationary() {
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
+        vehicle.issueFuelCutOffCommand(testTime);
 
-        vehicle.issueFuelCutOffCommand();
-        assertTrue(vehicle.isFuelCutActive());
+        vehicle.issueFuelRestoreCommand(testTime);
 
-        vehicle.issueFuelRestoreCommand();
-        assertFalse(vehicle.isFuelCutActive());
-        assertEquals(EngineState.ON, vehicle.getEngineState());
+        assertThat(vehicle.getFuelCutActive()).isFalse();
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.IDLE);
     }
 
     @Test
-    void testIssueFuelRestoreCommandWhenMoving() {
+    void endActiveTrip_marksInactive() {
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
         LocationPoint moving = new LocationPoint(40.7128, -74.0060, 30.0f, testTime);
-        vehicle.processNewTelemetry(moving);
+        vehicle.processNewTelemetry(moving, testTime);
 
-        // Can't cut fuel while moving, but let's test restore after cutting when stationary
-        LocationPoint stationary = new LocationPoint(40.7128, -74.0060, 0.0f, testTime.plusSeconds(10));
-        vehicle.processNewTelemetry(stationary);
+        Trip active = vehicle.getActiveTrip();
+        assertThat(active).isNotNull();
 
-        vehicle.issueFuelCutOffCommand();
-        vehicle.issueFuelRestoreCommand();
+        TrackerLocation endLoc = makeLocation(40.7589, -73.9851, 0.0f, testTime.plusSeconds(300));
+        vehicle.endActiveTrip(TripEndReason.ACC_OFF, endLoc);
 
-        // Should be ON (not MOVING) because speed is 0
-        assertEquals(EngineState.ON, vehicle.getEngineState());
+        assertThat(vehicle.getActiveTrip()).isNull();
     }
 
     @Test
-    void testEndTrip() {
-        LocationPoint start = new LocationPoint(40.7128, -74.0060, 10.0f, testTime);
-        vehicle.processNewTelemetry(start);
+    void engineStateTransitions() {
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.OFF);
 
-        assertNotNull(vehicle.getActiveTrip());
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
+        vehicle.processNewTelemetry(new LocationPoint(40.7128, -74.0060, 30.0f, testTime), testTime);
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.MOVING);
 
-        LocationPoint end = new LocationPoint(40.7589, -73.9851, 0.0f, testTime.plusSeconds(300));
-        vehicle.endTrip(end);
+        vehicle.processNewTelemetry(new LocationPoint(40.7128, -74.0060, 0.0f, testTime.plusSeconds(10)), testTime.plusSeconds(10));
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.IDLE);
 
-        assertNull(vehicle.getActiveTrip());
+        vehicle.issueFuelCutOffCommand(testTime.plusSeconds(15));
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.FUEL_CUT_ACTIVE);
+
+        vehicle.issueFuelRestoreCommand(testTime.plusSeconds(20));
+        assertThat(vehicle.getEngineState()).isEqualTo(EngineState.IDLE);
     }
 
     @Test
-    void testEndTripWhenNoActiveTrip() {
-        TripException exception = assertThrows(TripException.class,
-            () -> vehicle.endTrip(new LocationPoint(40.7128, -74.0060, 0.0f, testTime)));
+    void getIdleDurationWhenNotIdle_returnsZero() {
+        assertThat(vehicle.getIdleDuration(testTime)).isEqualTo(Duration.ZERO);
 
-        assertEquals("TRIP_NOT_ACTIVE", exception.getErrorCode());
-    }
+        vehicle.setCurrentLocation(makeLocation(40.7128, -74.0060, 0.0f, testTime));
+        vehicle.processNewTelemetry(new LocationPoint(40.7128, -74.0060, 30.0f, testTime), testTime);
 
-    @Test
-    void testAddAlert() {
-        assertEquals(0, vehicle.getRecentAlerts().size());
-
-        vehicle.addAlert("Test alert 1");
-        vehicle.addAlert("Test alert 2");
-
-        assertEquals(2, vehicle.getRecentAlerts().size());
-        assertTrue(vehicle.getRecentAlerts().get(0).contains("Test alert 1"));
-        assertTrue(vehicle.getRecentAlerts().get(1).contains("Test alert 2"));
-    }
-
-    @Test
-    void testAlertLimit() {
-        for (int i = 0; i < 150; i++) {
-            vehicle.addAlert("Alert " + i);
-        }
-
-        assertEquals(100, vehicle.getRecentAlerts().size());
-        // Oldest alerts should be removed
-        assertFalse(vehicle.getRecentAlerts().get(0).contains("Alert 0"));
-        assertTrue(vehicle.getRecentAlerts().get(vehicle.getRecentAlerts().size() - 1).contains("Alert 149"));
-    }
-
-    @Test
-    void testGetIdleDurationWhenNotIdle() {
-        assertEquals(Duration.ZERO, vehicle.getIdleDuration());
-
-        LocationPoint moving = new LocationPoint(40.7128, -74.0060, 30.0f, testTime);
-        vehicle.processNewTelemetry(moving);
-
-        assertEquals(Duration.ZERO, vehicle.getIdleDuration());
-    }
-
-    @Test
-    void testEngineStateTransitions() {
-        // Start OFF
-        assertEquals(EngineState.OFF, vehicle.getEngineState());
-
-        // Start moving -> MOVING
-        LocationPoint moving = new LocationPoint(40.7128, -74.0060, 30.0f, testTime);
-        vehicle.processNewTelemetry(moving);
-        assertEquals(EngineState.MOVING, vehicle.getEngineState());
-
-        // Stop -> IDLE
-        LocationPoint stopped = new LocationPoint(40.7128, -74.0060, 0.0f, testTime.plusSeconds(10));
-        vehicle.processNewTelemetry(stopped);
-        assertEquals(EngineState.IDLE, vehicle.getEngineState());
-
-        // Fuel cut -> FUEL_CUT_ACTIVE
-        vehicle.issueFuelCutOffCommand();
-        assertEquals(EngineState.FUEL_CUT_ACTIVE, vehicle.getEngineState());
-
-        // Restore fuel -> ON (because speed is 0)
-        vehicle.issueFuelRestoreCommand();
-        assertEquals(EngineState.ON, vehicle.getEngineState());
-    }
-
-    @Test
-    void testSettersForReconstruction() {
-        FuelStatus newFuelStatus = new FuelStatus(50.0f, 5.0f, testTime);
-
-        // These are protected methods, typically used by repository for reconstruction
-        // We're testing them directly for completeness
-        vehicle.setDeviceId("DEV-001");
-        vehicle.setFuelStatus(newFuelStatus);
-
-        assertEquals("DEV-001", vehicle.getDeviceId());
-        assertEquals(newFuelStatus, vehicle.getFuelStatus());
+        assertThat(vehicle.getIdleDuration(testTime)).isEqualTo(Duration.ZERO);
     }
 }

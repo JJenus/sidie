@@ -7,7 +7,6 @@ public interface IAlertRule {
     String getRuleKey();
     String getRuleName();
     boolean isEnabled();
-    void setEnabled(boolean enabled);
     int getPriority();
 }
 

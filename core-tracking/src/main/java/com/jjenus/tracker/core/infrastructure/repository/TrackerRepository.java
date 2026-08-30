@@ -15,8 +15,9 @@ import java.util.Optional;
 public interface TrackerRepository extends JpaRepository<Tracker, String> {
     
     Optional<Tracker> findByDeviceId(String deviceId);
-    
-//    Optional<Tracker> findByImei(String imei);
+
+    @Query("SELECT t FROM Tracker t WHERE t.vehicle.vehicleId = :vehicleId")
+    Optional<Tracker> findByVehicleId(@Param("vehicleId") String vehicleId);
     
     List<Tracker> findByIsOnline(boolean isOnline);
     

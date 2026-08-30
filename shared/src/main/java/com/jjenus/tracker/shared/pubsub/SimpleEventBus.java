@@ -1,5 +1,8 @@
 package com.jjenus.tracker.shared.pubsub;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -7,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 public class SimpleEventBus implements EventPublisher, EventSubscriber {
+    private static final Logger log = LoggerFactory.getLogger(SimpleEventBus.class);
     private final ConcurrentHashMap<Class<?>, CopyOnWriteArrayList<EventHandler<?>>> handlers;
     private final ExecutorService executor;
 
@@ -31,12 +35,11 @@ public class SimpleEventBus implements EventPublisher, EventSubscriber {
                         try {
                             handler.handle(event);
                         } catch (Exception e) {
-                            System.err.println("Error handling event: " + e.getMessage());
+                            log.error("Error handling event", e);
                         }
                     });
                 } catch (RejectedExecutionException e) {
-                    // Executor is shutting down, ignore
-                    System.err.println("Event rejected from executor: " + e.getMessage());
+                    log.warn("Event rejected from executor", e);
                 }
             }
         }

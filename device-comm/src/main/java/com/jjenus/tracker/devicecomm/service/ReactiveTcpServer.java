@@ -336,7 +336,7 @@ public class ReactiveTcpServer {
                     return false;
                 }
 
-                Connection nettyConnection = connectionInfo.getNettyConnection();
+                Connection nettyConnection = connectionTracker.getLiveConnection(connectionInfo.getConnectionId());
                 if (nettyConnection == null || nettyConnection.isDisposed()) {
                     logger.warn("Connection for device {} is disposed", deviceId);
                     connectionTracker.removeConnection(connectionInfo.getConnectionId());

@@ -24,6 +24,7 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             DateTimeFormatter.ofPattern("ddMMyyHHmmss");
 
     private final Logger log = LoggerFactory.getLogger(AutoseekerProtocolParser.class);
+    private volatile String lastParsedType;
 
     @Override
     public LocationPoint parse(String data) throws ProtocolParseException {
@@ -37,6 +38,7 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
             String[] parts = cleanData.split(",");
 
             String protocolType = parts[2]; // V1, V4, etc.
+            this.lastParsedType = protocolType;
 
             return switch (protocolType) {
                 case "V1" -> parseHeartPackPacket(parts);
@@ -287,6 +289,18 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
         return "Autoseeker";
     }
 
+    @Override
+    public PacketType getPacketType() {
+        if (lastParsedType == null) {
+            return PacketType.UNKNOWN;
+        }
+        return switch (lastParsedType) {
+            case "V1" -> PacketType.GPS;
+            case "V4" -> PacketType.COMMAND_RESPONSE;
+            default -> PacketType.UNKNOWN;
+        };
+    }
+
     // Additional utility methods
     public Map<String, Object> parseExtendedData(String[] parts) {
         Map<String, Object> extendedData = new HashMap<>();
@@ -328,37 +342,34 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
                 return statusMap;
             }
 
-            // Convert hex to binary (32 bits)
             long value = Long.parseLong(statusHex, 16);
             String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
 
-            // Parse bits according to protocol (0 = active)
-            // Based on Appendix 1 table in the PDF
-
-            // First byte (bits 24-31)
-            statusMap.put("saveStatus", binary.charAt(31) == '0');          // bit 0
-            statusMap.put("removeAlarm", binary.charAt(30) == '0');         // bit 1
-            statusMap.put("supplementaryData", binary.charAt(29) == '0');   // bit 2
-            statusMap.put("cutFuelElectricity", binary.charAt(28) == '0');  // bit 3
-            statusMap.put("batteryRemoveAlarm", binary.charAt(27) == '0');  // bit 4
-
-            // Second byte (bits 16-23)
-            statusMap.put("shakeAlarm", binary.charAt(23) == '0');          // bit 8
-            statusMap.put("setFence", binary.charAt(22) == '0');            // bit 9
-            statusMap.put("accClose", binary.charAt(21) == '0');            // bit 10
-
-            // Third byte (bits 8-15)
-            statusMap.put("useBackupBattery", binary.charAt(15) == '0');    // bit 16
-            statusMap.put("openLock", binary.charAt(14) == '0');            // bit 17
-
-            // Fourth byte (bits 0-7)
-            statusMap.put("engineStatus", binary.charAt(7) == '0');         // bit 24
+            // Autoseeker status bits per Appendix 1 - LSB first, 0 = active.
+            statusMap.put("saveStatus",          isActive(binary, 0));
+            statusMap.put("removeAlarm",         isActive(binary, 1));
+            statusMap.put("supplementaryData",   isActive(binary, 2));
+            statusMap.put("cutFuelElectricity",  isActive(binary, 3));
+            statusMap.put("batteryRemoveAlarm",  isActive(binary, 4));
+            statusMap.put("shakeAlarm",          isActive(binary, 8));
+            statusMap.put("setFence",            isActive(binary, 9));
+            statusMap.put("accClose",            isActive(binary, 10));
+            statusMap.put("useBackupBattery",    isActive(binary, 16));
+            statusMap.put("openLock",            isActive(binary, 17));
+            statusMap.put("engineStatus",        isActive(binary, 24));
 
         } catch (Exception e) {
             log.warn("Error parsing vehicle status: {}", e.getMessage());
         }
 
         return statusMap;
+    }
+
+    private boolean isActive(String binary, int lsbIndex) {
+        if (lsbIndex < 0 || lsbIndex >= binary.length()) {
+            return false;
+        }
+        return binary.charAt(binary.length() - 1 - lsbIndex) == '0';
     }
 
     private String getCurrentTimeString() {
