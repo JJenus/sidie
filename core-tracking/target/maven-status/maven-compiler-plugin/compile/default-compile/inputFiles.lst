@@ -23,7 +23,9 @@
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/application/VehicleEventHandler.java
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/domain/entity/DeviceCommand.java
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/infrastructure/repository/TripRepository.java
+/home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/application/TripExportService.java
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/domain/enums/EngineState.java
+/home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/api/TripExportController.java
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/exception/VehicleException.java
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/domain/FuelCutRequestedEvent.java
 /home/jjenus/workspace/apps/tracker/sidie/core-tracking/src/main/java/com/jjenus/tracker/core/exception/TripException.java
