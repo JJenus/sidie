@@ -14,25 +14,29 @@ import java.util.Optional;
 
 @Repository
 public interface NotificationTemplateRepository extends JpaRepository<NotificationTemplate, Long> {
-    
+
     Optional<NotificationTemplate> findByTemplateId(String templateId);
-    
+
     List<NotificationTemplate> findByTemplateTypeAndChannelAndEnabledTrue(String templateType, NotificationChannel channel);
-    
+
     List<NotificationTemplate> findByChannelAndEnabledTrue(NotificationChannel channel);
-    
+
+    List<NotificationTemplate> findByTemplateTypeAndEnabledTrue(String templateType);
+
     @Query("SELECT t FROM NotificationTemplate t WHERE " +
            "(:templateType IS NULL OR t.templateType = :templateType) AND " +
            "(:channel IS NULL OR t.channel = :channel) AND " +
+           "(:category IS NULL OR t.category = :category) AND " +
            "t.enabled = true " +
            "ORDER BY t.createdAt DESC")
     Page<NotificationTemplate> findWithFilters(
         @Param("templateType") String templateType,
-        @Param("channel") String channel,
+        @Param("channel") NotificationChannel channel,
+        @Param("category") String category,
         Pageable pageable
     );
-    
+
     boolean existsByTemplateId(String templateId);
-    
+
     void deleteByTemplateId(String templateId);
 }

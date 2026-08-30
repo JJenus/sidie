@@ -6,24 +6,24 @@ public enum DeliveryStatus {
     SENT("Successfully sent"),
     DELIVERED("Confirmed delivery"),
     FAILED("Delivery failed"),
-    RETRYING("Retrying delivery"),
-    DISCARDED("Discarded after retries");
-    
+    EXHAUSTED("Exhausted after max attempts"),
+    SKIPPED("Channel disabled, skipped");
+
     private final String description;
-    
+
     DeliveryStatus(String description) {
         this.description = description;
     }
-    
+
     public String getDescription() {
         return description;
     }
-    
+
     public boolean isFinal() {
-        return this == DELIVERED || this == DISCARDED;
+        return this == DELIVERED || this == EXHAUSTED || this == SKIPPED || this == SENT;
     }
-    
+
     public boolean canRetry() {
-        return this == FAILED || this == RETRYING;
+        return this == FAILED;
     }
 }

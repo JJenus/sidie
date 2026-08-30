@@ -1,21 +1,12 @@
 package com.jjenus.tracker.notification.application.service;
 
-import com.jjenus.tracker.notification.domain.entity.Notification;
+import com.jjenus.tracker.notification.domain.entity.Delivery;
 
 public interface NotificationService {
-    
-    /**
-     * Send a notification
-     */
-    void send(Notification notification);
-    
-    /**
-     * Check if service is available
-     */
+
+    DeliveryResult send(Delivery delivery);
+
     boolean isAvailable();
-    
-    /**
-     * Get the channel this service handles
-     */
+
     String getChannel();
 }

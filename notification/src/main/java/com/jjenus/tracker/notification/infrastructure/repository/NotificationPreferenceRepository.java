@@ -1,23 +1,25 @@
 package com.jjenus.tracker.notification.infrastructure.repository;
 
 import com.jjenus.tracker.notification.domain.entity.NotificationPreference;
+import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface NotificationPreferenceRepository extends JpaRepository<NotificationPreference, Long> {
-    
+
     List<NotificationPreference> findByUserId(String userId);
 
-    List<NotificationPreference> findByAlertType(String alertType);
+    List<NotificationPreference> findByCategory(String category);
 
-    List<NotificationPreference> findByUserIdAndAlertType(String userId, String alertType);
-    
-    List<NotificationPreference> findByUserIdAndAlertTypeIn(String userId, List<String> alertTypes);
-    
+    Optional<NotificationPreference> findByUserIdAndCategory(String userId, String category);
+
+    List<NotificationPreference> findByUserIdAndCategoryIn(String userId, List<String> categories);
+
     void deleteByUserId(String userId);
-    
-    void deleteByUserIdAndAlertType(String userId, String alertType);
+
+    void deleteByUserIdAndCategory(String userId, String category);
 }

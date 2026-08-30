@@ -1,13 +1,18 @@
 package com.jjenus.tracker.notification.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jjenus.tracker.notification.domain.entity.Notification;
-import com.jjenus.tracker.notification.domain.entity.NotificationPreference;
+import com.jjenus.tracker.notification.application.queue.NotificationMessage;
+import com.jjenus.tracker.notification.application.queue.NotificationQueuePublisher;
+import com.jjenus.tracker.notification.domain.entity.Delivery;
+import com.jjenus.tracker.notification.domain.entity.DeliveryEvent;
+import com.jjenus.tracker.notification.domain.entity.NotificationHub;
 import com.jjenus.tracker.notification.domain.entity.NotificationTemplate;
 import com.jjenus.tracker.notification.domain.enums.DeliveryStatus;
 import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
-import com.jjenus.tracker.notification.infrastructure.repository.NotificationPreferenceRepository;
-import com.jjenus.tracker.notification.infrastructure.repository.NotificationRepository;
+import com.jjenus.tracker.notification.domain.enums.NotificationStatus;
+import com.jjenus.tracker.notification.infrastructure.repository.DeliveryEventRepository;
+import com.jjenus.tracker.notification.infrastructure.repository.DeliveryRepository;
+import com.jjenus.tracker.notification.infrastructure.repository.NotificationHubRepository;
 import com.jjenus.tracker.notification.infrastructure.repository.NotificationTemplateRepository;
 import com.jjenus.tracker.shared.events.AlertRaisedEvent;
 import org.slf4j.Logger;
@@ -15,8 +20,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -24,195 +33,167 @@ public class NotificationOrchestrator {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationOrchestrator.class);
 
-    private final NotificationDispatcher dispatcher;
-    private final NotificationRepository notificationRepository;
-    private final NotificationPreferenceRepository preferenceRepository;
+    private final NotificationHubRepository hubRepository;
     private final NotificationTemplateRepository templateRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final DeliveryEventRepository eventRepository;
+    private final NotificationQueuePublisher queuePublisher;
+    private final PreferenceResolver preferenceResolver;
     private final ObjectMapper objectMapper;
 
     public NotificationOrchestrator(
-        NotificationDispatcher dispatcher,
-        NotificationRepository notificationRepository,
-        NotificationPreferenceRepository preferenceRepository,
+        NotificationHubRepository hubRepository,
         NotificationTemplateRepository templateRepository,
+        DeliveryRepository deliveryRepository,
+        DeliveryEventRepository eventRepository,
+        NotificationQueuePublisher queuePublisher,
+        PreferenceResolver preferenceResolver,
         ObjectMapper objectMapper
     ) {
-        this.dispatcher = dispatcher;
-        this.notificationRepository = notificationRepository;
-        this.preferenceRepository = preferenceRepository;
+        this.hubRepository = hubRepository;
         this.templateRepository = templateRepository;
+        this.deliveryRepository = deliveryRepository;
+        this.eventRepository = eventRepository;
+        this.queuePublisher = queuePublisher;
+        this.preferenceResolver = preferenceResolver;
         this.objectMapper = objectMapper;
     }
 
     public void processAlert(AlertRaisedEvent alert) {
-        try {
-            logger.info("Processing alert for notification: {}", alert.getAlertId());
+        logger.info("Processing alert for notification: {}", alert.getAlertId());
 
-            List<String> recipients = findRecipientsForAlert(alert);
-            logger.debug("Found {} recipients for alert {}", recipients.size(), alert.getAlertId());
+        NotificationMessage message = new NotificationMessage(
+            "admin",
+            alert.getAlertId(),
+            alert.getAlertType(),
+            buildContextFromAlert(alert)
+        );
 
-            for (String recipient : recipients) {
-                try {
-                    createNotificationsForRecipient(alert, recipient);
-                } catch (Exception e) {
-                    logger.error("Failed to create notifications for recipient: {}", recipient, e);
-                }
+        queuePublisher.publish(message);
+        logger.info("Published notification message to queue for alert {}", alert.getAlertId());
+    }
+
+    public void processNotification(NotificationMessage message) {
+        logger.info("Processing notification message for user {}", message.getUserId());
+
+        NotificationTemplate template = templateRepository
+            .findByTemplateId(message.getTemplateKey())
+            .orElseGet(() -> getDefaultTemplate(message.getTemplateKey()));
+
+        String category = template.getCategory() != null
+            ? template.getCategory()
+            : (message.getCategory() != null ? message.getCategory() : "DEFAULT");
+
+        NotificationHub hub = new NotificationHub();
+        hub.setNotificationId(UUID.randomUUID().toString());
+        hub.setUserId(message.getUserId());
+        hub.setTemplateId(template.getTemplateId());
+        hub.setCategory(category);
+        hub.setAlertId(message.getAlertId());
+        hub.setMetadata(toJson(message.getContext()));
+        hub.setStatus(NotificationStatus.CREATED);
+
+        hubRepository.saveAndFlush(hub);
+
+        Map<NotificationChannel, PreferenceResolver.ChannelPreference> prefs =
+            preferenceResolver.resolvePreferences(message.getUserId(), category, template);
+
+        List<Delivery> deliveries = new ArrayList<>();
+
+        for (NotificationChannel channel : NotificationChannel.values()) {
+            PreferenceResolver.ChannelPreference pref = prefs.get(channel);
+            if (pref != null && pref.enabled()) {
+                Delivery delivery = createDelivery(hub, channel, template, message.getContext());
+                deliveries.add(delivery);
+
+                DeliveryEvent event = DeliveryEvent.created(
+                    delivery.getDeliveryId(),
+                    "Created via queue for alert: " + message.getAlertId(),
+                    Instant.now()
+                );
+                eventRepository.save(event);
             }
-
-            logger.info("Successfully processed alert {}", alert.getAlertId());
-
-        } catch (Exception e) {
-            logger.error("Failed to process alert: {}", alert.getAlertId(), e);
-            throw new RuntimeException("Failed to process alert for notification", e);
         }
+
+        hub.setStatus(NotificationStatus.PROCESSING);
+
+        for (Delivery delivery : deliveries) {
+            hub.addDelivery(delivery);
+        }
+        hubRepository.save(hub);
+
+        hub.recalculateStatus();
+        hubRepository.save(hub);
+
+        logger.info("Created notification hub {} with {} deliveries for user {}",
+            hub.getNotificationId(), deliveries.size(), message.getUserId());
     }
 
-    private List<String> findRecipientsForAlert(AlertRaisedEvent alert) {
-        List<NotificationPreference> preferences = preferenceRepository
-                .findByAlertType(alert.getAlertType());
-
-        if (preferences.isEmpty()) {
-            return List.of("admin");
-        }
-
-        return preferences.stream()
-                .filter(NotificationPreference::isEnabled)
-                .map(NotificationPreference::getUserId)
-                .distinct()
-                .collect(Collectors.toList());
+    private Delivery createDelivery(NotificationHub hub, NotificationChannel channel,
+                                   NotificationTemplate template, Map<String, Object> context) {
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(UUID.randomUUID().toString());
+        delivery.setChannel(channel);
+        delivery.setTemplateId(template.getTemplateId());
+        delivery.setTitle(renderTemplate(template.getSubjectTemplate(), context));
+        delivery.setMessage(renderTemplate(template.getBodyTemplate(), context));
+        delivery.setTemplateVariables(toJson(context));
+        delivery.setRecipient(determineRecipient(hub.getUserId(), channel));
+        delivery.setStatus(DeliveryStatus.PENDING);
+        delivery.setMaxAttempts(5);
+        return delivery;
     }
 
-    private void createNotificationsForRecipient(AlertRaisedEvent alert, String recipient) {
-        List<NotificationPreference> preferences = preferenceRepository
-            .findByUserIdAndAlertType(recipient, alert.getAlertType());
-
-        if (preferences.isEmpty()) {
-            preferences = getDefaultPreferences(recipient, alert.getAlertType(), alert.getSeverity());
-        }
-
-        for (NotificationPreference preference : preferences) {
-            if (preference.isEnabled()) {
-                for (NotificationChannel channel : preference.getEnabledChannels()) {
-                    createAndQueueNotification(alert, recipient, channel);
-                }
-            }
-        }
+    private String determineRecipient(String userId, NotificationChannel channel) {
+        return switch (channel) {
+            case EMAIL -> userId + "@example.com";
+            case SMS -> "+1234567890";
+            default -> userId;
+        };
     }
 
-    private void createAndQueueNotification(
-        AlertRaisedEvent alert,
-        String recipient,
-        NotificationChannel channel
-    ) {
+    private String renderTemplate(String template, Map<String, Object> context) {
+        if (template == null) return "";
+        String result = template;
+        for (Map.Entry<String, Object> entry : context.entrySet()) {
+            result = result.replace("{{" + entry.getKey() + "}}",
+                entry.getValue() != null ? entry.getValue().toString() : "");
+        }
+        return result;
+    }
+
+    private String toJson(Map<String, Object> context) {
         try {
-            NotificationTemplate template = findTemplate(alert.getAlertType(), channel);
-            if (template == null || !template.isEnabled()) {
-                logger.warn("No enabled template found for rule type {} and channel {}",
-                          alert.getAlertType(), channel);
-                return;
-            }
-
-            Notification notification = new Notification();
-            notification.setAlertId(alert.getAlertId());
-            notification.setChannel(channel);
-            notification.setRecipient(recipient);
-            notification.setTemplateId(template.getTemplateId());
-            notification.setTemplateVariables(formatTemplateVariables(alert));
-            notification.setTitle(renderTemplate(template.getSubjectTemplate(), alert));
-            notification.setMessage(renderTemplate(template.getBodyTemplate(), alert));
-            notification.setStatus(DeliveryStatus.PENDING);
-
-            notificationRepository.save(notification);
-            logger.debug("Persisted notification {} for alert {} to {} via {}",
-                    notification.getNotificationId(), alert.getAlertId(), recipient, channel);
-
-            dispatcher.dispatch(notification);
-
+            return objectMapper.writeValueAsString(context);
         } catch (Exception e) {
-            logger.error("Failed to create notification for recipient {} via channel {}",
-                        recipient, channel, e);
-        }
-    }
-
-    private NotificationTemplate findTemplate(String ruleType, NotificationChannel channel) {
-        return templateRepository
-            .findByTemplateTypeAndChannelAndEnabledTrue(ruleType, channel)
-            .stream()
-            .findFirst()
-            .orElseGet(() -> getDefaultTemplate(channel));
-    }
-
-    private NotificationTemplate getDefaultTemplate(NotificationChannel channel) {
-        NotificationTemplate template = new NotificationTemplate();
-        template.setTemplateId("DEFAULT_" + channel.name());
-        template.setName("Default " + channel.getDisplayName() + " Template");
-        template.setTemplateType("DEFAULT");
-        template.setChannel(channel);
-        template.setSubjectTemplate("Alert: {{alertType}}");
-        template.setBodyTemplate("{{message}}\\n\\nVehicle: {{vehicleId}}\\nTime: {{timestamp}}");
-        return template;
-    }
-
-    private String formatTemplateVariables(AlertRaisedEvent alert) {
-        try {
-            Map<String, Object> variables = new HashMap<>();
-            variables.put("alertId", alert.getAlertId());
-            variables.put("ruleKey", alert.getRuleKey());
-            variables.put("vehicleId", alert.getVehicleId());
-            variables.put("alertType", alert.getAlertType());
-            variables.put("severity", alert.getSeverity());
-            variables.put("message", alert.getMessage());
-            variables.put("timestamp", alert.getTimestamp().toString());
-            variables.put("latitude", alert.getLatitude());
-            variables.put("longitude", alert.getLongitude());
-            return objectMapper.writeValueAsString(variables);
-        } catch (Exception e) {
-            logger.error("Failed to format template variables", e);
             return "{}";
         }
     }
 
-    private String renderTemplate(String template, AlertRaisedEvent alert) {
-        if (template == null) return "";
-
-        return template
-            .replace("{{alertId}}", nullSafe(alert.getAlertId()))
-            .replace("{{ruleKey}}", nullSafe(alert.getRuleKey()))
-            .replace("{{vehicleId}}", nullSafe(alert.getVehicleId()))
-            .replace("{{alertType}}", nullSafe(alert.getAlertType()))
-            .replace("{{severity}}", nullSafe(alert.getSeverity()))
-            .replace("{{message}}", nullSafe(alert.getMessage()))
-            .replace("{{timestamp}}", alert.getTimestamp() != null ? alert.getTimestamp().toString() : "")
-            .replace("{{latitude}}", alert.getLatitude() != null ? String.valueOf(alert.getLatitude()) : "")
-            .replace("{{longitude}}", alert.getLongitude() != null ? String.valueOf(alert.getLongitude()) : "");
+    private Map<String, Object> buildContextFromAlert(AlertRaisedEvent alert) {
+        Map<String, Object> context = new HashMap<>();
+        context.put("alertId", alert.getAlertId());
+        context.put("ruleKey", alert.getRuleKey());
+        context.put("vehicleId", alert.getVehicleId());
+        context.put("alertType", alert.getAlertType());
+        context.put("severity", alert.getSeverity());
+        context.put("message", alert.getMessage());
+        context.put("timestamp", alert.getTimestamp() != null ? alert.getTimestamp().toString() : "");
+        context.put("latitude", alert.getLatitude() != null ? alert.getLatitude().toString() : "");
+        context.put("longitude", alert.getLongitude() != null ? alert.getLongitude().toString() : "");
+        return context;
     }
 
-    private String nullSafe(String value) {
-        return value != null ? value : "";
-    }
-
-    private List<NotificationPreference> getDefaultPreferences(String userId, String alertType, String severity) {
-        NotificationPreference preference = new NotificationPreference();
-        preference.setUserId(userId);
-        preference.setAlertType(alertType);
-        preference.setEnabled(true);
-
-        Set<NotificationChannel> channels = new HashSet<>();
-        if ("CRITICAL".equals(severity)) {
-            channels.add(NotificationChannel.WEBSOCKET);
-            channels.add(NotificationChannel.SMS);
-            channels.add(NotificationChannel.MOBILE_PUSH);
-            channels.add(NotificationChannel.EMAIL);
-        } else if ("HIGH".equals(severity)) {
-            channels.add(NotificationChannel.WEBSOCKET);
-            channels.add(NotificationChannel.MOBILE_PUSH);
-            channels.add(NotificationChannel.EMAIL);
-        } else {
-            channels.add(NotificationChannel.WEBSOCKET);
-            channels.add(NotificationChannel.EMAIL);
-        }
-
-        preference.setEnabledChannels(channels);
-        return List.of(preference);
+    private NotificationTemplate getDefaultTemplate(String templateKey) {
+        NotificationTemplate template = new NotificationTemplate();
+        template.setTemplateId(templateKey);
+        template.setName("Default Template");
+        template.setTemplateType(templateKey);
+        template.setChannel(NotificationChannel.EMAIL);
+        template.setSubjectTemplate("Alert: {{alertType}}");
+        template.setBodyTemplate("{{message}}\\n\\nVehicle: {{vehicleId}}\\nTime: {{timestamp}}");
+        template.setEnabled(true);
+        template.setMandatory(false);
+        return template;
     }
 }

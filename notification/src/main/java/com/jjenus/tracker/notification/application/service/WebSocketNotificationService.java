@@ -1,6 +1,7 @@
 package com.jjenus.tracker.notification.application.service;
 
-import com.jjenus.tracker.notification.domain.entity.Notification;
+import com.jjenus.tracker.notification.domain.entity.Delivery;
+import com.jjenus.tracker.notification.domain.enums.ErrorType;
 import com.jjenus.tracker.notification.infrastructure.websocket.VehicleTrackingWebSocketHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,89 +9,77 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class WebSocketNotificationService implements NotificationService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(WebSocketNotificationService.class);
-    
+
     private final VehicleTrackingWebSocketHandler webSocketHandler;
-    
+
     public WebSocketNotificationService(VehicleTrackingWebSocketHandler webSocketHandler) {
         this.webSocketHandler = webSocketHandler;
     }
-    
+
     @Override
-    public void send(Notification notification) {
+    public DeliveryResult send(Delivery delivery) {
         try {
-            // Mark as sending
-            notification.markAsSending();
-            
-            // Send via WebSocket
+            if (!webSocketHandler.isUserConnected(delivery.getRecipient())) {
+                return DeliveryResult.failure("User not connected via WebSocket", ErrorType.TRANSIENT);
+            }
+
             webSocketHandler.sendAlertNotification(
-                notification.getRecipient(), 
-                createWebSocketMessage(notification)
+                delivery.getRecipient(),
+                createWebSocketMessage(delivery)
             );
-            
-            // Mark as sent
-            notification.markAsSent();
-            
-            logger.debug("WebSocket notification sent to user: {}", notification.getRecipient());
-            
+
+            delivery.markSent();
+            logger.debug("WebSocket notification sent to user: {}", delivery.getRecipient());
+            return DeliveryResult.success();
+
         } catch (Exception e) {
             logger.error("Failed to send WebSocket notification", e);
-            notification.markAsFailed(e.getMessage());
-            throw new RuntimeException("Failed to send WebSocket notification", e);
+            return DeliveryResult.failure(e.getMessage(), ErrorType.TRANSIENT);
         }
     }
-    
+
     @Override
     public boolean isAvailable() {
-        return true; // WebSocket is always available if handler is initialized
+        return true;
     }
-    
+
     @Override
     public String getChannel() {
         return "WEBSOCKET";
     }
-    
-    /**
-     * Create WebSocket message from notification
-     */
-    private Object createWebSocketMessage(Notification notification) {
+
+    private Object createWebSocketMessage(Delivery delivery) {
         return new WebSocketNotificationMessage(
-            notification.getNotificationId(),
-            notification.getAlertId(),
-            notification.getTitle(),
-            notification.getMessage(),
-            notification.getChannel().name(),
+            delivery.getDeliveryId(),
+            delivery.getNotificationHub() != null ? delivery.getNotificationHub().getAlertId() : null,
+            delivery.getTitle(),
+            delivery.getMessage(),
+            delivery.getChannel().name(),
             System.currentTimeMillis()
         );
     }
-    
-    // WebSocket message DTO
+
     private static class WebSocketNotificationMessage {
-        private final String notificationId;
+        private final String deliveryId;
         private final String alertId;
         private final String title;
         private final String message;
         private final String channel;
         private final long timestamp;
-        
-        public WebSocketNotificationMessage(
-            String notificationId,
-            String alertId,
-            String title,
-            String message,
-            String channel,
-            long timestamp
-        ) {
-            this.notificationId = notificationId;
+
+        public WebSocketNotificationMessage(String deliveryId, String alertId, String title,
+                                            String message, String channel, long timestamp) {
+            this.deliveryId = deliveryId;
             this.alertId = alertId;
             this.title = title;
             this.message = message;
             this.channel = channel;
             this.timestamp = timestamp;
         }
-        
-        public String getNotificationId() { return notificationId; }
+
+        public String getDeliveryId() { return deliveryId; }
         public String getAlertId() { return alertId; }
         public String getTitle() { return title; }
         public String getMessage() { return message; }

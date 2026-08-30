@@ -54,6 +54,38 @@ public class JmsConfig {
     }
 
     @Bean
+    public JmsTemplate queueJmsTemplate(
+            ConnectionFactory connectionFactory,
+            MessageConverter messageConverter
+    ) {
+        JmsTemplate template = new JmsTemplate(connectionFactory);
+        template.setPubSubDomain(false);
+        template.setMessageConverter(messageConverter);
+        template.setDeliveryPersistent(true);
+        return template;
+    }
+
+    @Bean
+    public JmsListenerContainerFactory<?> queueJmsListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            DefaultJmsListenerContainerFactoryConfigurer configurer
+    ) {
+        DefaultJmsListenerContainerFactory factory =
+                new DefaultJmsListenerContainerFactory();
+
+        factory.setPubSubDomain(false);
+        factory.setConcurrency("1-3");
+
+        configurer.configure(factory, connectionFactory);
+
+        factory.setErrorHandler(t ->
+                log.error("Queue JMS listener error", t)
+        );
+
+        return factory;
+    }
+
+    @Bean
     public MessageConverter jacksonJmsMessageConverter(ObjectMapper objectMapper) {
         MappingJackson2MessageConverter converter =
                 new MappingJackson2MessageConverter();
