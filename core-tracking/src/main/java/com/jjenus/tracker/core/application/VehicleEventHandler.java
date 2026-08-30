@@ -4,6 +4,7 @@ import com.jjenus.tracker.core.application.service.VehicleService;
 import com.jjenus.tracker.core.domain.FuelCutRequestedEvent;
 import com.jjenus.tracker.shared.events.LocationDataEvent;
 import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
+import com.jjenus.tracker.shared.metrics.MetricsRegistry;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.shared.redis.VehicleActivityTracker;
 import org.slf4j.Logger;
@@ -22,14 +23,17 @@ public class VehicleEventHandler {
     private final VehicleService vehicleService;
     private final EventPublisher eventPublisher;
     private final VehicleActivityTracker activityTracker;
+    private final MetricsRegistry metrics;
 
     public VehicleEventHandler(
             VehicleService vehicleService,
             EventPublisher eventPublisher,
-            VehicleActivityTracker activityTracker) {
+            VehicleActivityTracker activityTracker,
+            MetricsRegistry metrics) {
         this.vehicleService = vehicleService;
         this.eventPublisher = eventPublisher;
         this.activityTracker = activityTracker;
+        this.metrics = metrics;
     }
 
     @JmsListener(destination = "tracking.events.locationdataevent",
@@ -39,13 +43,12 @@ public class VehicleEventHandler {
     @Transactional
     public void handleLocationUpdate(@Payload LocationDataEvent event) {
         try {
-            logger.info("Received location update for device {}", event.getDeviceId());
-
             String vehicleId = vehicleService.findVehicleIdForDevice(event.getDeviceId());
 
             vehicleService.updateVehicleLocation(vehicleId, event.getLocation());
 
             activityTracker.recordActivity(vehicleId, Instant.now());
+            metrics.increment("telemetry.packets.received", "protocol", event.getProtocol());
 
             VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(
                     vehicleId,
@@ -54,14 +57,17 @@ public class VehicleEventHandler {
             );
             eventPublisher.publish(vehicleUpdatedEvent);
 
+            metrics.increment("telemetry.vehicles.updated");
             logger.debug("Updated vehicle {} for device {}", vehicleId, event.getDeviceId());
 
         } catch (IllegalArgumentException | IllegalStateException e) {
             logger.warn("Skipping location update for device {}: {}",
                     event != null ? event.getDeviceId() : "unknown", e.getMessage());
+            metrics.increment("telemetry.packets.skipped");
         } catch (Exception e) {
             logger.error("Failed to process location update for device {}",
                     event != null ? event.getDeviceId() : "unknown", e);
+            metrics.increment("telemetry.packets.failed");
             throw e;
         }
     }

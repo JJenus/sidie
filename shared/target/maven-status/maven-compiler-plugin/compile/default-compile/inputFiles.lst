@@ -19,3 +19,4 @@
 /home/jjenus/workspace/apps/tracker/sidie/shared/src/main/java/com/jjenus/tracker/shared/events/VehicleUpdatedEvent.java
 /home/jjenus/workspace/apps/tracker/sidie/shared/src/main/java/com/jjenus/tracker/shared/pubsub/ArtemisEventPublisher.java
 /home/jjenus/workspace/apps/tracker/sidie/shared/src/main/java/com/jjenus/tracker/shared/pubsub/EventHandler.java
+/home/jjenus/workspace/apps/tracker/sidie/shared/src/main/java/com/jjenus/tracker/shared/metrics/MetricsRegistry.java

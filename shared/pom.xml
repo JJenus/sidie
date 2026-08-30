@@ -69,6 +69,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Micrometer for MetricsRegistry -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Test dependencies - MUST be declared here -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

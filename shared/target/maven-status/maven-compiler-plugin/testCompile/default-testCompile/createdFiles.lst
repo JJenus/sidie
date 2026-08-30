@@ -1,3 +1,4 @@
+com/jjenus/tracker/shared/metrics/MetricsRegistryTest.class
 com/jjenus/tracker/shared/pubsub/SimpleEventBusTest$OtherEvent.class
 com/jjenus/tracker/shared/pubsub/SimpleEventBusTest.class
 com/jjenus/tracker/shared/pubsub/SimpleEventBusTest$TestEvent.class

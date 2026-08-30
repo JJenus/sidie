@@ -18,4 +18,5 @@ com/jjenus/tracker/shared/redis/VehicleActivityTracker.class
 com/jjenus/tracker/shared/exception/ValidationException.class
 com/jjenus/tracker/shared/exception/BusinessRuleException.class
 com/jjenus/tracker/shared/pubsub/EventPublisher.class
+com/jjenus/tracker/shared/metrics/MetricsRegistry.class
 com/jjenus/tracker/shared/domain/ConnectionInfo.class

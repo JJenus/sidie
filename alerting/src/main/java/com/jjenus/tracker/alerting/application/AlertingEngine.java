@@ -11,6 +11,7 @@ import com.jjenus.tracker.alerting.application.factory.AlertRuleFactory;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.metrics.MetricsRegistry;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ public class AlertingEngine {
     private final AlertRuleFactory ruleFactory;
     private final RuleStateStore stateStore;
     private final AlertDeduplicator deduplicator;
+    private final MetricsRegistry metrics;
     private final Logger logger = LoggerFactory.getLogger(AlertingEngine.class);
 
     public AlertingEngine(
@@ -35,13 +37,15 @@ public class AlertingEngine {
             VehicleRuleCacheService vehicleRuleCacheService,
             AlertRuleFactory ruleFactory,
             RuleStateStore stateStore,
-            AlertDeduplicator deduplicator) {
+            AlertDeduplicator deduplicator,
+            MetricsRegistry metrics) {
         this.vehicleRuleCacheService = vehicleRuleCacheService;
         this.eventPublisher = eventPublisher;
         this.evaluationService = evaluationService;
         this.ruleFactory = ruleFactory;
         this.stateStore = stateStore;
         this.deduplicator = deduplicator;
+        this.metrics = metrics;
     }
 
     public void processVehicleUpdate(String vehicleId, LocationPoint newLocation) {
@@ -81,6 +85,7 @@ public class AlertingEngine {
                 if (alert != null && deduplicator.tryAcquire(alert)) {
                     logger.info("Alert triggered: {} for vehicle {}", alert.getRuleKey(), vehicleId);
                     eventPublisher.publish(alert);
+                    metrics.increment("alert.triggered", "type", alert.getAlertType().name());
                 }
 
                 if (domainRule instanceof GeofenceRule geo) {
@@ -88,6 +93,7 @@ public class AlertingEngine {
                 }
             } catch (AlertException e) {
                 logger.error("Alert evaluation error for rule {}: {}", rule.getRuleKey(), e.getMessage());
+                metrics.increment("alert.error", "rule", rule.getRuleKey());
             } catch (Exception e) {
                 logger.error("Unexpected error evaluating rule {}: {}", rule.getRuleKey(), e.getMessage());
             }

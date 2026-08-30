@@ -7,12 +7,14 @@ import com.jjenus.tracker.alerting.domain.AlertRuleTestBuilder;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.RuleStateStore;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
+import com.jjenus.tracker.shared.metrics.MetricsRegistry;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.alerting.application.factory.AlertRuleFactory;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,12 +49,15 @@ class AlertingEngineTest {
     @Mock
     private AlertDeduplicator deduplicator;
 
+    private MetricsRegistry metrics;
+
     private AlertingEngine alertingEngine;
 
     @BeforeEach
     void setUp() {
+        metrics = new MetricsRegistry(new SimpleMeterRegistry());
         alertingEngine = new AlertingEngine(eventPublisher, evaluationService, vehicleRuleCacheService,
-                ruleFactory, stateStore, deduplicator);
+                ruleFactory, stateStore, deduplicator, metrics);
     }
 
     @Test
