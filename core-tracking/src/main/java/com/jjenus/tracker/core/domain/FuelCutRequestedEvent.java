@@ -15,10 +15,6 @@ public class FuelCutRequestedEvent extends DomainEvent {
         this.deviceId = deviceId;
     }
 
-    public FuelCutRequestedEvent(String vehicleId, String deviceId) {
-        this(Clock.systemUTC(), vehicleId, deviceId);
-    }
-
     public String getVehicleId() { return vehicleId; }
     public String getDeviceId() { return deviceId; }
 }

@@ -22,7 +22,7 @@ public class LocationDataEvent extends DomainEvent {
             @JsonProperty("location") LocationPoint location,
             @JsonProperty("protocol") String protocol,
             @JsonProperty("metaData") Map<String, Object> metaData) {
-        super(Clock.systemUTC(), UUID.randomUUID());
+        super();
         this.deviceId = deviceId;
         this.location = location;
         this.protocol = protocol;
@@ -30,7 +30,11 @@ public class LocationDataEvent extends DomainEvent {
     }
 
     public LocationDataEvent(Clock clock, String deviceId, LocationPoint location, String protocol) {
-        this(clock, UUID.randomUUID(), deviceId, location, protocol, new HashMap<>());
+        super(clock, UUID.randomUUID());
+        this.deviceId = deviceId;
+        this.location = location;
+        this.protocol = protocol;
+        this.metaData = new HashMap<>();
     }
 
     public LocationDataEvent(Clock clock, UUID eventId, String deviceId,
@@ -41,10 +45,6 @@ public class LocationDataEvent extends DomainEvent {
         this.location = location;
         this.protocol = protocol;
         this.metaData = metaData != null ? metaData : new HashMap<>();
-    }
-
-    public LocationDataEvent(String deviceId, LocationPoint location, String protocol) {
-        this(Clock.systemUTC(), deviceId, location, protocol);
     }
 
     public String getDeviceId() { return deviceId; }

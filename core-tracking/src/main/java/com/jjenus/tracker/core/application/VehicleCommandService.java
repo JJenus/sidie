@@ -39,6 +39,7 @@ public class VehicleCommandService {
             vehicleRepository.save(vehicle);
 
             FuelCutRequestedEvent event = new FuelCutRequestedEvent(
+                clock,
                 vehicle.getVehicleId(),
                 vehicle.getDeviceId()
             );

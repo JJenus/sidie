@@ -31,17 +31,6 @@ public class NotificationSentEvent extends DomainEvent {
         this.errorMessage = errorMessage;
     }
 
-    public NotificationSentEvent(
-        String notificationId,
-        String alertId,
-        String channel,
-        String recipient,
-        boolean success,
-        String errorMessage
-    ) {
-        this(Clock.systemUTC(), notificationId, alertId, channel, recipient, success, errorMessage);
-    }
-
     public String getNotificationId() { return notificationId; }
     public String getAlertId() { return alertId; }
     public String getChannel() { return channel; }

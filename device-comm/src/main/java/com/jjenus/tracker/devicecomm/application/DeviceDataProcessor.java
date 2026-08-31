@@ -9,14 +9,19 @@ import com.jjenus.tracker.devicecomm.exception.ProtocolException;
 import com.jjenus.tracker.devicecomm.exception.DeviceException;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.util.UUID;
+
 @Service
 public class DeviceDataProcessor {
     private final ParserFactory parserFactory;
     private final EventPublisher eventPublisher;
+    private final Clock clock;
 
-    public DeviceDataProcessor(ParserFactory parserFactory, EventPublisher eventPublisher) {
+    public DeviceDataProcessor(ParserFactory parserFactory, EventPublisher eventPublisher, Clock clock) {
         this.parserFactory = parserFactory;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     public void processDeviceData(DeviceDataPacket packet) {
@@ -25,13 +30,16 @@ public class DeviceDataProcessor {
             LocationPoint location = parser.parse(packet.rawData());
 
             LocationDataEvent event = new LocationDataEvent(
+                clock,
+                UUID.randomUUID(),
                 packet.deviceId(),
                 location,
-                parser.getProtocolName()
+                parser.getProtocolName(),
+                null
             );
 
             eventPublisher.publish(event);
-            
+
         } catch (ProtocolException | DeviceException e) {
             throw e;
         } catch (Exception e) {

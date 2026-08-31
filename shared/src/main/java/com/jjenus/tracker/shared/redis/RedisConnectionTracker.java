@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -20,24 +21,27 @@ public class RedisConnectionTracker {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ValueOperations<String, Object> valueOps;
+    private final Clock clock;
 
     // In-memory storage for live Netty connections
     private final Map<String, Connection> liveConnections = new ConcurrentHashMap<>();
 
-    public RedisConnectionTracker(RedisTemplate<String, Object> redisTemplate) {
+    public RedisConnectionTracker(RedisTemplate<String, Object> redisTemplate, Clock clock) {
         this.redisTemplate = redisTemplate;
         this.valueOps = redisTemplate.opsForValue();
+        this.clock = clock;
     }
 
     public void registerConnection(String connectionId, String deviceId, String clientIp,
                                    Connection nettyConnection) {
         // Store metadata in Redis (serializable data only)
+        Instant now = clock.instant();
         ConnectionMetadata metadata = new ConnectionMetadata(
                 connectionId,
                 deviceId,
                 clientIp,
-                Instant.now(),
-                Instant.now()
+                now,
+                now
         );
 
         // Store metadata in Redis with TTL
@@ -66,7 +70,7 @@ public class RedisConnectionTracker {
         ConnectionMetadata metadata = getConnectionMetadata(connectionId);
         if (metadata != null) {
             metadata.setDeviceId(deviceId);
-            metadata.setLastSeen(Instant.now());
+            metadata.setLastSeen(clock.instant());
 
             // Update Redis
             String key = getConnectionKey(connectionId);
@@ -83,7 +87,7 @@ public class RedisConnectionTracker {
     public void updateLastSeen(String connectionId) {
         ConnectionMetadata metadata = getConnectionMetadata(connectionId);
         if (metadata != null) {
-            metadata.setLastSeen(Instant.now());
+            metadata.setLastSeen(clock.instant());
 
             // Update Redis
             String key = getConnectionKey(connectionId);

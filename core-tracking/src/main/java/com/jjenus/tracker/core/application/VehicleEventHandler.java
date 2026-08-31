@@ -14,7 +14,9 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 public class VehicleEventHandler {
@@ -24,16 +26,19 @@ public class VehicleEventHandler {
     private final EventPublisher eventPublisher;
     private final VehicleActivityTracker activityTracker;
     private final MetricsRegistry metrics;
+    private final Clock clock;
 
     public VehicleEventHandler(
             VehicleService vehicleService,
             EventPublisher eventPublisher,
             VehicleActivityTracker activityTracker,
-            MetricsRegistry metrics) {
+            MetricsRegistry metrics,
+            Clock clock) {
         this.vehicleService = vehicleService;
         this.eventPublisher = eventPublisher;
         this.activityTracker = activityTracker;
         this.metrics = metrics;
+        this.clock = clock;
     }
 
     @JmsListener(destination = "tracking.events.locationdataevent",
@@ -47,10 +52,13 @@ public class VehicleEventHandler {
 
             vehicleService.updateVehicleLocation(vehicleId, event.getLocation());
 
-            activityTracker.recordActivity(vehicleId, Instant.now());
+            Instant now = clock.instant();
+            activityTracker.recordActivity(vehicleId, now);
             metrics.increment("telemetry.packets.received", "protocol", event.getProtocol());
 
             VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(
+                    clock,
+                    UUID.randomUUID(),
                     vehicleId,
                     event.getLocation(),
                     event.getMetaData()

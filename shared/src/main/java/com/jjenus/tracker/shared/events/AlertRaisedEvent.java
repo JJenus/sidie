@@ -20,33 +20,33 @@ public class AlertRaisedEvent extends DomainEvent {
     private final Double speed;
     private final Map<String,Object> metadata;
 
-    public AlertRaisedEvent(
-            Clock clock,
-            String alertId,
-            String ruleKey,
-            String vehicleId,
-            String alertType,
-            String severity,
-            String message,
-            Instant timestamp,
-            Double latitude,
-            Double longitude,
-            Double speed,
-            Map<String, Object> metadata
-    ) {
-        super(clock, UUID.randomUUID());
-        this.alertId = alertId;
-        this.ruleKey = ruleKey;
-        this.vehicleId = vehicleId;
-        this.alertType = alertType;
-        this.severity = severity;
-        this.message = message;
-        this.timestamp = timestamp;
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.speed = speed;
-        this.metadata = metadata;
-    }
+public AlertRaisedEvent(
+        Clock clock,
+        String alertId,
+        String ruleKey,
+        String vehicleId,
+        String alertType,
+        String severity,
+        String message,
+        Instant timestamp,
+        Double latitude,
+        Double longitude,
+        Double speed,
+        Map<String, Object> metadata
+) {
+    super(clock, UUID.randomUUID());
+    this.alertId = alertId;
+    this.ruleKey = ruleKey;
+    this.vehicleId = vehicleId;
+    this.alertType = alertType;
+    this.severity = severity;
+    this.message = message;
+    this.timestamp = timestamp;
+    this.latitude = latitude;
+    this.longitude = longitude;
+    this.speed = speed;
+    this.metadata = metadata;
+}
 
     public AlertRaisedEvent(
             String alertId,
@@ -62,7 +62,7 @@ public class AlertRaisedEvent extends DomainEvent {
             Map<String, Object> metadata
     ) {
         this(Clock.systemUTC(), alertId, ruleKey, vehicleId, alertType, severity,
-             message, timestamp, latitude, longitude, speed, metadata);
+                message, timestamp, latitude, longitude, speed, metadata);
     }
 
     public String getAlertId() { return alertId; }

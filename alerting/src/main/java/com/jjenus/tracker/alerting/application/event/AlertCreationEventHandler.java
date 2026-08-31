@@ -12,6 +12,7 @@ import org.springframework.jms.annotation.JmsListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,14 +24,17 @@ public class AlertCreationEventHandler {
     private final AlertService alertService;
     private final AlertingEngine alertingEngine;
     private final EventPublisher eventPublisher;
+    private final Clock clock;
 
     public AlertCreationEventHandler(
             AlertService alertService,
             AlertingEngine alertingEngine,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            Clock clock) {
         this.alertService = alertService;
         this.alertingEngine = alertingEngine;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @JmsListener(
@@ -63,6 +67,7 @@ public class AlertCreationEventHandler {
             );
 
             AlertRaisedEvent alertRaisedEvent = new AlertRaisedEvent(
+                    clock,
                     event.getRuleKey(),
                     event.getRuleKey(),
                     event.getVehicleId(),
