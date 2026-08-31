@@ -16,53 +16,58 @@ import java.util.Set;
 @Repository
 public interface AlertRuleRepository extends JpaRepository<AlertRule, Long> {
 
-    Optional<AlertRule> findByRuleKey(String ruleKey);
+    Optional<AlertRule> findByRuleKeyAndOrganizationId(String ruleKey, Long organizationId);
 
-    List<AlertRule> findByIsEnabled(boolean isEnabled);
+    List<AlertRule> findByIsEnabledAndOrganizationId(boolean isEnabled, Long organizationId);
 
-    Page<AlertRule> findByIsEnabled(boolean isEnabled, Pageable pageable);
+    Page<AlertRule> findByIsEnabledAndOrganizationId(boolean isEnabled, Long organizationId, Pageable pageable);
 
-    List<AlertRule> findByRuleType(AlertRuleType ruleType);
+    List<AlertRule> findByRuleTypeAndOrganizationId(AlertRuleType ruleType, Long organizationId);
 
-    Page<AlertRule> findByRuleType(AlertRuleType ruleType, Pageable pageable);
+    Page<AlertRule> findByRuleTypeAndOrganizationId(AlertRuleType ruleType, Long organizationId, Pageable pageable);
 
-    List<AlertRule> findByRuleTypeAndIsEnabled(AlertRuleType ruleType, boolean isEnabled);
+    List<AlertRule> findByRuleTypeAndIsEnabledAndOrganizationId(AlertRuleType ruleType, boolean isEnabled, Long organizationId);
 
-    Page<AlertRule> findByRuleTypeAndIsEnabled(AlertRuleType ruleType, boolean isEnabled, Pageable pageable);
+    Page<AlertRule> findByRuleTypeAndIsEnabledAndOrganizationId(AlertRuleType ruleType, boolean isEnabled, Long organizationId, Pageable pageable);
 
-    @Query("SELECT ar FROM AlertRule ar WHERE ar.isEnabled = true " +
+    @Query("SELECT ar FROM AlertRule ar WHERE ar.isEnabled = true AND ar.organizationId = :organizationId " +
             "ORDER BY ar.priority DESC")
-    List<AlertRule> findActiveRulesOrderedByPriority();
+    List<AlertRule> findActiveRulesOrderedByPriority(@Param("organizationId") Long organizationId);
 
-    @Query("SELECT ar FROM AlertRule ar WHERE ar.isEnabled = true " +
+    @Query("SELECT ar FROM AlertRule ar WHERE ar.isEnabled = true AND ar.organizationId = :organizationId " +
             "ORDER BY ar.priority DESC")
-    Page<AlertRule> findActiveRulesOrderedByPriority(Pageable pageable);
+    Page<AlertRule> findActiveRulesOrderedByPriority(@Param("organizationId") Long organizationId, Pageable pageable);
 
     @Query("SELECT ar FROM AlertRule ar WHERE ar.isEnabled = true " +
+            "AND ar.organizationId = :organizationId " +
             "AND (:vehicleId MEMBER OF ar.vehicleIds OR :vehicleId IS NULL) " +
             "ORDER BY ar.priority DESC")
-    List<AlertRule> findActiveRulesForVehicle(@Param("vehicleId") String vehicleId);
+    List<AlertRule> findActiveRulesForVehicleAndOrganizationId(@Param("vehicleId") String vehicleId, @Param("organizationId") Long organizationId);
 
     @Query("SELECT ar FROM AlertRule ar WHERE ar.isEnabled = true " +
+            "AND ar.organizationId = :organizationId " +
             "AND (:vehicleId MEMBER OF ar.vehicleIds OR :vehicleId IS NULL)")
-    Page<AlertRule> findActiveRulesForVehicle(@Param("vehicleId") String vehicleId, Pageable pageable);
+    Page<AlertRule> findActiveRulesForVehicleAndOrganizationId(@Param("vehicleId") String vehicleId, @Param("organizationId") Long organizationId, Pageable pageable);
 
-    // Find all vehicles that have rules
-    @Query("SELECT DISTINCT vid FROM AlertRule ar JOIN ar.vehicleIds vid WHERE ar.isEnabled = true")
-    Set<String> findVehiclesWithActiveRules();
+    @Query("SELECT DISTINCT vid FROM AlertRule ar JOIN ar.vehicleIds vid WHERE ar.isEnabled = true AND ar.organizationId = :organizationId")
+    Set<String> findVehiclesWithActiveRules(@Param("organizationId") Long organizationId);
 
-    boolean existsByRuleKey(String ruleKey);
+    boolean existsByRuleKeyAndOrganizationId(String ruleKey, Long organizationId);
 
-    void deleteByRuleKey(String ruleKey);
+    void deleteByRuleKeyAndOrganizationId(String ruleKey, Long organizationId);
 
-    // Search methods with pagination
-    @Query("SELECT ar FROM AlertRule ar WHERE " +
+    @Query("SELECT ar FROM AlertRule ar WHERE ar.organizationId = :organizationId AND " +
             "(:search IS NULL OR LOWER(ar.ruleName) LIKE LOWER(CONCAT('%', :search, '%'))) " +
             "AND (:ruleType IS NULL OR ar.ruleType = :ruleType) " +
             "AND (:enabled IS NULL OR ar.isEnabled = :enabled)")
     Page<AlertRule> searchAlertRules(
+            @Param("organizationId") Long organizationId,
             @Param("search") String search,
             @Param("ruleType") AlertRuleType ruleType,
             @Param("enabled") Boolean enabled,
             Pageable pageable);
+
+    Page<AlertRule> findByOrganizationId(Long organizationId, Pageable pageable);
+
+    long countByOrganizationId(Long organizationId);
 }

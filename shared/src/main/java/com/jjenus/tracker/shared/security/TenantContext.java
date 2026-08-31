@@ -1,4 +1,4 @@
-package com.jjenus.tracker.userauth.infrastructure.security;
+package com.jjenus.tracker.shared.security;
 
 public final class TenantContext {
 

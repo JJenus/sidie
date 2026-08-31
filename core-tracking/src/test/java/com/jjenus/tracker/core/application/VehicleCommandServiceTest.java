@@ -5,6 +5,8 @@ import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.shared.security.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class VehicleCommandServiceTest {
 
+    private static final Long ORG_ID = 1L;
+
     @Mock
     private VehicleRepository vehicleRepository;
 
@@ -43,11 +47,18 @@ class VehicleCommandServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.setCurrentOrgId(ORG_ID);
         fixedClock = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC);
         commandService = new VehicleCommandService(vehicleRepository, eventPublisher, fixedClock);
         testVehicle = new Vehicle();
         testVehicle.setVehicleId("VEH-001");
         testVehicle.setDeviceId("DEV-001");
+        testVehicle.setOrganizationId(ORG_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     private void setVehicleStationary(Vehicle v) {

@@ -14,6 +14,7 @@ import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.shared.security.TenantContext;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class AlertingEngineTest {
     @BeforeEach
     void setUp() {
         metrics = new MetricsRegistry(new SimpleMeterRegistry());
+        TenantContext.setCurrentOrgId(1L);
         alertingEngine = new AlertingEngine(eventPublisher, evaluationService, vehicleRuleCacheService,
                 ruleFactory, stateStore, deduplicator, metrics);
     }
@@ -92,7 +94,7 @@ class AlertingEngineTest {
 
         // then
         verify(vehicleRuleCacheService).hasRulesCached(vehicleId);
-        verify(vehicleRuleCacheService, never()).getActiveRulesForVehicle(vehicleId);
+        verify(vehicleRuleCacheService, never()).getActiveRulesForVehicle(vehicleId, 1L);
         verify(evaluationService, never()).evaluateRule(any(), any(), any());
     }
 
@@ -103,14 +105,14 @@ class AlertingEngineTest {
         LocationPoint location = new LocationPoint(40.7128, -74.0060, 60.0f, Instant.now());
 
         when(vehicleRuleCacheService.hasRulesCached(vehicleId)).thenReturn(true);
-        when(vehicleRuleCacheService.hasActiveRules(vehicleId)).thenReturn(false);
+        when(vehicleRuleCacheService.hasActiveRules(vehicleId, 1L)).thenReturn(false);
 
         // when
         alertingEngine.processVehicleUpdate(vehicleId, location);
 
         // then
-        verify(vehicleRuleCacheService).hasActiveRules(vehicleId);
-        verify(vehicleRuleCacheService, never()).getActiveRulesForVehicle(vehicleId);
+        verify(vehicleRuleCacheService).hasActiveRules(vehicleId, 1L);
+        verify(vehicleRuleCacheService, never()).getActiveRulesForVehicle(vehicleId, 1L);
     }
 
     @Test
@@ -139,8 +141,8 @@ class AlertingEngineTest {
         );
 
         when(vehicleRuleCacheService.hasRulesCached(vehicleId)).thenReturn(true);
-        when(vehicleRuleCacheService.hasActiveRules(vehicleId)).thenReturn(true);
-        when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId))
+        when(vehicleRuleCacheService.hasActiveRules(vehicleId, 1L)).thenReturn(true);
+        when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId, 1L))
             .thenReturn(List.of(rule1, rule2));
         when(ruleFactory.createDomainRule(any(AlertRule.class), eq(vehicleId)))
             .thenAnswer(inv -> new IAlertRule() {
@@ -160,7 +162,7 @@ class AlertingEngineTest {
         alertingEngine.processVehicleUpdate(vehicleId, location);
 
         // then
-        verify(vehicleRuleCacheService).getActiveRulesForVehicle(vehicleId);
+        verify(vehicleRuleCacheService).getActiveRulesForVehicle(vehicleId, 1L);
         verify(evaluationService, times(2)).evaluateRule(any(), eq(vehicleId), eq(location));
         verify(eventPublisher, times(1)).publish(alert);
     }
@@ -191,8 +193,8 @@ class AlertingEngineTest {
         );
 
         when(vehicleRuleCacheService.hasRulesCached(vehicleId)).thenReturn(true);
-        when(vehicleRuleCacheService.hasActiveRules(vehicleId)).thenReturn(true);
-        when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId))
+        when(vehicleRuleCacheService.hasActiveRules(vehicleId, 1L)).thenReturn(true);
+        when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId, 1L))
             .thenReturn(List.of(rule1, rule2));
         when(ruleFactory.createDomainRule(any(AlertRule.class), eq(vehicleId)))
             .thenAnswer(inv -> new IAlertRule() {
@@ -241,7 +243,7 @@ class AlertingEngineTest {
     void refreshVehicleRules_callsCacheService() {
         // given
         String vehicleId = "vehicle-001";
-        when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId))
+        when(vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId, 1L))
             .thenReturn(List.of());
 
         // when
@@ -249,6 +251,6 @@ class AlertingEngineTest {
 
         // then
         verify(vehicleRuleCacheService).invalidateVehicleRules(vehicleId);
-        verify(vehicleRuleCacheService).getActiveRulesForVehicle(vehicleId);
+        verify(vehicleRuleCacheService).getActiveRulesForVehicle(vehicleId, 1L);
     }
 }

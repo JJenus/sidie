@@ -2,7 +2,7 @@ package com.jjenus.tracker.userauth.api;
 
 import com.jjenus.tracker.userauth.application.dto.*;
 import com.jjenus.tracker.userauth.application.service.AuthService;
-import com.jjenus.tracker.userauth.infrastructure.security.TenantContext;
+import com.jjenus.tracker.shared.security.TenantContext;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

@@ -6,9 +6,11 @@ import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -29,9 +31,12 @@ public class VehicleCommandService {
         this.clock = clock;
     }
 
+    @Transactional
     public void handleFuelCutRequest(String vehicleId) {
         try {
+            Long orgId = TenantContext.getCurrentOrgId();
             Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .filter(v -> orgId.equals(v.getOrganizationId()))
                 .orElseThrow(() -> VehicleException.notFound(vehicleId));
 
             Instant now = clock.instant();
@@ -57,9 +62,12 @@ public class VehicleCommandService {
         }
     }
 
+    @Transactional
     public void handleFuelRestoreRequest(String vehicleId) {
         try {
+            Long orgId = TenantContext.getCurrentOrgId();
             Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .filter(v -> orgId.equals(v.getOrganizationId()))
                 .orElseThrow(() -> VehicleException.notFound(vehicleId));
 
             Instant now = clock.instant();

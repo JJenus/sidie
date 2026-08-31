@@ -74,6 +74,9 @@ public class TrackerAlert {
     @Column(name = "updated_at")
     private Instant updatedAt = Instant.EPOCH;
 
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = TimeProvider.now();
@@ -185,4 +188,7 @@ public class TrackerAlert {
     
     public Map<String, Object> getMetadata() { return metadata; }
     public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
+
+    public Long getOrganizationId() { return organizationId; }
+    public void setOrganizationId(Long organizationId) { this.organizationId = organizationId; }
 }

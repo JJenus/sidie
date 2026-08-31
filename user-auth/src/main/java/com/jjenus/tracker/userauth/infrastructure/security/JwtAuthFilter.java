@@ -1,5 +1,6 @@
 package com.jjenus.tracker.userauth.infrastructure.security;
 
+import com.jjenus.tracker.shared.security.TenantContext;
 import com.jjenus.tracker.userauth.infrastructure.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;

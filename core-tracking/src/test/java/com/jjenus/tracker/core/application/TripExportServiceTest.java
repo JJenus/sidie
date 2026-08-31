@@ -5,6 +5,7 @@ import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import com.jjenus.tracker.core.infrastructure.repository.TripRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,10 +20,13 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TripExportServiceTest {
+
+    private static final Long ORG_ID = 1L;
 
     @Mock
     private TripRepository tripRepository;
@@ -35,6 +39,8 @@ class TripExportServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.setCurrentOrgId(ORG_ID);
+
         vehicle = new Vehicle();
         vehicle.setVehicleId("vehicle-001");
 
@@ -55,7 +61,7 @@ class TripExportServiceTest {
 
     @Test
     void exportToCsv_writesHeaderAndRow() {
-        when(tripRepository.findByVehicleVehicleId("vehicle-001"))
+        when(tripRepository.findByVehicleVehicleIdAndOrganizationId("vehicle-001", ORG_ID))
                 .thenReturn(List.of(trip));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -71,7 +77,8 @@ class TripExportServiceTest {
 
     @Test
     void exportToCsv_allVehicles_noFilter() {
-        when(tripRepository.findAll()).thenReturn(List.of(trip));
+        when(tripRepository.findByOrganizationId(eq(ORG_ID), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(trip)));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv(null, null, null, out);
@@ -84,7 +91,7 @@ class TripExportServiceTest {
     void exportToCsv_withDateRange_usesBetween() {
         Instant start = Instant.parse("2026-08-30T00:00:00Z");
         Instant end = Instant.parse("2026-08-30T23:59:59Z");
-        when(tripRepository.findByVehicleVehicleIdAndStartTimeBetween("vehicle-001", start, end))
+        when(tripRepository.findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId("vehicle-001", start, end, ORG_ID))
                 .thenReturn(List.of(trip));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -96,7 +103,7 @@ class TripExportServiceTest {
 
     @Test
     void exportToCsv_emptyResult_writesHeaderOnly() {
-        when(tripRepository.findByVehicleVehicleId("vehicle-001")).thenReturn(List.of());
+        when(tripRepository.findByVehicleVehicleIdAndOrganizationId("vehicle-001", ORG_ID)).thenReturn(List.of());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv("vehicle-001", null, null, out);
@@ -112,7 +119,7 @@ class TripExportServiceTest {
         Vehicle v = new Vehicle();
         v.setVehicleId("v,1,with,commas");
         trip.setVehicle(v);
-        when(tripRepository.findByVehicleVehicleId("v,1,with,commas"))
+        when(tripRepository.findByVehicleVehicleIdAndOrganizationId("v,1,with,commas", ORG_ID))
                 .thenReturn(List.of(trip));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();

@@ -15,56 +15,57 @@ import java.util.List;
 @Repository
 public interface TrackerAlertRepository extends JpaRepository<TrackerAlert, Long> {
 
-    // Basic queries
-    Page<TrackerAlert> findByVehicleId(String vehicleId, Pageable pageable);
+    Page<TrackerAlert> findByVehicleIdAndOrganizationId(String vehicleId, Long organizationId, Pageable pageable);
 
-    Page<TrackerAlert> findByTrackerId(String trackerId, Pageable pageable);
+    Page<TrackerAlert> findByTrackerIdAndOrganizationId(String trackerId, Long organizationId, Pageable pageable);
 
-    List<TrackerAlert> findByAlertTypeAndTriggeredAtAfter(
-        String alertType, Instant triggeredAfter);
+    List<TrackerAlert> findByAlertTypeAndOrganizationIdAndTriggeredAtAfter(
+        String alertType, Long organizationId, Instant triggeredAfter);
 
-    List<TrackerAlert> findBySeverityAndAcknowledged(
-            AlertSeverity severity, boolean acknowledged);
+    List<TrackerAlert> findBySeverityAndAcknowledgedAndOrganizationId(
+            AlertSeverity severity, boolean acknowledged, Long organizationId);
 
-    // Advanced queries with date ranges
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.vehicleId = :vehicleId " +
+           "AND ta.organizationId = :organizationId " +
            "AND ta.triggeredAt >= :startTime AND ta.triggeredAt <= :endTime " +
            "ORDER BY ta.triggeredAt DESC")
     List<TrackerAlert> findVehicleAlertsInRange(
         @Param("vehicleId") String vehicleId,
+        @Param("organizationId") Long organizationId,
         @Param("startTime") Instant startTime,
         @Param("endTime") Instant endTime);
 
-    // Active alerts (not acknowledged and not resolved)
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.acknowledged = false " +
            "AND ta.resolved = false " +
+           "AND ta.organizationId = :organizationId " +
            "ORDER BY ta.severity DESC, ta.triggeredAt DESC")
-    Page<TrackerAlert> findActiveAlerts(Pageable pageable);
+    Page<TrackerAlert> findActiveAlerts(@Param("organizationId") Long organizationId, Pageable pageable);
 
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.vehicleId = :vehicleId " +
            "AND ta.acknowledged = false " +
            "AND ta.resolved = false " +
+           "AND ta.organizationId = :organizationId " +
            "ORDER BY ta.triggeredAt DESC")
-    List<TrackerAlert> findActiveVehicleAlerts(@Param("vehicleId") String vehicleId);
+    List<TrackerAlert> findActiveVehicleAlerts(@Param("vehicleId") String vehicleId, @Param("organizationId") Long organizationId);
 
-    // Statistics queries
     @Query("SELECT COUNT(ta) FROM TrackerAlert ta WHERE ta.acknowledged = false " +
-           "AND ta.severity = :severity")
-    Long countUnacknowledgedBySeverity(@Param("severity") AlertSeverity severity);
+           "AND ta.severity = :severity " +
+           "AND ta.organizationId = :organizationId")
+    Long countUnacknowledgedBySeverity(@Param("severity") AlertSeverity severity, @Param("organizationId") Long organizationId);
 
     @Query("SELECT ta.alertType, COUNT(ta) FROM TrackerAlert ta " +
-           "WHERE ta.triggeredAt >= :startTime " +
+           "WHERE ta.organizationId = :organizationId " +
+           "AND ta.triggeredAt >= :startTime " +
            "GROUP BY ta.alertType " +
            "ORDER BY COUNT(ta) DESC")
-    List<Object[]> getAlertTypeStatistics(@Param("startTime") Instant startTime);
+    List<Object[]> getAlertTypeStatistics(@Param("organizationId") Long organizationId, @Param("startTime") Instant startTime);
 
-    // Stale alerts (unresolved older than cutoff)
     @Query("SELECT ta FROM TrackerAlert ta WHERE ta.resolved = false " +
-           "AND ta.triggeredAt < :cutoffTime")
-    List<TrackerAlert> findStaleAlerts(@Param("cutoffTime") Instant cutoffTime);
+           "AND ta.triggeredAt < :cutoffTime " +
+           "AND ta.organizationId = :organizationId")
+    List<TrackerAlert> findStaleAlerts(@Param("cutoffTime") Instant cutoffTime, @Param("organizationId") Long organizationId);
 
-    // Comprehensive search query
-    @Query("SELECT ta FROM TrackerAlert ta WHERE " +
+    @Query("SELECT ta FROM TrackerAlert ta WHERE ta.organizationId = :organizationId AND " +
            "(:vehicleId IS NULL OR ta.vehicleId = :vehicleId) " +
            "AND (:trackerId IS NULL OR ta.trackerId = :trackerId) " +
            "AND (:alertType IS NULL OR ta.alertType = :alertType) " +
@@ -80,6 +81,7 @@ public interface TrackerAlertRepository extends JpaRepository<TrackerAlert, Long
            "CASE WHEN :sortBy = 'acknowledgedAt' THEN ta.acknowledgedAt END DESC, " +
            "ta.triggeredAt DESC")
     Page<TrackerAlert> searchAlerts(
+            @Param("organizationId") Long organizationId,
             @Param("vehicleId") String vehicleId,
             @Param("trackerId") String trackerId,
             @Param("alertType") String alertType,
@@ -91,29 +93,29 @@ public interface TrackerAlertRepository extends JpaRepository<TrackerAlert, Long
             @Param("search") String search,
             Pageable pageable);
 
-    // Batch operations
-    @Query("SELECT ta FROM TrackerAlert ta WHERE ta.alertId IN :alertIds")
-    List<TrackerAlert> findByIds(@Param("alertIds") List<Long> alertIds);
+    @Query("SELECT ta FROM TrackerAlert ta WHERE ta.alertId IN :alertIds AND ta.organizationId = :organizationId")
+    List<TrackerAlert> findByIds(@Param("alertIds") List<Long> alertIds, @Param("organizationId") Long organizationId);
 
-    // Dashboard statistics
-    @Query("SELECT COUNT(ta) FROM TrackerAlert ta WHERE " +
-           "ta.triggeredAt >= :startTime AND ta.triggeredAt <= :endTime " +
+    @Query("SELECT COUNT(ta) FROM TrackerAlert ta WHERE ta.organizationId = :organizationId " +
+           "AND ta.triggeredAt >= :startTime AND ta.triggeredAt <= :endTime " +
            "AND ta.severity = :severity")
     Long countBySeverityAndTimeRange(
+            @Param("organizationId") Long organizationId,
             @Param("severity") AlertSeverity severity,
             @Param("startTime") Instant startTime,
             @Param("endTime") Instant endTime);
 
     @Query("SELECT ta.vehicleId, COUNT(ta) FROM TrackerAlert ta " +
-           "WHERE ta.triggeredAt >= :startTime " +
+           "WHERE ta.organizationId = :organizationId " +
+           "AND ta.triggeredAt >= :startTime " +
            "GROUP BY ta.vehicleId " +
            "ORDER BY COUNT(ta) DESC")
-    List<Object[]> getAlertCountByVehicle(@Param("startTime") Instant startTime);
+    List<Object[]> getAlertCountByVehicle(@Param("organizationId") Long organizationId, @Param("startTime") Instant startTime);
 
-    // Resolution time statistics
     @Query("SELECT AVG(TIMESTAMPDIFF(SECOND, ta.triggeredAt, ta.resolvedAt)) " +
            "FROM TrackerAlert ta WHERE ta.resolved = true " +
            "AND ta.resolvedAt IS NOT NULL " +
-           "AND ta.triggeredAt >= :startTime")
-    Double getAverageResolutionTime(@Param("startTime") Instant startTime);
+           "AND ta.triggeredAt >= :startTime " +
+           "AND ta.organizationId = :organizationId")
+    Double getAverageResolutionTime(@Param("startTime") Instant startTime, @Param("organizationId") Long organizationId);
 }

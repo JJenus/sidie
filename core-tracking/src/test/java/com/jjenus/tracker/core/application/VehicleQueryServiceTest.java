@@ -4,6 +4,8 @@ import com.jjenus.tracker.core.domain.entity.TrackerLocation;
 import com.jjenus.tracker.core.domain.entity.Vehicle;
 import com.jjenus.tracker.core.infrastructure.repository.VehicleRepository;
 import com.jjenus.tracker.shared.domain.LocationPoint;
+import com.jjenus.tracker.shared.security.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -24,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(MockitoExtension.class)
 class VehicleQueryServiceTest {
 
+    private static final Long ORG_ID = 1L;
+
     @Mock
     private VehicleRepository vehicleRepository;
 
@@ -34,16 +39,24 @@ class VehicleQueryServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.setCurrentOrgId(ORG_ID);
         queryService = new VehicleQueryService(vehicleRepository);
         testTime = Instant.now();
 
         testVehicle1 = new Vehicle();
         testVehicle1.setVehicleId("VEH-001");
+        testVehicle1.setOrganizationId(ORG_ID);
         testVehicle1.setCurrentLocation(makeLocation(40.7128, -74.0060, 30.0f));
 
         testVehicle2 = new Vehicle();
         testVehicle2.setVehicleId("VEH-002");
+        testVehicle2.setOrganizationId(ORG_ID);
         testVehicle2.setCurrentLocation(makeLocation(34.0522, -118.2437, 0.0f));
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     private TrackerLocation makeLocation(double lat, double lon, float speed) {
@@ -80,24 +93,24 @@ class VehicleQueryServiceTest {
     void getAllVehicles_returnsAll() {
         List<Vehicle> vehicles = Arrays.asList(testVehicle1, testVehicle2);
         Page<Vehicle> page = new PageImpl<>(vehicles, PageRequest.of(0, 500), 2);
-        when(vehicleRepository.findAll(any(PageRequest.class))).thenReturn(page);
+        when(vehicleRepository.findByOrganizationId(eq(ORG_ID), any(Pageable.class))).thenReturn(page);
 
         List<Vehicle> result = queryService.getAllVehicles();
 
         assertThat(result).hasSize(2);
         assertThat(result).contains(testVehicle1, testVehicle2);
-        verify(vehicleRepository, times(1)).findAll(any(PageRequest.class));
+        verify(vehicleRepository, times(1)).findByOrganizationId(eq(ORG_ID), any(Pageable.class));
     }
 
     @Test
     void getAllVehiclesEmpty_returnsEmpty() {
         Page<Vehicle> page = new PageImpl<>(List.of(), PageRequest.of(0, 500), 0);
-        when(vehicleRepository.findAll(any(PageRequest.class))).thenReturn(page);
+        when(vehicleRepository.findByOrganizationId(eq(ORG_ID), any(Pageable.class))).thenReturn(page);
 
         List<Vehicle> result = queryService.getAllVehicles();
 
         assertThat(result).isEmpty();
-        verify(vehicleRepository, times(1)).findAll(any(PageRequest.class));
+        verify(vehicleRepository, times(1)).findByOrganizationId(eq(ORG_ID), any(Pageable.class));
     }
 
     @Test

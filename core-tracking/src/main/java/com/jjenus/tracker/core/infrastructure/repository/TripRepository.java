@@ -16,38 +16,46 @@ import java.util.Optional;
 @Repository
 public interface TripRepository extends JpaRepository<Trip, String> {
     
-    List<Trip> findByVehicleVehicleId(String vehicleId);
+    List<Trip> findByVehicleVehicleIdAndOrganizationId(String vehicleId, Long organizationId);
     
-    Optional<Trip> findByVehicleVehicleIdAndIsActive(String vehicleId, boolean isActive);
+    Optional<Trip> findByVehicleVehicleIdAndIsActiveAndOrganizationId(String vehicleId, boolean isActive, Long organizationId);
     
-    List<Trip> findByVehicleVehicleIdAndStartTimeBetween(
-        String vehicleId, Instant startTime, Instant endTime);
+    List<Trip> findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(
+        String vehicleId, Instant startTime, Instant endTime, Long organizationId);
     
-    List<Trip> findByIsActive(boolean isActive);
+    List<Trip> findByIsActiveAndOrganizationId(boolean isActive, Long organizationId);
     
     @Query("SELECT t FROM Trip t WHERE t.vehicle.vehicleId = :vehicleId " +
            "AND t.endReason = :endReason " +
-           "AND t.endTime >= :startTime")
+           "AND t.endTime >= :startTime " +
+           "AND t.vehicle.organizationId = :organizationId")
     List<Trip> findTripsByEndReason(
         @Param("vehicleId") String vehicleId,
         @Param("endReason") TripEndReason endReason,
-        @Param("startTime") Instant startTime);
+        @Param("startTime") Instant startTime,
+        @Param("organizationId") Long organizationId);
     
     @Query("SELECT t FROM Trip t WHERE t.vehicle.vehicleId = :vehicleId " +
            "AND t.isActive = false " +
            "AND t.totalDistanceKm > :minDistance " +
+           "AND t.vehicle.organizationId = :organizationId " +
            "ORDER BY t.endTime DESC")
     Page<Trip> findRecentCompletedTrips(
         @Param("vehicleId") String vehicleId,
         @Param("minDistance") float minDistance,
+        @Param("organizationId") Long organizationId,
         Pageable pageable);
     
     @Query("SELECT SUM(t.totalDistanceKm) FROM Trip t " +
            "WHERE t.vehicle.vehicleId = :vehicleId " +
            "AND t.isActive = false " +
-           "AND t.endTime BETWEEN :startTime AND :endTime")
+           "AND t.endTime BETWEEN :startTime AND :endTime " +
+           "AND t.vehicle.organizationId = :organizationId")
     Float getTotalDistanceForPeriod(
         @Param("vehicleId") String vehicleId,
         @Param("startTime") Instant startTime,
-        @Param("endTime") Instant endTime);
+        @Param("endTime") Instant endTime,
+        @Param("organizationId") Long organizationId);
+
+    Page<Trip> findByOrganizationId(Long organizationId, Pageable pageable);
 }

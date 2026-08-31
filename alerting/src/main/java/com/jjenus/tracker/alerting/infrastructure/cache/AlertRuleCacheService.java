@@ -40,9 +40,9 @@ public class AlertRuleCacheService {
     /**
      * Load all active rules into cache on startup or when rules change
      */
-    public void loadAllActiveRules() {
+    public void loadAllActiveRules(Long organizationId) {
         try {
-            List<AlertRule> activeRules = ruleRepository.findActiveRulesOrderedByPriority();
+            List<AlertRule> activeRules = ruleRepository.findActiveRulesOrderedByPriority(organizationId);
 
             // Clear existing cache
             redisTemplate.delete(keyGenerator.getAllActiveRulesKey());
@@ -62,14 +62,14 @@ public class AlertRuleCacheService {
     /**
      * Get all active rules from cache
      */
-    public List<AlertRule> getAllActiveRules() {
+    public List<AlertRule> getAllActiveRules(Long organizationId) {
         try {
             // Get all rule keys from the active rules set
             Set<Object> ruleKeys = redisTemplate.opsForSet()
                     .members(keyGenerator.getAllActiveRulesKey());
 
             if (ruleKeys == null || ruleKeys.isEmpty()) {
-                return loadAllActiveRulesAndReturn();
+                return loadAllActiveRulesAndReturn(organizationId);
             }
 
             // Fetch all rules in bulk using pipelining
@@ -89,7 +89,7 @@ public class AlertRuleCacheService {
 
         } catch (Exception e) {
             logger.error("Failed to get active rules from cache, falling back to DB", e);
-            return ruleRepository.findActiveRulesOrderedByPriority();
+            return ruleRepository.findActiveRulesOrderedByPriority(organizationId);
         }
     }
 
@@ -190,9 +190,9 @@ public class AlertRuleCacheService {
         }
     }
 
-    private List<AlertRule> loadAllActiveRulesAndReturn() {
-        List<AlertRule> rules = ruleRepository.findActiveRulesOrderedByPriority();
-        loadAllActiveRules(); // Re-populate cache
+    private List<AlertRule> loadAllActiveRulesAndReturn(Long organizationId) {
+        List<AlertRule> rules = ruleRepository.findActiveRulesOrderedByPriority(organizationId);
+        loadAllActiveRules(organizationId); // Re-populate cache
         return rules;
     }
 }

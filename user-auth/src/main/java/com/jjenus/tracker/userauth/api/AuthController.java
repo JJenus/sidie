@@ -5,7 +5,7 @@ import com.jjenus.tracker.userauth.application.dto.*;
 import com.jjenus.tracker.userauth.application.service.AuthService;
 import com.jjenus.tracker.userauth.infrastructure.security.AuthException;
 import com.jjenus.tracker.userauth.infrastructure.security.SecurityException;
-import com.jjenus.tracker.userauth.infrastructure.security.TenantContext;
+import com.jjenus.tracker.shared.security.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;

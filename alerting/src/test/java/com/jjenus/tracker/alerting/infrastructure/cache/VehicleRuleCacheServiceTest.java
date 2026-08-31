@@ -63,7 +63,7 @@ class VehicleRuleCacheServiceTest {
             .thenReturn(List.of(testRule));
 
         // when
-        List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001");
+        List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001", 1L);
 
         // then
         assertThat(result).hasSize(1);
@@ -76,14 +76,14 @@ class VehicleRuleCacheServiceTest {
         when(redisTemplate.opsForList()).thenReturn(listOperations);
         when(keyGenerator.getVehicleRulesKey("vehicle-001")).thenReturn("cache-key");
         when(listOperations.range("cache-key", 0, -1)).thenReturn(Collections.emptyList());
-        when(ruleRepository.findActiveRulesForVehicle("vehicle-001")).thenReturn(List.of(testRule));
+        when(ruleRepository.findActiveRulesForVehicleAndOrganizationId("vehicle-001", 1L)).thenReturn(List.of(testRule));
 
         // when
-        List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001");
+        List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001", 1L);
 
         // then
         assertThat(result).hasSize(1);
-        verify(ruleRepository).findActiveRulesForVehicle("vehicle-001");
+        verify(ruleRepository).findActiveRulesForVehicleAndOrganizationId("vehicle-001", 1L);
     }
 
     @Test
@@ -94,7 +94,7 @@ class VehicleRuleCacheServiceTest {
         when(redisTemplate.opsForValue().get("cache-key")).thenReturn("EMPTY");
 
         // when
-        boolean result = vehicleRuleCacheService.hasActiveRules("vehicle-001");
+        boolean result = vehicleRuleCacheService.hasActiveRules("vehicle-001", 1L);
 
         // then
         assertThat(result).isFalse();
@@ -110,7 +110,7 @@ class VehicleRuleCacheServiceTest {
         when(listOperations.range("cache-key", 0, -1)).thenReturn(List.of(testRule));
 
         // when
-        boolean result = vehicleRuleCacheService.hasActiveRules("vehicle-001");
+        boolean result = vehicleRuleCacheService.hasActiveRules("vehicle-001", 1L);
 
         // then
         assertThat(result).isTrue();
@@ -149,16 +149,16 @@ class VehicleRuleCacheServiceTest {
     void getVehiclesWithActiveRules_loadsFromRepository() {
         // given
         Set<String> vehicleIds = Set.of("vehicle-001", "vehicle-002");
-        when(ruleRepository.findVehiclesWithActiveRules()).thenReturn(vehicleIds);
+        when(ruleRepository.findVehiclesWithActiveRules(1L)).thenReturn(vehicleIds);
         when(redisTemplate.opsForSet()).thenReturn(setOperations);
         when(keyGenerator.getVehiclesWithRulesKey()).thenReturn("index-key");
 
         // when
-        Set<String> result = vehicleRuleCacheService.getVehiclesWithActiveRules();
+        Set<String> result = vehicleRuleCacheService.getVehiclesWithActiveRules(1L);
 
         // then
         assertThat(result).containsExactlyInAnyOrder("vehicle-001", "vehicle-002");
-        verify(ruleRepository).findVehiclesWithActiveRules();
+        verify(ruleRepository).findVehiclesWithActiveRules(1L);
     }
 
     @Test
@@ -167,7 +167,7 @@ class VehicleRuleCacheServiceTest {
         when(redisTemplate.opsForList()).thenThrow(new RuntimeException("Redis error"));
 
         // when
-        List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001");
+        List<AlertRule> result = vehicleRuleCacheService.getActiveRulesForVehicle("vehicle-001", 1L);
 
         // then
         assertThat(result).isEmpty();

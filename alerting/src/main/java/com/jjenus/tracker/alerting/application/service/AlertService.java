@@ -6,6 +6,7 @@ import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import com.jjenus.tracker.alerting.infrastructure.repository.TrackerAlertRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -81,6 +82,7 @@ public class AlertService {
         alert.setTriggeredAt(clock.instant());
         alert.setAcknowledged(false);
         alert.setResolved(false);
+        alert.setOrganizationId(TenantContext.getCurrentOrgId());
 
         TrackerAlert saved = alertRepository.save(alert);
         logger.info("Alert created with ID: {}", saved.getAlertId());
@@ -101,6 +103,7 @@ public class AlertService {
     public PagedResponse<AlertResponse> searchAlerts(AlertSearchRequest searchRequest) {
         Pageable pageable = createPageable(searchRequest);
         Page<TrackerAlert> page = alertRepository.searchAlerts(
+                TenantContext.getCurrentOrgId(),
                 searchRequest.getVehicleId(),
                 searchRequest.getTrackerId(),
                 searchRequest.getAlertType() != null ? searchRequest.getAlertType().name() : null,
@@ -118,7 +121,7 @@ public class AlertService {
     @Transactional(readOnly = true)
     @Cacheable(value = "alerts", key = "'active_' + #vehicleId")
     public List<AlertResponse> getActiveAlerts(String vehicleId) {
-        List<TrackerAlert> alerts = alertRepository.findActiveVehicleAlerts(vehicleId);
+        List<TrackerAlert> alerts = alertRepository.findActiveVehicleAlerts(vehicleId, TenantContext.getCurrentOrgId());
         return alerts.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
@@ -128,7 +131,7 @@ public class AlertService {
     @Cacheable(value = "alertsPaged", key = "'activePaged_' + #page + '_' + #size")
     public PagedResponse<AlertResponse> getActiveAlertsPaged(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "severity", "triggeredAt"));
-        Page<TrackerAlert> pageResult = alertRepository.findActiveAlerts(pageable);
+        Page<TrackerAlert> pageResult = alertRepository.findActiveAlerts(TenantContext.getCurrentOrgId(), pageable);
         return new PagedResponse<>(pageResult.map(this::toResponse));
     }
 
@@ -240,7 +243,7 @@ public class AlertService {
     public void cleanupStaleAlerts(Instant cutoffTime) {
         logger.info("Cleaning up alerts older than {}", cutoffTime);
 
-        List<TrackerAlert> staleAlerts = alertRepository.findStaleAlerts(cutoffTime);
+        List<TrackerAlert> staleAlerts = alertRepository.findStaleAlerts(cutoffTime, TenantContext.getCurrentOrgId());
         int staleCount = staleAlerts.size();
 
         for (TrackerAlert alert : staleAlerts) {
@@ -294,8 +297,8 @@ public class AlertService {
     @Transactional(readOnly = true)
     @Cacheable(value = "alertStats", key = "'hasCritical_' + #vehicleId")
     public boolean hasCriticalUnacknowledgedAlerts(String vehicleId) {
-        List<TrackerAlert> criticalAlerts = alertRepository.findBySeverityAndAcknowledged(
-                AlertSeverity.CRITICAL, false);
+        List<TrackerAlert> criticalAlerts = alertRepository.findBySeverityAndAcknowledgedAndOrganizationId(
+                AlertSeverity.CRITICAL, false, TenantContext.getCurrentOrgId());
 
         return criticalAlerts.stream()
                 .anyMatch(alert -> vehicleId.equals(alert.getVehicle()) &&
@@ -306,9 +309,9 @@ public class AlertService {
     @Cacheable(value = "alertStats", key = "'unacknowledgedCounts'")
     public Map<String, Long> getUnacknowledgedCountBySeverity() {
         Map<String, Long> counts = Map.of(
-                "INFO", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.INFO),
-                "WARNING", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.WARNING),
-                "CRITICAL", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.CRITICAL)
+                "INFO", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.INFO, TenantContext.getCurrentOrgId()),
+                "WARNING", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.WARNING, TenantContext.getCurrentOrgId()),
+                "CRITICAL", alertRepository.countUnacknowledgedBySeverity(AlertSeverity.CRITICAL, TenantContext.getCurrentOrgId())
         );
         return counts;
     }
@@ -318,7 +321,7 @@ public class AlertService {
     public List<AlertResponse> getRecentAlerts(String vehicleId, int limit) {
         Instant startTime = clock.instant().minusSeconds(24 * 60 * 60);
         List<TrackerAlert> alerts = alertRepository.findVehicleAlertsInRange(
-                vehicleId, startTime, clock.instant());
+                vehicleId, TenantContext.getCurrentOrgId(), startTime, clock.instant());
 
         return alerts.stream()
                 .limit(limit)
@@ -375,7 +378,7 @@ public class AlertService {
 
         @Cacheable(value = "alertStats", key = "'statistics_' + #startDate.toString()")
         public Map<String, Long> getAlertStatistics(Instant startDate, Instant endDate) {
-            List<Object[]> stats = alertRepository.getAlertTypeStatistics(startDate);
+            List<Object[]> stats = alertRepository.getAlertTypeStatistics(TenantContext.getCurrentOrgId(), startDate);
             return stats.stream()
                     .collect(Collectors.toMap(
                             obj -> (String) obj[0],

@@ -2,8 +2,11 @@ package com.jjenus.tracker.core.application;
 
 import com.jjenus.tracker.core.domain.entity.Trip;
 import com.jjenus.tracker.core.infrastructure.repository.TripRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.Pageable;
 
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -11,6 +14,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 @Service
@@ -41,6 +46,7 @@ public class TripExportService {
             Instant endDate,
             OutputStream out
     ) {
+        Long orgId = TenantContext.getCurrentOrgId();
         try (PrintWriter w = new PrintWriter(out)) {
             w.println(CSV_HEADER);
 
@@ -50,16 +56,17 @@ public class TripExportService {
             };
 
             if (vehicleId != null && startDate != null && endDate != null) {
-                tripRepository.findByVehicleVehicleIdAndStartTimeBetween(vehicleId, startDate, endDate)
+                tripRepository.findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(vehicleId, startDate, endDate, orgId)
                         .forEach(rowWriter);
             } else if (vehicleId != null && startDate != null) {
-                tripRepository.findByVehicleVehicleId(vehicleId).stream()
+                tripRepository.findByVehicleVehicleIdAndOrganizationId(vehicleId, orgId).stream()
                         .filter(t -> t.getStartTime().compareTo(startDate) >= 0)
                         .forEach(rowWriter);
             } else if (vehicleId != null) {
-                tripRepository.findByVehicleVehicleId(vehicleId).forEach(rowWriter);
+                tripRepository.findByVehicleVehicleIdAndOrganizationId(vehicleId, orgId).forEach(rowWriter);
             } else {
-                tripRepository.findAll().forEach(rowWriter);
+                Pageable pageable = Pageable.unpaged();
+                tripRepository.findByOrganizationId(orgId, pageable).forEach(rowWriter);
             }
         }
     }

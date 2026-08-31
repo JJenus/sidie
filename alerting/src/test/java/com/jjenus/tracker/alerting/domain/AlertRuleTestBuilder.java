@@ -16,6 +16,7 @@ public class AlertRuleTestBuilder {
     private Set<String> vehicleIds = new HashSet<>();
     private Instant createdAt = Instant.now();
     private Instant updatedAt = Instant.now();
+    private Long organizationId = 1L;
 
     private AlertRuleTestBuilder() {}
 
@@ -91,6 +92,11 @@ public class AlertRuleTestBuilder {
         return this;
     }
 
+    public AlertRuleTestBuilder organizationId(Long organizationId) {
+        this.organizationId = organizationId;
+        return this;
+    }
+
     public AlertRule build() {
         AlertRule rule = new AlertRule();
         rule.setRuleId(ruleId);
@@ -101,6 +107,7 @@ public class AlertRuleTestBuilder {
         rule.setPriority(priority);
         rule.setParameters(parameters);
         rule.setVehicleIds(vehicleIds);
+        rule.setOrganizationId(organizationId);
         rule.setCreatedAt(createdAt);
         rule.setUpdatedAt(updatedAt);
         return rule;

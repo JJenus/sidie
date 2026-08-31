@@ -13,6 +13,7 @@ import com.jjenus.tracker.shared.domain.LocationPoint;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.shared.metrics.MetricsRegistry;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
+import com.jjenus.tracker.shared.security.TenantContext;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,16 +57,18 @@ public class AlertingEngine {
             );
         }
 
+        Long organizationId = TenantContext.getCurrentOrgId();
+
         if (!vehicleRuleCacheService.hasRulesCached(vehicleId)) {
             logger.debug("Vehicle {} has no active rules (cached index), skipping", vehicleId);
             return;
         }
 
-        if (!vehicleRuleCacheService.hasActiveRules(vehicleId)) {
+        if (!vehicleRuleCacheService.hasActiveRules(vehicleId, organizationId)) {
             return;
         }
 
-        List<AlertRule> vehicleRules = vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId);
+        List<AlertRule> vehicleRules = vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId, organizationId);
 
         if (vehicleRules.isEmpty()) {
             return;
@@ -110,6 +113,6 @@ public class AlertingEngine {
 
     public void refreshVehicleRules(String vehicleId) {
         vehicleRuleCacheService.invalidateVehicleRules(vehicleId);
-        vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId);
+        vehicleRuleCacheService.getActiveRulesForVehicle(vehicleId, TenantContext.getCurrentOrgId());
     }
 }

@@ -13,6 +13,7 @@ import com.jjenus.tracker.alerting.infrastructure.cache.AlertRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +70,7 @@ class AlertRuleServiceTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.setCurrentOrgId(1L);
         alertRuleService = new AlertRuleService(
             ruleRepository,
             ruleCacheService,
@@ -104,7 +106,7 @@ class AlertRuleServiceTest {
         request.setPriority(1);
         request.setEnabled(true);
 
-        when(ruleRepository.existsByRuleKey("new-rule")).thenReturn(false);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("new-rule", 1L)).thenReturn(false);
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
         when(objectMapper.readValue(anyString(), any(com.fasterxml.jackson.core.type.TypeReference.class)))
             .thenReturn(Map.of("speedLimit", 80.0f));
@@ -124,7 +126,7 @@ class AlertRuleServiceTest {
         CreateAlertRuleRequest request = new CreateAlertRuleRequest();
         request.setRuleKey("existing-rule");
 
-        when(ruleRepository.existsByRuleKey("existing-rule")).thenReturn(true);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("existing-rule", 1L)).thenReturn(true);
 
         // when & then
         assertThatThrownBy(() -> alertRuleService.createRule(request))
@@ -141,7 +143,7 @@ class AlertRuleServiceTest {
         request.setRuleType("INVALID_TYPE");
         request.setParameters("{}");
 
-        when(ruleRepository.existsByRuleKey("new-rule")).thenReturn(false);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("new-rule", 1L)).thenReturn(false);
 
         // when & then
         assertThatThrownBy(() -> alertRuleService.createRule(request))
@@ -153,7 +155,7 @@ class AlertRuleServiceTest {
     void getRuleByKey_existingRule_returnsRule() {
         // given
         when(ruleCacheService.getRuleByKey("test-rule")).thenReturn(Optional.empty());
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
 
         // when
         AlertRuleResponse result = alertRuleService.getRuleByKey("test-rule");
@@ -167,7 +169,7 @@ class AlertRuleServiceTest {
     void getRuleByKey_nonExistentRule_throwsException() {
         // given
         when(ruleCacheService.getRuleByKey("non-existent")).thenReturn(Optional.empty());
-        when(ruleRepository.findByRuleKey("non-existent")).thenReturn(Optional.empty());
+        when(ruleRepository.findByRuleKeyAndOrganizationId("non-existent", 1L)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> alertRuleService.getRuleByKey("non-existent"))
@@ -190,7 +192,7 @@ class AlertRuleServiceTest {
         when(redisTemplate.opsForValue()).thenReturn(mock(org.springframework.data.redis.core.ValueOperations.class));
         when(keyGenerator.getPaginatedRulesKey(anyInt(), anyInt(), anyString(), anyString(), any(), any(), any()))
             .thenReturn("cache-key");
-        when(ruleRepository.searchAlertRules(any(), any(), any(), any())).thenReturn(page);
+        when(ruleRepository.searchAlertRules(any(), any(), any(), any(), any())).thenReturn(page);
 
         // when
         PagedResponse<AlertRuleResponse> result = alertRuleService.getAllRulesPaged(searchRequest);
@@ -205,7 +207,7 @@ class AlertRuleServiceTest {
     void enableRule_existingRule_enablesIt() {
         // given
         testRule.setIsEnabled(false);
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
 
         // when
         alertRuleService.enableRule("test-rule");
@@ -221,7 +223,7 @@ class AlertRuleServiceTest {
     void enableRule_alreadyEnabled_noAction() {
         // given
         testRule.setIsEnabled(true);
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
 
         // when
         alertRuleService.enableRule("test-rule");
@@ -234,7 +236,7 @@ class AlertRuleServiceTest {
     void disableRule_existingRule_disablesIt() {
         // given
         testRule.setIsEnabled(true);
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
 
         // when
         alertRuleService.disableRule("test-rule");
@@ -249,14 +251,14 @@ class AlertRuleServiceTest {
     @Test
     void deleteRule_existingRule_deletesIt() {
         // given
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
-        doNothing().when(ruleRepository).deleteByRuleKey("test-rule");
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
+        doNothing().when(ruleRepository).deleteByRuleKeyAndOrganizationId("test-rule", 1L);
 
         // when
         alertRuleService.deleteRule("test-rule");
 
         // then
-        verify(ruleRepository).deleteByRuleKey("test-rule");
+        verify(ruleRepository).deleteByRuleKeyAndOrganizationId("test-rule", 1L);
         verify(ruleCacheService).evictRule("test-rule");
         verify(vehicleRuleCacheService).invalidateVehicleRules("vehicle-001");
     }
@@ -264,7 +266,7 @@ class AlertRuleServiceTest {
     @Test
     void deleteRule_nonExistentRule_throwsException() {
         // given
-        when(ruleRepository.findByRuleKey("non-existent")).thenReturn(Optional.empty());
+        when(ruleRepository.findByRuleKeyAndOrganizationId("non-existent", 1L)).thenReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> alertRuleService.deleteRule("non-existent"))
@@ -284,7 +286,7 @@ class AlertRuleServiceTest {
         request.setPriority(1);
         request.setEnabled(true);
 
-        when(ruleRepository.existsByRuleKey("overspeed-rule")).thenReturn(false);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("overspeed-rule", 1L)).thenReturn(false);
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
 
         // when
@@ -332,7 +334,7 @@ class AlertRuleServiceTest {
         request.setPriority(2);
         request.setEnabled(true);
 
-        when(ruleRepository.existsByRuleKey("idle-rule")).thenReturn(false);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("idle-rule", 1L)).thenReturn(false);
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
 
         // when
@@ -355,7 +357,7 @@ class AlertRuleServiceTest {
         request.setPriority(3);
         request.setEnabled(true);
 
-        when(ruleRepository.existsByRuleKey("geofence-rule")).thenReturn(false);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("geofence-rule", 1L)).thenReturn(false);
         when(geofenceRuleValidator.getValidatedGeofence("1")).thenReturn(testGeofence);
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
 
@@ -374,7 +376,7 @@ class AlertRuleServiceTest {
         request.setRuleName("Updated Name");
         request.setPriority(10);
 
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
 
         // when
@@ -394,8 +396,8 @@ class AlertRuleServiceTest {
         UpdateAlertRuleRequest request = new UpdateAlertRuleRequest();
         request.setRuleKey("new-key");
 
-        when(ruleRepository.findByRuleKey("test-rule")).thenReturn(Optional.of(testRule));
-        when(ruleRepository.existsByRuleKey("new-key")).thenReturn(false);
+        when(ruleRepository.findByRuleKeyAndOrganizationId("test-rule", 1L)).thenReturn(Optional.of(testRule));
+        when(ruleRepository.existsByRuleKeyAndOrganizationId("new-key", 1L)).thenReturn(false);
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
 
         // when
@@ -424,7 +426,7 @@ class AlertRuleServiceTest {
         request2.setParameters("{\"maxIdleMinutes\":30}");
         request2.setEnabled(true);
 
-        when(ruleRepository.existsByRuleKey(anyString())).thenReturn(false);
+        when(ruleRepository.existsByRuleKeyAndOrganizationId(anyString(), eq(1L))).thenReturn(false);
         when(ruleRepository.save(any(AlertRule.class))).thenReturn(testRule);
         when(objectMapper.readValue(anyString(), any(com.fasterxml.jackson.core.type.TypeReference.class)))
             .thenAnswer(inv -> {
@@ -458,8 +460,8 @@ class AlertRuleServiceTest {
             .enabled(false)
             .build();
 
-        when(ruleRepository.findByRuleKey("rule-1")).thenReturn(Optional.of(disabledRule1));
-        when(ruleRepository.findByRuleKey("rule-2")).thenReturn(Optional.of(disabledRule2));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("rule-1", 1L)).thenReturn(Optional.of(disabledRule1));
+        when(ruleRepository.findByRuleKeyAndOrganizationId("rule-2", 1L)).thenReturn(Optional.of(disabledRule2));
 
         // when
         alertRuleService.batchEnableRules(new HashSet<>(ruleKeys));

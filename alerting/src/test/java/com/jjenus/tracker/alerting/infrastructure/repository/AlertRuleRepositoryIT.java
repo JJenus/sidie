@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 class AlertRuleRepositoryIT {
 
+    private static final long ORG_ID = 1L;
+
     @Autowired
     private TestEntityManager entityManager;
 
@@ -34,7 +36,7 @@ class AlertRuleRepositoryIT {
         entityManager.persistAndFlush(rule);
 
         // when
-        Optional<AlertRule> found = alertRuleRepository.findByRuleKey("test-rule-001");
+        Optional<AlertRule> found = alertRuleRepository.findByRuleKeyAndOrganizationId("test-rule-001", ORG_ID);
 
         // then
         assertThat(found).isPresent();
@@ -44,7 +46,7 @@ class AlertRuleRepositoryIT {
     @Test
     void findByRuleKey_nonExistentRule_returnsEmpty() {
         // when
-        Optional<AlertRule> found = alertRuleRepository.findByRuleKey("non-existent");
+        Optional<AlertRule> found = alertRuleRepository.findByRuleKeyAndOrganizationId("non-existent", ORG_ID);
 
         // then
         assertThat(found).isEmpty();
@@ -59,7 +61,7 @@ class AlertRuleRepositoryIT {
         entityManager.persistAndFlush(rule);
 
         // when
-        boolean exists = alertRuleRepository.existsByRuleKey("test-rule-002");
+        boolean exists = alertRuleRepository.existsByRuleKeyAndOrganizationId("test-rule-002", ORG_ID);
 
         // then
         assertThat(exists).isTrue();
@@ -68,7 +70,7 @@ class AlertRuleRepositoryIT {
     @Test
     void existsByRuleKey_nonExistentRule_returnsFalse() {
         // when
-        boolean exists = alertRuleRepository.existsByRuleKey("non-existent");
+        boolean exists = alertRuleRepository.existsByRuleKeyAndOrganizationId("non-existent", ORG_ID);
 
         // then
         assertThat(exists).isFalse();
@@ -92,8 +94,8 @@ class AlertRuleRepositoryIT {
         entityManager.flush();
 
         // when
-        List<AlertRule> enabledRules = alertRuleRepository.findByIsEnabled(true);
-        List<AlertRule> disabledRules = alertRuleRepository.findByIsEnabled(false);
+        List<AlertRule> enabledRules = alertRuleRepository.findByIsEnabledAndOrganizationId(true, ORG_ID);
+        List<AlertRule> disabledRules = alertRuleRepository.findByIsEnabledAndOrganizationId(false, ORG_ID);
 
         // then
         assertThat(enabledRules).hasSize(1);
@@ -130,7 +132,7 @@ class AlertRuleRepositoryIT {
         entityManager.flush();
 
         // when
-        List<AlertRule> vehicleRules = alertRuleRepository.findActiveRulesForVehicle("vehicle-001");
+        List<AlertRule> vehicleRules = alertRuleRepository.findActiveRulesForVehicleAndOrganizationId("vehicle-001", ORG_ID);
 
         // then
         assertThat(vehicleRules).hasSize(2);
@@ -159,7 +161,7 @@ class AlertRuleRepositoryIT {
         entityManager.flush();
 
         // when
-        Set<String> vehicles = alertRuleRepository.findVehiclesWithActiveRules();
+        Set<String> vehicles = alertRuleRepository.findVehiclesWithActiveRules(ORG_ID);
 
         // then
         assertThat(vehicles).containsExactlyInAnyOrder("vehicle-001", "vehicle-002", "vehicle-003");
@@ -183,8 +185,8 @@ class AlertRuleRepositoryIT {
         entityManager.flush();
 
         // when
-        List<AlertRule> speedRules = alertRuleRepository.findByRuleType(AlertRuleType.SPEED);
-        List<AlertRule> timeRules = alertRuleRepository.findByRuleType(AlertRuleType.TIME);
+        List<AlertRule> speedRules = alertRuleRepository.findByRuleTypeAndOrganizationId(AlertRuleType.SPEED, ORG_ID);
+        List<AlertRule> timeRules = alertRuleRepository.findByRuleTypeAndOrganizationId(AlertRuleType.TIME, ORG_ID);
 
         // then
         assertThat(speedRules).hasSize(1);
@@ -203,10 +205,10 @@ class AlertRuleRepositoryIT {
         entityManager.persistAndFlush(rule);
 
         // when
-        alertRuleRepository.deleteByRuleKey("to-delete");
+        alertRuleRepository.deleteByRuleKeyAndOrganizationId("to-delete", ORG_ID);
 
         // then
-        Optional<AlertRule> found = alertRuleRepository.findByRuleKey("to-delete");
+        Optional<AlertRule> found = alertRuleRepository.findByRuleKeyAndOrganizationId("to-delete", ORG_ID);
         assertThat(found).isEmpty();
     }
 }

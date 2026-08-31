@@ -9,6 +9,7 @@ import com.jjenus.tracker.core.domain.enums.CommandStatus;
 import com.jjenus.tracker.core.domain.enums.CommandType;
 import com.jjenus.tracker.core.infrastructure.repository.DeviceCommandRepository;
 import com.jjenus.tracker.core.infrastructure.repository.TrackerRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -54,7 +55,7 @@ public class FuelCutCommandHandler {
                 return;
             }
 
-            Optional<Tracker> trackerOpt = trackerRepository.findByDeviceId(deviceId);
+            Optional<Tracker> trackerOpt = trackerRepository.findByDeviceIdAndOrganizationId(deviceId, TenantContext.getCurrentOrgId());
             String protocol = trackerOpt.map(Tracker::getProtocol).orElse("GT06");
             String command = builders.stream()
                 .filter(b -> b.supports(protocol))
@@ -99,7 +100,7 @@ public class FuelCutCommandHandler {
         if (event.getDeviceId() != null && !event.getDeviceId().isBlank() && !"unknown".equals(event.getDeviceId())) {
             return event.getDeviceId();
         }
-        return trackerRepository.findByVehicleId(event.getVehicleId())
+        return trackerRepository.findByVehicleId(event.getVehicleId(), TenantContext.getCurrentOrgId())
                 .map(Tracker::getDeviceId)
                 .orElse(null);
     }

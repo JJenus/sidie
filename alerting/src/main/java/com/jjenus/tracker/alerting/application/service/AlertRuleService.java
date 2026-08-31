@@ -14,6 +14,7 @@ import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
 import com.jjenus.tracker.alerting.infrastructure.cache.GeofenceCacheService;
 import com.jjenus.tracker.shared.redis.RedisKeyScanner;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -187,7 +188,8 @@ public class AlertRuleService {
         rule.setPriority(request.getPriority());
         rule.setIsEnabled(request.isEnabled());
         rule.setVehicleIds(vehicleIds);
-        rule.setCooldownMinutes(5); // Default cooldown
+        rule.setCooldownMinutes(5);
+        rule.setOrganizationId(TenantContext.getCurrentOrgId());
 
         AlertRule saved = saveAndCacheRule(rule);
 
@@ -205,9 +207,10 @@ public class AlertRuleService {
     }
 
     private void findAllBatched(Pageable pageable, Consumer<AlertRule> consumer) {
+        Long orgId = TenantContext.getCurrentOrgId();
         Page<AlertRule> page;
         do {
-            page = ruleRepository.findAll(pageable);
+            page = ruleRepository.findByOrganizationId(orgId, pageable);
             page.forEach(consumer);
             pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
         } while (page.hasNext());
@@ -240,6 +243,7 @@ public class AlertRuleService {
         // Cache miss - query database
         Pageable pageable = createPageable(searchRequest);
         Page<AlertRule> page = ruleRepository.searchAlertRules(
+                TenantContext.getCurrentOrgId(),
                 searchRequest.getSearch(),
                 searchRequest.getRuleType(),
                 searchRequest.getEnabled(),
@@ -259,9 +263,9 @@ public class AlertRuleService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "alertRules", key = "'enabled'")
+    @Cacheable(value = "alertRules", key = "'enabled_' + #root.target.getCurrentOrgId()")
     public List<AlertRuleResponse> getEnabledRules() {
-        return ruleRepository.findByIsEnabled(true).stream()
+        return ruleRepository.findByIsEnabledAndOrganizationId(true, TenantContext.getCurrentOrgId()).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -284,7 +288,7 @@ public class AlertRuleService {
         }
 
         // Cache miss - load from DB
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
+        AlertRule rule = ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
 
         // Cache the rule for future requests
@@ -305,7 +309,7 @@ public class AlertRuleService {
     public AlertRuleResponse updateRule(String ruleKey, UpdateAlertRuleRequest request) {
         logger.info("Updating alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
+        AlertRule rule = ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
 
         boolean hasChanges = false;
@@ -382,7 +386,7 @@ public class AlertRuleService {
     public void enableRule(String ruleKey) {
         logger.info("Enabling alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
+        AlertRule rule = ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
 
         if (!Boolean.TRUE.equals(rule.isEnabled())) {
@@ -417,7 +421,7 @@ public class AlertRuleService {
     public void disableRule(String ruleKey) {
         logger.info("Disabling alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
+        AlertRule rule = ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
 
         if (Boolean.TRUE.equals(rule.isEnabled())) {
@@ -452,12 +456,12 @@ public class AlertRuleService {
     public void deleteRule(String ruleKey) {
         logger.info("Deleting alert rule: {}", ruleKey);
 
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
+        AlertRule rule = ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
 
         Set<String> affectedVehicles = rule.getVehicleIds();
 
-        ruleRepository.deleteByRuleKey(ruleKey);
+        ruleRepository.deleteByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId());
 
         // Remove from cache
         ruleCacheService.evictRule(ruleKey);
@@ -514,7 +518,7 @@ public class AlertRuleService {
     }
 
     private void validateRuleKeyUniqueness(String ruleKey) {
-        if (ruleRepository.existsByRuleKey(ruleKey)) {
+        if (ruleRepository.existsByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())) {
             throw AlertException.ruleAlreadyExists(ruleKey);
         }
     }
@@ -832,7 +836,7 @@ public class AlertRuleService {
         Map<String, List<AlertRuleResponse>> result = new HashMap<>();
 
         for (String vehicleId : vehicleIds) {
-            List<AlertRule> vehicleRules = ruleRepository.findActiveRulesForVehicle(vehicleId);
+            List<AlertRule> vehicleRules = ruleRepository.findActiveRulesForVehicleAndOrganizationId(vehicleId, TenantContext.getCurrentOrgId());
             result.put(vehicleId, vehicleRules.stream()
                     .map(this::toResponse)
                     .collect(Collectors.toList()));

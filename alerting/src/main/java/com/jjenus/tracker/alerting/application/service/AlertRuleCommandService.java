@@ -9,6 +9,7 @@ import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -264,7 +265,7 @@ public class AlertRuleCommandService {
         logger.info("Deleting alert rule: {}", ruleKey);
 
         AlertRule rule = ruleQueryService.getRuleEntityByKey(ruleKey);
-        ruleRepository.deleteByRuleKey(ruleKey);
+        ruleRepository.deleteByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId());
 
         logger.info("Alert rule deleted successfully: {}", ruleKey);
     }

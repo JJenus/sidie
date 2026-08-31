@@ -1,6 +1,8 @@
 package com.jjenus.tracker.core.infrastructure.repository;
 
 import com.jjenus.tracker.core.domain.entity.Vehicle;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,22 +15,24 @@ import java.util.Optional;
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle, String> {
     
-    Optional<Vehicle> findByDeviceId(String deviceId);
+    Optional<Vehicle> findByDeviceIdAndOrganizationId(String deviceId, Long organizationId);
     
-    Optional<Vehicle> findByLicensePlate(String licensePlate);
+    Optional<Vehicle> findByLicensePlateAndOrganizationId(String licensePlate, Long organizationId);
     
-    List<Vehicle> findByEngineState(String engineState);
+    List<Vehicle> findByEngineStateAndOrganizationId(String engineState, Long organizationId);
     
-    @Query("SELECT v FROM Vehicle v WHERE v.lastTelemetryTime < :cutoffTime AND v.accStatus = true")
-    List<Vehicle> findVehiclesWithStaleTelemetry(@Param("cutoffTime") Instant cutoffTime);
+    @Query("SELECT v FROM Vehicle v WHERE v.lastTelemetryTime < :cutoffTime AND v.accStatus = true AND v.organizationId = :organizationId")
+    List<Vehicle> findVehiclesWithStaleTelemetry(@Param("cutoffTime") Instant cutoffTime, @Param("organizationId") Long organizationId);
     
-    @Query("SELECT v FROM Vehicle v WHERE EXISTS (SELECT t FROM v.trips t WHERE t.isActive = true)")
-    List<Vehicle> findVehiclesWithActiveTrips();
+    @Query("SELECT v FROM Vehicle v WHERE EXISTS (SELECT t FROM v.trips t WHERE t.isActive = true) AND v.organizationId = :organizationId")
+    List<Vehicle> findVehiclesWithActiveTrips(@Param("organizationId") Long organizationId);
     
-    @Query("SELECT v FROM Vehicle v WHERE v.fuelCutActive = true")
-    List<Vehicle> findVehiclesWithActiveFuelCut();
+    @Query("SELECT v FROM Vehicle v WHERE v.fuelCutActive = true AND v.organizationId = :organizationId")
+    List<Vehicle> findVehiclesWithActiveFuelCut(@Param("organizationId") Long organizationId);
     
-    boolean existsByDeviceId(String deviceId);
+    boolean existsByDeviceIdAndOrganizationId(String deviceId, Long organizationId);
     
-    boolean existsByLicensePlate(String licensePlate);
+    boolean existsByLicensePlateAndOrganizationId(String licensePlate, Long organizationId);
+
+    Page<Vehicle> findByOrganizationId(Long organizationId, Pageable pageable);
 }

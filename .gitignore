@@ -74,4 +74,6 @@ temp/
 *.swp
 *.swo
 *~
-note*
+
+# ===== Maven wrapper distribution (downloaded artifact) =====
+.mvn/wrapper/maven-dist/

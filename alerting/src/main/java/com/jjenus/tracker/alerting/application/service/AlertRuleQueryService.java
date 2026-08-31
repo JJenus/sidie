@@ -9,6 +9,7 @@ import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -58,6 +59,7 @@ public class AlertRuleQueryService {
     public PagedResponse<AlertRuleResponse> getAllRulesPaged(SearchRequest searchRequest) {
         Pageable pageable = createPageable(searchRequest);
         Page<AlertRule> page = ruleRepository.searchAlertRules(
+                TenantContext.getCurrentOrgId(),
                 searchRequest.getSearch(),
                 searchRequest.getRuleType(),
                 searchRequest.getEnabled(),
@@ -68,7 +70,7 @@ public class AlertRuleQueryService {
 
     @Cacheable(value = "alertRules", key = "'enabled'")
     public List<AlertRuleResponse> getEnabledRules() {
-        return ruleRepository.findByIsEnabled(true).stream()
+        return ruleRepository.findByIsEnabledAndOrganizationId(true, TenantContext.getCurrentOrgId()).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -81,25 +83,25 @@ public class AlertRuleQueryService {
 
     @Cacheable(value = "alertRules", key = "'rule_' + #ruleKey")
     public AlertRuleResponse getRuleByKey(String ruleKey) {
-        AlertRule rule = ruleRepository.findByRuleKey(ruleKey)
+        AlertRule rule = ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
         return toResponse(rule);
     }
 
     @Cacheable(value = "alertRules", key = "'rule_' + #ruleKey")
     public AlertRule getRuleEntityByKey(String ruleKey) {
-        return ruleRepository.findByRuleKey(ruleKey)
+        return ruleRepository.findByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> AlertException.ruleNotFound(ruleKey));
     }
 
     @Cacheable(value = "alertRules", key = "'vehicle_' + #vehicleId")
     public List<AlertRule> getActiveRulesForVehicle(String vehicleId) {
-        return ruleRepository.findActiveRulesForVehicle(vehicleId);
+        return ruleRepository.findActiveRulesForVehicleAndOrganizationId(vehicleId, TenantContext.getCurrentOrgId());
     }
 
     @Cacheable(value = "alertRules", key = "'vehiclesWithRules'")
     public Set<String> getVehiclesWithActiveRules() {
-        return ruleRepository.findVehiclesWithActiveRules();
+        return ruleRepository.findVehiclesWithActiveRules(TenantContext.getCurrentOrgId());
     }
 
     @Cacheable(value = "vehicleRules", key = "'rulesByVehicle_' + #vehicleIds.hashCode()")
@@ -107,7 +109,7 @@ public class AlertRuleQueryService {
         Map<String, List<AlertRuleResponse>> result = new HashMap<>();
 
         for (String vehicleId : vehicleIds) {
-            List<AlertRule> vehicleRules = ruleRepository.findActiveRulesForVehicle(vehicleId);
+            List<AlertRule> vehicleRules = ruleRepository.findActiveRulesForVehicleAndOrganizationId(vehicleId, TenantContext.getCurrentOrgId());
             result.put(vehicleId, vehicleRules.stream()
                     .map(this::toResponse)
                     .collect(Collectors.toList()));
@@ -117,7 +119,7 @@ public class AlertRuleQueryService {
     }
 
     public boolean existsByRuleKey(String ruleKey) {
-        return ruleRepository.existsByRuleKey(ruleKey);
+        return ruleRepository.existsByRuleKeyAndOrganizationId(ruleKey, TenantContext.getCurrentOrgId());
     }
 
     private Pageable createPageable(SearchRequest searchRequest) {

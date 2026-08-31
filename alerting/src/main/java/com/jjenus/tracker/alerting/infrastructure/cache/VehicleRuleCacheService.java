@@ -33,7 +33,7 @@ public class VehicleRuleCacheService {
     /**
      * Get active rules for a specific vehicle
      */
-    public List<AlertRule> getActiveRulesForVehicle(String vehicleId) {
+    public List<AlertRule> getActiveRulesForVehicle(String vehicleId, Long organizationId) {
         try {
             String cacheKey = keyGenerator.getVehicleRulesKey(vehicleId);
 
@@ -47,7 +47,7 @@ public class VehicleRuleCacheService {
             }
 
             // Cache miss - load from DB and cache
-            return loadAndCacheRulesForVehicle(vehicleId);
+            return loadAndCacheRulesForVehicle(vehicleId, organizationId);
 
         } catch (Exception e) {
             logger.error("Failed to get rules for vehicle {}", vehicleId, e);
@@ -58,10 +58,9 @@ public class VehicleRuleCacheService {
     /**
      * Load and cache rules for vehicle
      */
-    private List<AlertRule> loadAndCacheRulesForVehicle(String vehicleId) {
+    private List<AlertRule> loadAndCacheRulesForVehicle(String vehicleId, Long organizationId) {
         try {
-            // Query rules that apply to this vehicle
-            List<AlertRule> rules = ruleRepository.findActiveRulesForVehicle(vehicleId);
+            List<AlertRule> rules = ruleRepository.findActiveRulesForVehicleAndOrganizationId(vehicleId, organizationId);
 
             if (rules.isEmpty()) {
                 // Cache empty result with short TTL
@@ -131,7 +130,7 @@ public class VehicleRuleCacheService {
     /**
      * Check if vehicle has any active rules (quick cache check)
      */
-    public boolean hasActiveRules(String vehicleId) {
+    public boolean hasActiveRules(String vehicleId, Long organizationId) {
         try {
             String cacheKey = keyGenerator.getVehicleRulesKey(vehicleId);
             Object cached = redisTemplate.opsForValue().get(cacheKey);
@@ -144,7 +143,7 @@ public class VehicleRuleCacheService {
             }
 
             // Cache miss - check if we should even try
-            return !getActiveRulesForVehicle(vehicleId).isEmpty();
+            return !getActiveRulesForVehicle(vehicleId, organizationId).isEmpty();
 
         } catch (Exception e) {
             logger.error("Failed to check rules for vehicle {}", vehicleId, e);
@@ -155,10 +154,9 @@ public class VehicleRuleCacheService {
     /**
      * Get all vehicles that have active rules (for bulk operations)
      */
-    public Set<String> getVehiclesWithActiveRules() {
+    public Set<String> getVehiclesWithActiveRules(Long organizationId) {
         try {
-            // This could be cached separately for faster lookups
-            Set<String> vehiclesWithRules = ruleRepository.findVehiclesWithActiveRules();
+            Set<String> vehiclesWithRules = ruleRepository.findVehiclesWithActiveRules(organizationId);
 
             // Cache this set as well for quick reference
             String key = keyGenerator.getVehiclesWithRulesKey();
@@ -232,13 +230,12 @@ public class VehicleRuleCacheService {
     /**
      * Pre-warm cache for frequently accessed vehicles
      */
-    public void prewarmCacheForHighPriorityVehicles() {
+    public void prewarmCacheForHighPriorityVehicles(Long organizationId) {
         try {
             Set<String> highPriorityVehicles = getHighPriorityVehicles();
 
             for (String vehicleId : highPriorityVehicles) {
-                // Async load into cache
-                loadAndCacheRulesForVehicle(vehicleId);
+                loadAndCacheRulesForVehicle(vehicleId, organizationId);
             }
 
             logger.info("Pre-warmed cache for {} vehicles", highPriorityVehicles.size());
