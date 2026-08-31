@@ -3,6 +3,7 @@ package com.jjenus.tracker.alerting.domain;
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import java.awt.geom.Path2D;
 import java.time.Duration;
 import java.time.Instant;
@@ -80,7 +81,7 @@ public class GeofenceRule implements IAlertRule {
 
         boolean isInside = isPointInPolygon(newLocation);
         AlertDetectedEvent alert = null;
-        Instant now = Instant.now();
+        Instant now = TimeProvider.now();
 
         switch (action) {
             case ENTRY:
