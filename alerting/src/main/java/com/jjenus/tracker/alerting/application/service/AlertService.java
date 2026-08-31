@@ -22,6 +22,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 public class AlertService {
 
     private static final Logger logger = LoggerFactory.getLogger(AlertService.class);
+    private static final int FIND_ALL_BY_ID_BATCH_SIZE = 100;
 
     private final TrackerAlertRepository alertRepository;
     private final AlertQueryService alertQueryService;
@@ -187,7 +189,7 @@ public class AlertService {
     public void bulkAcknowledgeAlerts(List<Long> alertIds, String acknowledgedBy) {
         logger.info("Bulk acknowledging {} alerts by {}", alertIds.size(), acknowledgedBy);
 
-        List<TrackerAlert> alerts = alertRepository.findAllById(alertIds);
+        List<TrackerAlert> alerts = findAllByIdBatched(alertIds);
 
         for (TrackerAlert alert : alerts) {
             if (!Boolean.TRUE.equals(alert.getAcknowledged())) {
@@ -204,7 +206,7 @@ public class AlertService {
     public void bulkResolveAlerts(List<Long> alertIds, String resolvedBy, String resolutionNotes) {
         logger.info("Bulk resolving {} alerts by {}", alertIds.size(), resolvedBy);
 
-        List<TrackerAlert> alerts = alertRepository.findAllById(alertIds);
+        List<TrackerAlert> alerts = findAllByIdBatched(alertIds);
 
         for (TrackerAlert alert : alerts) {
             if (!Boolean.TRUE.equals(alert.getResolved())) {
@@ -214,6 +216,23 @@ public class AlertService {
 
         alertRepository.saveAll(alerts);
         logger.info("Bulk resolved {} alerts", alerts.size());
+    }
+
+    private List<TrackerAlert> findAllByIdBatched(Iterable<Long> ids) {
+        List<TrackerAlert> result = new ArrayList<>();
+        List<Long> batch = new ArrayList<>(FIND_ALL_BY_ID_BATCH_SIZE);
+        for (Long id : ids) {
+            if (id == null) continue;
+            batch.add(id);
+            if (batch.size() >= FIND_ALL_BY_ID_BATCH_SIZE) {
+                result.addAll(alertRepository.findAllById(batch));
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) {
+            result.addAll(alertRepository.findAllById(batch));
+        }
+        return result;
     }
 
     @Transactional

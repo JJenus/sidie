@@ -3,11 +3,15 @@ package com.jjenus.tracker.userauth.application.service;
 import com.jjenus.tracker.userauth.domain.entity.LoginAttempt;
 import com.jjenus.tracker.userauth.infrastructure.repository.LoginAttemptRepository;
 import com.jjenus.tracker.userauth.infrastructure.security.LoginPolicyConfig;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -50,7 +54,16 @@ public class LoginAttemptService {
 
     @Transactional(readOnly = true)
     public List<LoginAttempt> recentAttempts(Long userId, int limit) {
-        return loginAttemptRepository.findAll().stream()
+        List<LoginAttempt> all = new ArrayList<>();
+        Pageable pageable = PageRequest.of(0, 500);
+        Page<LoginAttempt> page;
+        do {
+            page = loginAttemptRepository.findAll(pageable);
+            page.forEach(all::add);
+            pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
+        } while (page.hasNext());
+
+        return all.stream()
             .filter(a -> a.getUser() != null && a.getUser().getId().equals(userId))
             .sorted((a, b) -> b.getAttemptedAt().compareTo(a.getAttemptedAt()))
             .limit(limit)

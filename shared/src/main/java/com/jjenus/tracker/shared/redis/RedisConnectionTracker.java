@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import reactor.netty.Connection;
@@ -156,10 +157,8 @@ public class RedisConnectionTracker {
     }
 
     public int getActiveConnectionCount() {
-        // Count from Redis for accuracy across instances
-        String pattern = getConnectionKey("*");
-        Long count = redisTemplate.countExistingKeys(redisTemplate.keys(pattern));
-        return count != null ? count.intValue() : 0;
+        List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, getConnectionKey("*"));
+        return keys.size();
     }
 
     public int getLiveConnectionCount() {
@@ -169,8 +168,8 @@ public class RedisConnectionTracker {
     public Map<String, ConnectionInfo> getAllConnections() {
         Map<String, ConnectionInfo> connections = new ConcurrentHashMap<>();
 
-        String pattern = getConnectionKey("*");
-        redisTemplate.keys(pattern).forEach(key -> {
+        List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, getConnectionKey("*"));
+        for (String key : keys) {
             Object value = valueOps.get(key);
             if (value instanceof ConnectionMetadata metadata) {
                 ConnectionInfo info = new ConnectionInfo(
@@ -182,29 +181,26 @@ public class RedisConnectionTracker {
                 );
                 connections.put(metadata.getConnectionId(), info);
             }
-        });
+        }
 
         return connections;
     }
 
     public void cleanupStaleConnections() {
-        // Clean up connections where Redis entry exists but no live connection
-        String pattern = getConnectionKey("*");
-        redisTemplate.keys(pattern).forEach(key -> {
+        List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, getConnectionKey("*"));
+        for (String key : keys) {
             Object value = valueOps.get(key);
             if (value instanceof ConnectionMetadata metadata) {
                 String connectionId = metadata.getConnectionId();
                 if (!liveConnections.containsKey(connectionId)) {
-                    // Connection is stale, remove from Redis
                     redisTemplate.delete(key);
                     logger.info("Cleaned up stale connection: {}", connectionId);
 
-                    // Clean up reverse lookup if needed
                     String deviceKey = getDeviceConnectionKey(metadata.getDeviceId());
                     redisTemplate.delete(deviceKey);
                 }
             }
-        });
+        }
     }
 
     private String getConnectionKey(String connectionId) {

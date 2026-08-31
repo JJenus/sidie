@@ -4,12 +4,18 @@ import com.jjenus.tracker.shared.exception.DomainException;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.userauth.domain.entity.Permission;
 import com.jjenus.tracker.userauth.infrastructure.repository.PermissionRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,18 +29,29 @@ public class PermissionService {
 
     @Transactional(readOnly = true)
     public List<Permission> listAll() {
-        return permissionRepository.findAll();
+        List<Permission> result = new ArrayList<>();
+        findAllBatched(PageRequest.of(0, 500), result::add);
+        return result;
+    }
+
+    private void findAllBatched(Pageable pageable, Consumer<Permission> consumer) {
+        Page<Permission> page;
+        do {
+            page = permissionRepository.findAll(pageable);
+            page.forEach(consumer);
+            pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
+        } while (page.hasNext());
     }
 
     @Transactional(readOnly = true)
     public Set<String> resolveForUser(Collection<String> roleNames, Long orgId) {
-        return permissionRepository.findAll().stream()
-            .filter(p -> {
-                if (p.getId() == null) return false;
-                return true;
-            })
-            .map(Permission::getKey)
-            .collect(Collectors.toSet());
+        Set<String> result = new HashSet<>();
+        for (Permission permission : listAll()) {
+            if (permission.getId() != null) {
+                result.add(permission.getKey());
+            }
+        }
+        return result;
     }
 
     @Transactional

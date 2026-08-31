@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.infrastructure.cache;
 
 import com.jjenus.tracker.alerting.domain.entity.TrackerAlert;
+import com.jjenus.tracker.shared.redis.RedisKeyScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -135,8 +136,8 @@ public class AlertCacheService {
     public void invalidateStatistics() {
         try {
             String pattern = keyGenerator.getAlertStatisticsPattern();
-            var keys = redisTemplate.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
+            List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, pattern);
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
         } catch (Exception e) {
@@ -148,8 +149,8 @@ public class AlertCacheService {
     public void clearAll() {
         try {
             String pattern = keyGenerator.getAllAlertKeysPattern();
-            var keys = redisTemplate.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
+            List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, pattern);
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
         } catch (Exception e) {

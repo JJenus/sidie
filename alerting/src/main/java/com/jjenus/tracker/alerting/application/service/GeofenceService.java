@@ -10,6 +10,7 @@ import com.jjenus.tracker.alerting.domain.entity.GeofencePoint;
 import com.jjenus.tracker.alerting.infrastructure.cache.GeofenceCacheService;
 import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
 import com.jjenus.tracker.alerting.infrastructure.repository.GeofenceRepository;
+import com.jjenus.tracker.shared.redis.RedisKeyScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -332,8 +333,8 @@ public class GeofenceService {
 
     private void invalidatePaginationCache() {
         try {
-            Set<String> keys = redisTemplate.keys(keyGenerator.getPaginatedGeofencesPattern());
-            if (keys != null && !keys.isEmpty()) {
+            List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, keyGenerator.getPaginatedGeofencesPattern());
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
                 logger.debug("Invalidated pagination cache for geofences");
             }

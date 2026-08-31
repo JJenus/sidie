@@ -8,16 +8,16 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Component
 public class VehicleActivityTracker {
 
     private static final Logger logger = LoggerFactory.getLogger(VehicleActivityTracker.class);
     private static final String KEY_PREFIX = "vehicle:lastseen:";
+    private static final int PAGE_SIZE = 1000;
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ValueOperations<String, Object> valueOps;
@@ -51,18 +51,23 @@ public class VehicleActivityTracker {
         }
     }
 
-    public Set<String> getAllActiveVehicleIds() {
-        Set<String> result = new HashSet<>();
-        try {
-            Set<String> keys = redisTemplate.keys(KEY_PREFIX + "*");
-            if (keys != null) {
-                for (String key : keys) {
-                    result.add(key.substring(KEY_PREFIX.length()));
-                }
+    public List<String> getAllActiveVehicleIds() {
+        return RedisKeyScanner.scanKeys(redisTemplate, KEY_PREFIX + "*").stream()
+                .map(key -> key.substring(KEY_PREFIX.length()))
+                .toList();
+    }
+
+    public void getAllActiveVehicleIdsBatched(java.util.function.Consumer<List<String>> batchConsumer) {
+        List<String> batch = new ArrayList<>(PAGE_SIZE);
+        RedisKeyScanner.scanDelete(redisTemplate, KEY_PREFIX + "*", key -> {
+            batch.add(key.substring(KEY_PREFIX.length()));
+            if (batch.size() >= PAGE_SIZE) {
+                batchConsumer.accept(new ArrayList<>(batch));
+                batch.clear();
             }
-        } catch (Exception e) {
-            logger.warn("Failed to get active vehicle IDs: {}", e.getMessage());
+        });
+        if (!batch.isEmpty()) {
+            batchConsumer.accept(batch);
         }
-        return result;
     }
 }

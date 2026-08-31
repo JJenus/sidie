@@ -2,6 +2,7 @@ package com.jjenus.tracker.alerting.infrastructure.cache;
 
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
+import com.jjenus.tracker.shared.redis.RedisKeyScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -213,8 +214,8 @@ public class VehicleRuleCacheService {
      */
     public void invalidateAllVehicleRules() {
         try {
-            Set<String> keys = redisTemplate.keys(keyGenerator.getVehicleRulesKey("*"));
-            if (keys != null && !keys.isEmpty()) {
+            List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, keyGenerator.getVehicleRulesKey("*"));
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
 

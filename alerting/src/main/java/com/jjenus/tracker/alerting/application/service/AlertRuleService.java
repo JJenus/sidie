@@ -13,6 +13,7 @@ import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
 import com.jjenus.tracker.alerting.infrastructure.cache.VehicleRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
 import com.jjenus.tracker.alerting.infrastructure.cache.GeofenceCacheService;
+import com.jjenus.tracker.shared.redis.RedisKeyScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -33,6 +34,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
@@ -197,9 +199,18 @@ public class AlertRuleService {
     @Transactional(readOnly = true)
     @Cacheable(value = "alertRules", key = "'all'")
     public List<AlertRuleResponse> getAllRules() {
-        return ruleRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<AlertRuleResponse> result = new ArrayList<>();
+        findAllBatched(PageRequest.of(0, 500), rule -> result.add(toResponse(rule)));
+        return result;
+    }
+
+    private void findAllBatched(Pageable pageable, Consumer<AlertRule> consumer) {
+        Page<AlertRule> page;
+        do {
+            page = ruleRepository.findAll(pageable);
+            page.forEach(consumer);
+            pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
+        } while (page.hasNext());
     }
 
     @Transactional(readOnly = true)
@@ -469,8 +480,8 @@ public class AlertRuleService {
 
     private void invalidatePaginationCache() {
         try {
-            Set<String> keys = redisTemplate.keys(keyGenerator.getPaginatedRulesPattern());
-            if (keys != null && !keys.isEmpty()) {
+            List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, keyGenerator.getPaginatedRulesPattern());
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
                 logger.debug("Invalidated pagination cache for rules");
             }

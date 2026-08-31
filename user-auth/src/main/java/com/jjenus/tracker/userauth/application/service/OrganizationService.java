@@ -4,10 +4,15 @@ import com.jjenus.tracker.shared.exception.BusinessRuleException;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.userauth.domain.entity.Organization;
 import com.jjenus.tracker.userauth.infrastructure.repository.OrganizationRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 @Service
@@ -50,6 +55,17 @@ public class OrganizationService {
 
     @Transactional(readOnly = true)
     public List<Organization> listAll() {
-        return organizationRepository.findAll();
+        List<Organization> result = new ArrayList<>();
+        findAllBatched(PageRequest.of(0, 500), result::add);
+        return result;
+    }
+
+    private void findAllBatched(Pageable pageable, Consumer<Organization> consumer) {
+        Page<Organization> page;
+        do {
+            page = organizationRepository.findAll(pageable);
+            page.forEach(consumer);
+            pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
+        } while (page.hasNext());
     }
 }

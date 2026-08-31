@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Component
 public class DisconnectionScheduler {
@@ -45,26 +45,28 @@ public class DisconnectionScheduler {
 
     @Scheduled(fixedDelayString = "${alerting.disconnect.check-interval-ms:60000}")
     public void checkDisconnectedVehicles() {
-        Set<String> activeVehicles = activityTracker.getAllActiveVehicleIds();
         Instant now = clock.instant();
-        int disconnected = 0;
+        int totalDisconnected = 0;
+        int[] disconnectedHolder = {0};
 
-        for (String vehicleId : activeVehicles) {
-            Optional<Instant> lastSeen = activityTracker.getLastSeen(vehicleId);
-            if (lastSeen.isEmpty()) {
-                continue;
+        activityTracker.getAllActiveVehicleIdsBatched(batch -> {
+            for (String vehicleId : batch) {
+                Optional<Instant> lastSeen = activityTracker.getLastSeen(vehicleId);
+                if (lastSeen.isEmpty()) {
+                    continue;
+                }
+                Duration silence = Duration.between(lastSeen.get(), now);
+                if (silence.toMinutes() >= thresholdMinutes) {
+                    disconnectedHolder[0]++;
+                    raiseDisconnectedAlert(vehicleId, lastSeen.get(), silence);
+                }
             }
+        });
+        totalDisconnected = disconnectedHolder[0];
 
-            Duration silence = Duration.between(lastSeen.get(), now);
-            if (silence.toMinutes() >= thresholdMinutes) {
-                disconnected++;
-                raiseDisconnectedAlert(vehicleId, lastSeen.get(), silence);
-            }
-        }
-
-        if (disconnected > 0) {
+        if (totalDisconnected > 0) {
             logger.info("Detected {} disconnected vehicles (threshold={}min)",
-                    disconnected, thresholdMinutes);
+                    totalDisconnected, thresholdMinutes);
         }
     }
 

@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -76,23 +79,25 @@ class VehicleQueryServiceTest {
     @Test
     void getAllVehicles_returnsAll() {
         List<Vehicle> vehicles = Arrays.asList(testVehicle1, testVehicle2);
-        when(vehicleRepository.findAll()).thenReturn(vehicles);
+        Page<Vehicle> page = new PageImpl<>(vehicles, PageRequest.of(0, 500), 2);
+        when(vehicleRepository.findAll(any(PageRequest.class))).thenReturn(page);
 
         List<Vehicle> result = queryService.getAllVehicles();
 
         assertThat(result).hasSize(2);
         assertThat(result).contains(testVehicle1, testVehicle2);
-        verify(vehicleRepository, times(1)).findAll();
+        verify(vehicleRepository, times(1)).findAll(any(PageRequest.class));
     }
 
     @Test
     void getAllVehiclesEmpty_returnsEmpty() {
-        when(vehicleRepository.findAll()).thenReturn(List.of());
+        Page<Vehicle> page = new PageImpl<>(List.of(), PageRequest.of(0, 500), 0);
+        when(vehicleRepository.findAll(any(PageRequest.class))).thenReturn(page);
 
         List<Vehicle> result = queryService.getAllVehicles();
 
         assertThat(result).isEmpty();
-        verify(vehicleRepository, times(1)).findAll();
+        verify(vehicleRepository, times(1)).findAll(any(PageRequest.class));
     }
 
     @Test

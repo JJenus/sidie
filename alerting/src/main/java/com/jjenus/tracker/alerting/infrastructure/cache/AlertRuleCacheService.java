@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jjenus.tracker.alerting.domain.IAlertRule;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
+import com.jjenus.tracker.shared.redis.RedisKeyScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisCallback;
@@ -179,8 +180,8 @@ public class AlertRuleCacheService {
     public void clearAllCache() {
         try {
             // Get all cache keys matching the pattern
-            Set<String> keys = redisTemplate.keys("alerting:*");
-            if (keys != null && !keys.isEmpty()) {
+            List<String> keys = RedisKeyScanner.scanKeys(redisTemplate, "alerting:*");
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
                 logger.info("Cleared all alert rule cache entries");
             }

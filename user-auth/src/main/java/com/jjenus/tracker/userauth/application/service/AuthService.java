@@ -11,6 +11,9 @@ import com.jjenus.tracker.userauth.domain.entity.*;
 import com.jjenus.tracker.userauth.domain.enums.FailureReason;
 import com.jjenus.tracker.userauth.infrastructure.repository.*;
 import com.jjenus.tracker.userauth.infrastructure.security.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -174,20 +177,25 @@ public class AuthService {
     @Transactional
     public void logout(Long userId, String ip, String userAgent) {
         if (userId == null) return;
-        List<Session> all = sessionRepository.findAll();
         Instant now = Instant.now(clock);
-        for (Session s : all) {
-            if (s.getUser().getId().equals(userId) && s.getRevokedAt() == null) {
-                s.revokeAt(now);
-                sessionRepository.save(s);
-                for (RefreshToken rt : refreshTokenRepository.findBySessionId(s.getId())) {
-                    if (rt.getRevokedAt() == null) {
-                        rt.revokeAt(now);
-                        refreshTokenRepository.save(rt);
+        Pageable pageable = PageRequest.of(0, 500);
+        Page<Session> page;
+        do {
+            page = sessionRepository.findAll(pageable);
+            for (Session s : page.getContent()) {
+                if (s.getUser().getId().equals(userId) && s.getRevokedAt() == null) {
+                    s.revokeAt(now);
+                    sessionRepository.save(s);
+                    for (RefreshToken rt : refreshTokenRepository.findBySessionId(s.getId())) {
+                        if (rt.getRevokedAt() == null) {
+                            rt.revokeAt(now);
+                            refreshTokenRepository.save(rt);
+                        }
                     }
                 }
             }
-        }
+            pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
+        } while (page.hasNext());
     }
 
     @Transactional

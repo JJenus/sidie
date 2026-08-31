@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,9 +40,18 @@ public class AlertRuleQueryService {
 
     @Cacheable(value = "alertRules", key = "'all'")
     public List<AlertRuleResponse> getAllRules() {
-        return ruleRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<AlertRuleResponse> result = new ArrayList<>();
+        findAllBatched(PageRequest.of(0, 500), rule -> result.add(toResponse(rule)));
+        return result;
+    }
+
+    private void findAllBatched(Pageable pageable, Consumer<AlertRule> consumer) {
+        Page<AlertRule> page;
+        do {
+            page = ruleRepository.findAll(pageable);
+            page.forEach(consumer);
+            pageable = PageRequest.of(pageable.getPageNumber() + 1, pageable.getPageSize());
+        } while (page.hasNext());
     }
 
     @Cacheable(value = "alertRulesPaged", key = "'search_' + #searchRequest.hashCode()")
