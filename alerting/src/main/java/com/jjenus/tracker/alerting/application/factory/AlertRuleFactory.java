@@ -5,15 +5,18 @@ import com.jjenus.tracker.alerting.domain.*;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
+import com.jjenus.tracker.alerting.domain.parameters.GeofenceRuleParameters;
+import com.jjenus.tracker.alerting.domain.parameters.IdleRuleParameters;
+import com.jjenus.tracker.alerting.domain.parameters.RuleParameters;
+import com.jjenus.tracker.alerting.domain.parameters.RuleParametersMapper;
+import com.jjenus.tracker.alerting.domain.parameters.SpeedRuleParameters;
 import com.jjenus.tracker.shared.domain.LocationPoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,11 +28,14 @@ public class AlertRuleFactory {
     private final GeofenceService geofenceService;
     private final RuleStateStore stateStore;
     private final Clock clock;
+    private final RuleParametersMapper ruleParametersMapper;
 
-    public AlertRuleFactory(GeofenceService geofenceService, RuleStateStore stateStore, Clock clock) {
+    public AlertRuleFactory(GeofenceService geofenceService, RuleStateStore stateStore, Clock clock,
+                            RuleParametersMapper ruleParametersMapper) {
         this.geofenceService = geofenceService;
         this.stateStore = stateStore;
         this.clock = clock;
+        this.ruleParametersMapper = ruleParametersMapper;
     }
 
     /**
@@ -45,14 +51,16 @@ public class AlertRuleFactory {
             return null;
         }
 
-        Map<String, Object> params = entity.getParameters();
-
         try {
             return switch (entity.getRuleType()) {
-                case SPEED -> createMaxSpeedRule(entity, params);
-                case TIME -> createIdleTimeRule(entity, params);
-                case GEOFENCE -> createGeofenceRule(entity, params, vehicleId);
-                default -> createGenericRule(entity, params);
+                case SPEED -> createMaxSpeedRule(entity,
+                        (SpeedRuleParameters) ruleParametersMapper.fromMap(AlertRuleType.SPEED, entity.getParameters()));
+                case TIME -> createIdleTimeRule(entity,
+                        (IdleRuleParameters) ruleParametersMapper.fromMap(AlertRuleType.TIME, entity.getParameters()));
+                case GEOFENCE -> createGeofenceRule(entity,
+                        (GeofenceRuleParameters) ruleParametersMapper.fromMap(AlertRuleType.GEOFENCE, entity.getParameters()),
+                        vehicleId);
+                default -> createGenericRule(entity, entity.getParameters());
             };
         } catch (Exception e) {
             logger.error("Failed to create domain rule for {}: {}",
@@ -61,22 +69,22 @@ public class AlertRuleFactory {
         }
     }
 
-    private MaxSpeedRule createMaxSpeedRule(AlertRule entity, Map<String, Object> params) {
-        float speedLimit = getFloatParam(params, "speedLimit", 80.0f);
+    private MaxSpeedRule createMaxSpeedRule(AlertRule entity, SpeedRuleParameters params) {
+        float speedLimit = params.speedLimit();
         return new MaxSpeedRule(entity.getRuleKey(), entity.getRuleName(), speedLimit);
     }
 
-    private IdleTimeRule createIdleTimeRule(AlertRule entity, Map<String, Object> params) {
-        int maxIdleMinutes = getIntParam(params, "maxIdleMinutes", 30);
+    private IdleTimeRule createIdleTimeRule(AlertRule entity, IdleRuleParameters params) {
+        int maxIdleMinutes = params.maxIdleMinutes();
         Duration maxIdleTime = Duration.ofMinutes(maxIdleMinutes);
-        Map<String, Instant> persistedTimes = stateStore.getAllLastMovementTimes(entity.getRuleKey());
+        java.util.Map<String, Instant> persistedTimes = stateStore.getAllLastMovementTimes(entity.getRuleKey());
         return new IdleTimeRule(entity.getRuleKey(), entity.getRuleName(), maxIdleTime, persistedTimes,
                                 (vehicleId, time) -> stateStore.setLastMovementTime(entity.getRuleKey(), vehicleId, time));
     }
 
-    private GeofenceRule createGeofenceRule(AlertRule entity, Map<String, Object> params, String vehicleId) {
-        String geofenceId = getStringParam(params, "geofenceId", "");
-        String actionStr = getStringParam(params, "action", "BOTH");
+    private GeofenceRule createGeofenceRule(AlertRule entity, GeofenceRuleParameters params, String vehicleId) {
+        String geofenceId = params.geofenceId();
+        String actionStr = params.action();
 
         Geofence geofence = getGeofenceById(geofenceId);
         if (geofence == null) {
@@ -99,7 +107,7 @@ public class AlertRuleFactory {
         }
 
         Optional<Boolean> previous = stateStore.getGeofenceWasInside(entity.getRuleKey(), vehicleId);
-        long maxDwellMinutes = getLongParam(params, "maxDwellMinutes", 0L);
+        long maxDwellMinutes = params.maxDwellMinutes();
         GeofenceRule rule = new GeofenceRule(
                 entity.getRuleKey(),
                 entity.getRuleName(),
@@ -179,62 +187,5 @@ public class AlertRuleFactory {
 
     private IAlertRule createGenericRule(AlertRule entity, Map<String, Object> params) {
         return new GenericAlertRule(entity, params);
-    }
-
-    // Helper methods for parameter extraction
-    private float getFloatParam(Map<String, Object> params, String key, float defaultValue) {
-        if (params != null && params.containsKey(key)) {
-            Object value = params.get(key);
-            if (value instanceof Number) {
-                return ((Number) value).floatValue();
-            } else if (value instanceof String) {
-                try {
-                    return Float.parseFloat((String) value);
-                } catch (NumberFormatException e) {
-                    return defaultValue;
-                }
-            }
-        }
-        return defaultValue;
-    }
-
-    private int getIntParam(Map<String, Object> params, String key, int defaultValue) {
-        if (params != null && params.containsKey(key)) {
-            Object value = params.get(key);
-            if (value instanceof Number) {
-                return ((Number) value).intValue();
-            } else if (value instanceof String) {
-                try {
-                    return Integer.parseInt((String) value);
-                } catch (NumberFormatException e) {
-                    return defaultValue;
-                }
-            }
-        }
-        return defaultValue;
-    }
-
-    private long getLongParam(Map<String, Object> params, String key, long defaultValue) {
-        if (params != null && params.containsKey(key)) {
-            Object value = params.get(key);
-            if (value instanceof Number) {
-                return ((Number) value).longValue();
-            } else if (value instanceof String) {
-                try {
-                    return Long.parseLong((String) value);
-                } catch (NumberFormatException e) {
-                    return defaultValue;
-                }
-            }
-        }
-        return defaultValue;
-    }
-
-    private String getStringParam(Map<String, Object> params, String key, String defaultValue) {
-        if (params != null && params.containsKey(key)) {
-            Object value = params.get(key);
-            return value != null ? value.toString() : defaultValue;
-        }
-        return defaultValue;
     }
 }

@@ -302,36 +302,32 @@ public class AutoseekerProtocolParser implements ITrackerProtocolParser {
     }
 
     // Additional utility methods
-    public Map<String, Object> parseExtendedData(String[] parts) {
-        Map<String, Object> extendedData = new HashMap<>();
-
+    public ExtendedDeviceData parseExtendedData(String[] parts) {
         try {
-            if (parts.length > 12) {
-                extendedData.put("vehicleStatus", parts[12]);
-            }
+            String vehicleStatus = parts.length > 12 ? parts[12] : null;
+            String mcc = parts.length > 13 ? parts[13] : null;
+            String mnc = parts.length > 14 ? parts[14] : null;
+            String lac = parts.length > 15 ? parts[15] : null;
+            String cellId = parts.length > 16 ? parts[16] : null;
 
-            if (parts.length > 13) {
-                extendedData.put("mcc", parts[13]);
-                extendedData.put("mnc", parts[14]);
-                extendedData.put("lac", parts[15]);
-                extendedData.put("cellId", parts[16]);
-            }
-
+            Integer gpsSignal = null;
+            Integer gsmSignal = null;
+            Integer voltage = null;
             if (parts.length > 17) {
                 try {
-                    extendedData.put("gpsSignal", Integer.parseInt(parts[17]));
-                    extendedData.put("gsmSignal", Integer.parseInt(parts[18]));
-                    extendedData.put("voltage", Integer.parseInt(parts[19]));
+                    gpsSignal = Integer.parseInt(parts[17]);
+                    gsmSignal = Integer.parseInt(parts[18]);
+                    voltage = Integer.parseInt(parts[19]);
                 } catch (NumberFormatException e) {
                     // Ignore if can't parse
                 }
             }
 
+            return new ExtendedDeviceData(vehicleStatus, mcc, mnc, lac, cellId, gpsSignal, gsmSignal, voltage);
         } catch (Exception e) {
             log.warn("Error parsing extended data: {}", e.getMessage());
+            return null;
         }
-
-        return extendedData;
     }
 
     public Map<String, Boolean> parseVehicleStatus(String statusHex) {

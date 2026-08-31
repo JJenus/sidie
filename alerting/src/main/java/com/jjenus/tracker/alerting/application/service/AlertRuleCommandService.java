@@ -7,6 +7,11 @@ import com.jjenus.tracker.alerting.api.dto.*;
         import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
+import com.jjenus.tracker.alerting.domain.parameters.GeofenceRuleParameters;
+import com.jjenus.tracker.alerting.domain.parameters.IdleRuleParameters;
+import com.jjenus.tracker.alerting.domain.parameters.RuleParameters;
+import com.jjenus.tracker.alerting.domain.parameters.RuleParametersMapper;
+import com.jjenus.tracker.alerting.domain.parameters.SpeedRuleParameters;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import com.jjenus.tracker.alerting.infrastructure.repository.AlertRuleRepository;
 import com.jjenus.tracker.shared.security.TenantContext;
@@ -34,6 +39,7 @@ public class AlertRuleCommandService {
     private final AlertRuleQueryService ruleQueryService;
     private final GeofenceRuleValidator geofenceRuleValidator;
     private final ObjectMapper objectMapper;
+    private final RuleParametersMapper ruleParametersMapper;
     private final Clock clock;
 
     public AlertRuleCommandService(
@@ -41,11 +47,13 @@ public class AlertRuleCommandService {
             AlertRuleQueryService ruleQueryService,
             GeofenceRuleValidator geofenceRuleValidator,
             ObjectMapper objectMapper,
+            RuleParametersMapper ruleParametersMapper,
             Clock clock) {
         this.ruleRepository = ruleRepository;
         this.ruleQueryService = ruleQueryService;
         this.geofenceRuleValidator = geofenceRuleValidator;
         this.objectMapper = objectMapper;
+        this.ruleParametersMapper = ruleParametersMapper;
         this.clock = clock;
     }
 
@@ -58,7 +66,7 @@ public class AlertRuleCommandService {
         validateRuleKeyUniqueness(request.getRuleKey());
         validateOverspeedRuleRequest(request);
 
-        Map<String, Object> parameters = buildOverspeedParameters(request);
+        RuleParameters parameters = buildOverspeedParameters(request);
         String actionsJson = buildOverspeedActions();
 
         AlertRule rule = createBaseRule(request, AlertRuleType.SPEED, parameters);
@@ -80,7 +88,7 @@ public class AlertRuleCommandService {
         validateRuleKeyUniqueness(request.getRuleKey());
         validateIdleTimeoutRuleRequest(request);
 
-        Map<String, Object> parameters = buildIdleTimeoutParameters(request);
+        RuleParameters parameters = buildIdleTimeoutParameters(request);
         AlertRule rule = createBaseRule(request, AlertRuleType.TIME, parameters);
         rule.setVehicleIds(request.getVehicleIds());
 
@@ -100,7 +108,7 @@ public class AlertRuleCommandService {
         geofenceRuleValidator.validateGeofenceRuleRequest(request);
 
         Geofence geofence = geofenceRuleValidator.getValidatedGeofence(request.getGeofenceId());
-        Map<String, Object> parameters = buildGeofenceParameters(request, geofence);
+        RuleParameters parameters = buildGeofenceParameters(request, geofence);
         validateVehicleGeofenceAssociation(geofence, request.getVehicleIds());
 
         AlertRule rule = createBaseRule(request, AlertRuleType.GEOFENCE, parameters);
@@ -351,48 +359,41 @@ public class AlertRuleCommandService {
         }
     }
 
-    private Map<String, Object> buildOverspeedParameters(OverspeedRuleTemplateRequest request) {
-        Map<String, Object> parameters = new HashMap<>();
-        parameters.put("speedLimit", request.getSpeedLimit());
-        parameters.put("buffer", request.getBuffer());
-        parameters.put("severity", "CRITICAL");
-        parameters.put("vehicleIds", new ArrayList<>(request.getVehicleIds()));
-        parameters.put("unit", "km/h");
-        parameters.put("evaluationInterval", 60);
-        return parameters;
+    private SpeedRuleParameters buildOverspeedParameters(OverspeedRuleTemplateRequest request) {
+        return new SpeedRuleParameters(
+                request.getSpeedLimit(),
+                request.getBuffer(),
+                "CRITICAL",
+                new ArrayList<>(request.getVehicleIds()),
+                "km/h",
+                60
+        );
     }
 
-    private Map<String, Object> buildIdleTimeoutParameters(IdleTimeoutRuleTemplateRequest request) {
-        Map<String, Object> parameters = new HashMap<>();
-        parameters.put("maxIdleMinutes", request.getMaxIdleMinutes());
-        parameters.put("severity", "WARNING");
-        parameters.put("vehicleIds", new ArrayList<>(request.getVehicleIds()));
-        parameters.put("ignoreEngineOff", false);
-        parameters.put("notificationThreshold", request.getMaxIdleMinutes() / 2);
-        return parameters;
+    private IdleRuleParameters buildIdleTimeoutParameters(IdleTimeoutRuleTemplateRequest request) {
+        return new IdleRuleParameters(
+                request.getMaxIdleMinutes(),
+                "WARNING",
+                new ArrayList<>(request.getVehicleIds()),
+                false,
+                request.getMaxIdleMinutes() / 2
+        );
     }
 
-    private Map<String, Object> buildGeofenceParameters(GeofenceRuleTemplateRequest request,
-                                                        Geofence geofence) {
-        Map<String, Object> parameters = new HashMap<>();
-        parameters.put("geofenceId", request.getGeofenceId());
-        parameters.put("geofenceName", geofence.getName());
-        parameters.put("action", request.getAction().name());
-        parameters.put("severity", "WARNING");
-        parameters.put("vehicleIds", new ArrayList<>(request.getVehicleIds()));
-        parameters.put("shapeType", geofence.getShapeType().name());
-
-        if (geofence.getCenterLatitude() != null) {
-            parameters.put("centerLatitude", geofence.getCenterLatitude());
-        }
-        if (geofence.getCenterLongitude() != null) {
-            parameters.put("centerLongitude", geofence.getCenterLongitude());
-        }
-        if (geofence.getRadiusMeters() != null) {
-            parameters.put("radiusMeters", geofence.getRadiusMeters());
-        }
-
-        return parameters;
+    private GeofenceRuleParameters buildGeofenceParameters(GeofenceRuleTemplateRequest request,
+                                                           Geofence geofence) {
+        return new GeofenceRuleParameters(
+                request.getGeofenceId(),
+                geofence.getName(),
+                request.getAction().name(),
+                "WARNING",
+                new ArrayList<>(request.getVehicleIds()),
+                geofence.getShapeType() != null ? geofence.getShapeType().name() : null,
+                geofence.getCenterLatitude(),
+                geofence.getCenterLongitude(),
+                geofence.getRadiusMeters(),
+                0L
+        );
     }
 
     private String buildOverspeedActions() {
@@ -411,7 +412,7 @@ public class AlertRuleCommandService {
     }
 
     private AlertRule createBaseRule(Object request, AlertRuleType ruleType,
-                                     Map<String, Object> parameters) {
+                                     RuleParameters parameters) {
         AlertRule rule = new AlertRule();
 
         if (request instanceof OverspeedRuleTemplateRequest overspeedRequest) {
@@ -432,10 +433,11 @@ public class AlertRuleCommandService {
         }
 
         rule.setRuleType(ruleType);
-        rule.setParameters(parameters);
+        rule.setParameters(ruleParametersMapper.toMap(parameters));
         rule.setCooldownMinutes(5);
         rule.setCreatedAt(clock.instant());
         rule.setUpdatedAt(clock.instant());
+        rule.setOrganizationId(TenantContext.getCurrentOrgId());
 
         return rule;
     }

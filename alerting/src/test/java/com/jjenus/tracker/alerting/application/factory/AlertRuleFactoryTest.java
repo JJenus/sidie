@@ -1,9 +1,11 @@
 package com.jjenus.tracker.alerting.application.factory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jjenus.tracker.alerting.domain.*;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
+import com.jjenus.tracker.alerting.domain.parameters.RuleParametersMapper;
 import com.jjenus.tracker.alerting.application.service.GeofenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +36,8 @@ class AlertRuleFactoryTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-08-30T12:00:00Z"), ZoneOffset.UTC);
-        alertRuleFactory = new AlertRuleFactory(geofenceService, stateStore, clock);
+        alertRuleFactory = new AlertRuleFactory(geofenceService, stateStore, clock,
+                new RuleParametersMapper(new ObjectMapper()));
     }
 
     @Test

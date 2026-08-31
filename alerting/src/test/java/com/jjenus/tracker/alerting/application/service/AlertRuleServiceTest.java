@@ -8,6 +8,7 @@ import com.jjenus.tracker.alerting.domain.GeofenceTestBuilder;
 import com.jjenus.tracker.alerting.domain.entity.AlertRule;
 import com.jjenus.tracker.alerting.domain.entity.Geofence;
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
+import com.jjenus.tracker.alerting.domain.parameters.RuleParametersMapper;
 import com.jjenus.tracker.alerting.exception.AlertException;
 import com.jjenus.tracker.alerting.infrastructure.cache.AlertRuleCacheService;
 import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
@@ -81,6 +82,7 @@ class AlertRuleServiceTest {
             objectMapper,
             redisTemplate,
             keyGenerator,
+            new RuleParametersMapper(new ObjectMapper()),
             FIXED_CLOCK
         );
 

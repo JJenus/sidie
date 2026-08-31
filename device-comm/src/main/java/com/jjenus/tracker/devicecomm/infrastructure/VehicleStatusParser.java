@@ -1,117 +1,59 @@
 package com.jjenus.tracker.devicecomm.infrastructure;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class VehicleStatusParser {
-    
-    public static Map<String, Object> parseGT06Status(String statusHex) {
-        Map<String, Object> status = new HashMap<>();
-        
+
+    public static DeviceStatus parseGT06Status(String statusHex) {
         if (statusHex == null || statusHex.length() != 8) {
-            return status;
+            return DeviceStatus.allClear();
         }
-        
+
         try {
             // Parse 4-byte status field
             long value = Long.parseLong(statusHex, 16);
             String binary = String.format("%32s", Long.toBinaryString(value)).replace(' ', '0');
-            
+
             // Byte 4 (bits 24-31)
-            parseByte4(status, binary.substring(24, 32));
-            
+            char b4b0 = binary.charAt(31);
+            char b4b2 = binary.charAt(29);
+            char b4b4 = binary.charAt(27);
+            char b4b7 = binary.charAt(24);
+
             // Byte 3 (bits 16-23)
-            parseByte3(status, binary.substring(16, 24));
-            
+            char b3b0 = binary.charAt(23);
+            char b3b1 = binary.charAt(22);
+            char b3b2 = binary.charAt(21);
+
             // Byte 2 (bits 8-15)
-            parseByte2(status, binary.substring(8, 16));
-            
+            char b2b0 = binary.charAt(15);
+            char b2b1 = binary.charAt(14);
+
             // Byte 1 (bits 0-7)
-            parseByte1(status, binary.substring(0, 8));
-            
+            char b1b0 = binary.charAt(7);
+            char b1b1 = binary.charAt(6);
+            char b1b2 = binary.charAt(5);
+            char b1b3 = binary.charAt(4);
+            char b1b4 = binary.charAt(3);
+            char b1b5 = binary.charAt(2);
+
+            return new DeviceStatus(
+                    b1b0 == '0',
+                    b1b1 == '0',
+                    b1b2 == '0',
+                    b1b3 == '0',
+                    b1b4 == '0',
+                    b1b5 == '0',
+                    b2b0 == '0',
+                    b2b1 == '0',
+                    b3b0 == '0',
+                    b3b1 == '0',
+                    b3b2 == '0',
+                    b4b0 == '0',
+                    b4b2 == '0',
+                    b4b4 == '0',
+                    b4b7 == '0'
+            );
         } catch (Exception e) {
-            status.put("parse_error", e.getMessage());
+            return DeviceStatus.allClear();
         }
-        
-        return status;
-    }
-    
-    private static void parseByte1(Map<String, Object> status, String byteStr) {
-        // Bit 0: GPS Status (0=located, 1=not located)
-        boolean gpsLocated = byteStr.charAt(7) == '0';
-        status.put("gps_located", gpsLocated);
-        
-        // Bit 1: Vehicle security condition
-        boolean securityActive = byteStr.charAt(6) == '0';
-        status.put("security_active", securityActive);
-        
-        // Bit 2: ACC off
-        boolean accOff = byteStr.charAt(5) == '0';
-        status.put("acc_off", accOff);
-        
-        // Bit 3: SOS Alarm
-        boolean sosAlarm = byteStr.charAt(4) == '0';
-        status.put("sos_alarm", sosAlarm);
-        
-        // Bit 4: Vibration Alarm
-        boolean vibrationAlarm = byteStr.charAt(3) == '0';
-        status.put("vibration_alarm", vibrationAlarm);
-        
-        // Bit 5: Low Battery Alarm
-        boolean lowBatteryAlarm = byteStr.charAt(2) == '0';
-        status.put("low_battery_alarm", lowBatteryAlarm);
-    }
-    
-    private static void parseByte2(Map<String, Object> status, String byteStr) {
-        // Bit 0: Power cut-off alarm
-        boolean powerCutAlarm = byteStr.charAt(7) == '0';
-        status.put("power_cut_alarm", powerCutAlarm);
-        
-        // Bit 1: Device powered by backup battery
-        boolean backupBattery = byteStr.charAt(6) == '0';
-        status.put("backup_battery", backupBattery);
-    }
-    
-    private static void parseByte3(Map<String, Object> status, String byteStr) {
-        // Bit 0: Anti-tamper alarm
-        boolean antiTamperAlarm = byteStr.charAt(7) == '0';
-        status.put("anti_tamper_alarm", antiTamperAlarm);
-        
-        // Bit 1: Cut off oil condition
-        boolean oilCutOff = byteStr.charAt(6) == '0';
-        status.put("oil_cut_off", oilCutOff);
-        
-        // Bit 2: Vehicle battery remove condition alarm
-        boolean batteryRemoved = byteStr.charAt(5) == '0';
-        status.put("battery_removed", batteryRemoved);
-    }
-    
-    private static void parseByte4(Map<String, Object> status, String byteStr) {
-        // Bit 0: Door open
-        boolean doorOpen = byteStr.charAt(7) == '0';
-        status.put("door_open", doorOpen);
-        
-        // Bit 2: Overspeeding alarm
-        boolean overspeedAlarm = byteStr.charAt(5) == '0';
-        status.put("overspeed_alarm", overspeedAlarm);
-        
-        // Bit 4: Fence-in alarm
-        boolean fenceInAlarm = byteStr.charAt(3) == '0';
-        status.put("fence_in_alarm", fenceInAlarm);
-        
-        // Bit 7: Fence-out alarm
-        boolean fenceOutAlarm = byteStr.charAt(0) == '0';
-        status.put("fence_out_alarm", fenceOutAlarm);
-    }
-    
-    public static boolean isAlarmActive(Map<String, Object> status) {
-        return (boolean) status.getOrDefault("sos_alarm", false) ||
-               (boolean) status.getOrDefault("vibration_alarm", false) ||
-               (boolean) status.getOrDefault("low_battery_alarm", false) ||
-               (boolean) status.getOrDefault("power_cut_alarm", false) ||
-               (boolean) status.getOrDefault("anti_tamper_alarm", false) ||
-               (boolean) status.getOrDefault("overspeed_alarm", false) ||
-               (boolean) status.getOrDefault("fence_in_alarm", false) ||
-               (boolean) status.getOrDefault("fence_out_alarm", false);
     }
 }

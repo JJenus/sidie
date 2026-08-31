@@ -1,5 +1,7 @@
 package com.jjenus.tracker.notification.api;
 
+import com.jjenus.tracker.notification.api.dto.WebhookEmailPayload;
+import com.jjenus.tracker.notification.api.dto.WebhookPushPayload;
 import com.jjenus.tracker.notification.domain.entity.Delivery;
 import com.jjenus.tracker.notification.domain.entity.DeliveryEvent;
 import com.jjenus.tracker.notification.domain.entity.Device;
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -43,14 +44,14 @@ public class WebhookController {
     @PostMapping("/push/{provider}")
     public ResponseEntity<Void> handlePushCallback(
             @PathVariable String provider,
-            @RequestBody Map<String, Object> payload) {
+            @RequestBody WebhookPushPayload payload) {
 
         logger.info("Received push callback from provider {}: {}", provider, payload);
 
-        String deliveryId = (String) payload.get("deliveryId");
-        String status = (String) payload.get("status");
-        String errorCode = (String) payload.get("errorCode");
-        String errorMessage = (String) payload.get("errorMessage");
+        String deliveryId = payload.deliveryId();
+        String status = payload.status();
+        String errorCode = payload.errorCode();
+        String errorMessage = payload.errorMessage();
 
         if (deliveryId == null) {
             logger.warn("Push callback missing deliveryId");
@@ -101,13 +102,13 @@ public class WebhookController {
     @PostMapping("/email/{provider}")
     public ResponseEntity<Void> handleEmailCallback(
             @PathVariable String provider,
-            @RequestBody Map<String, Object> payload) {
+            @RequestBody WebhookEmailPayload payload) {
 
         logger.info("Received email callback from provider {}: {}", provider, payload);
 
-        String deliveryId = (String) payload.get("deliveryId");
-        String status = (String) payload.get("status");
-        String errorMessage = (String) payload.get("errorMessage");
+        String deliveryId = payload.deliveryId();
+        String status = payload.status();
+        String errorMessage = payload.errorMessage();
 
         if (deliveryId == null) {
             return ResponseEntity.badRequest().build();
