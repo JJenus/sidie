@@ -57,6 +57,9 @@ public class AlertRule {
     @Column(name = "cooldown_minutes")
     private Integer cooldownMinutes = 5;
 
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @Column(name = "created_by", length = 100)
     private String createdBy;
 
@@ -132,4 +135,7 @@ public class AlertRule {
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+
+    public Long getOrganizationId() { return organizationId; }
+    public void setOrganizationId(Long organizationId) { this.organizationId = organizationId; }
 }

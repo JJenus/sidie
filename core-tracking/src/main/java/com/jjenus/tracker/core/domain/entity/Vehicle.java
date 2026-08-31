@@ -67,6 +67,9 @@ public class Vehicle {
     @OneToMany(mappedBy = "vehicle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Tracker> trackers = new ArrayList<>();
 
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @OneToMany(mappedBy = "vehicle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Trip> trips = new ArrayList<>();
 
@@ -228,6 +231,9 @@ public class Vehicle {
     
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    
+    public Long getOrganizationId() { return organizationId; }
+    public void setOrganizationId(Long organizationId) { this.organizationId = organizationId; }
     
     // Additional getters/setters
     public String getLicensePlate() { return licensePlate; }

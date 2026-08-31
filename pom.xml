@@ -17,6 +17,7 @@
         <module>device-comm</module>
         <module>alerting</module>
         <module>notification</module>
+        <module>user-auth</module>
         <module>main-app</module>
     </modules>
 
@@ -70,6 +71,11 @@
             <dependency>
                 <groupId>com.jjenus.tracker</groupId>
                 <artifactId>notification</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.jjenus.tracker</groupId>
+                <artifactId>user-auth</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

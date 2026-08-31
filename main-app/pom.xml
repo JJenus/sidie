@@ -77,6 +77,10 @@
             <groupId>com.jjenus.tracker</groupId>
             <artifactId>notification</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.jjenus.tracker</groupId>
+            <artifactId>user-auth</artifactId>
+        </dependency>
 
         <!-- Redis client (lettuce is auto-configured by spring-boot-starter-data-redis) -->
 
