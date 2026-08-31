@@ -3,6 +3,7 @@ package com.jjenus.tracker.alerting.domain;
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
 import com.jjenus.tracker.shared.domain.LocationPoint;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -55,7 +56,7 @@ public class IdleTimeRule implements IAlertRule {
     public AlertDetectedEvent evaluate(String vehicleId, LocationPoint newLocation) {
         if (!enabled) return null;
 
-        Instant now = Instant.now();
+        Instant now = TimeProvider.now();
         Instant lastMovement = lastMovementTimes.get(vehicleId);
 
         if (newLocation.speedKmh() > 1.0) {

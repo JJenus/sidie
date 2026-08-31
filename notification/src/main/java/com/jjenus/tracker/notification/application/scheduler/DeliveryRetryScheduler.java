@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
@@ -24,20 +25,23 @@ public class DeliveryRetryScheduler {
     private final DeliveryRepository deliveryRepository;
     private final DeliveryEventRepository eventRepository;
     private final NotificationDispatcher dispatcher;
+    private final Clock clock;
 
     public DeliveryRetryScheduler(DeliveryRepository deliveryRepository,
                                  DeliveryEventRepository eventRepository,
-                                 NotificationDispatcher dispatcher) {
+                                 NotificationDispatcher dispatcher,
+                                 Clock clock) {
         this.deliveryRepository = deliveryRepository;
         this.eventRepository = eventRepository;
         this.dispatcher = dispatcher;
+        this.clock = clock;
     }
 
     @Scheduled(fixedDelay = 30000)
     @Transactional
     public void processRetries() {
         logger.info("Starting retry scheduler run");
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         List<Delivery> failedDeliveries = deliveryRepository
             .findByStatusAndNextRetryAtLessThanEqual(DeliveryStatus.FAILED, now);

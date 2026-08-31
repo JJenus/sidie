@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +27,7 @@ public class DisconnectionScheduler {
     private final VehicleActivityTracker activityTracker;
     private final AlertDeduplicator deduplicator;
     private final EventPublisher eventPublisher;
+    private final Clock clock;
 
     @Value("${alerting.disconnect.threshold-minutes:5}")
     private int thresholdMinutes;
@@ -33,16 +35,18 @@ public class DisconnectionScheduler {
     public DisconnectionScheduler(
             VehicleActivityTracker activityTracker,
             AlertDeduplicator deduplicator,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            Clock clock) {
         this.activityTracker = activityTracker;
         this.deduplicator = deduplicator;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Scheduled(fixedDelayString = "${alerting.disconnect.check-interval-ms:60000}")
     public void checkDisconnectedVehicles() {
         Set<String> activeVehicles = activityTracker.getAllActiveVehicleIds();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         int disconnected = 0;
 
         for (String vehicleId : activeVehicles) {

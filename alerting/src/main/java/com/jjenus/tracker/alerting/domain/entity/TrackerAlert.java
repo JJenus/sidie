@@ -2,6 +2,7 @@ package com.jjenus.tracker.alerting.domain.entity;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertSeverity;
 import com.jjenus.tracker.alerting.domain.enums.AlertType;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -40,7 +41,7 @@ public class TrackerAlert {
     private String locationId;
     
     @Column(name = "triggered_at", nullable = false)
-    private Instant triggeredAt = Instant.now();
+    private Instant triggeredAt = Instant.EPOCH;
     
     @Column(name = "acknowledged")
     private Boolean acknowledged = false;
@@ -68,27 +69,27 @@ public class TrackerAlert {
     private Map<String, Object> metadata = new HashMap<>();
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
-    
+    private Instant createdAt = Instant.EPOCH;
+
     @Column(name = "updated_at")
-    private Instant updatedAt = Instant.now();
-    
+    private Instant updatedAt = Instant.EPOCH;
+
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
-    
+
     // Business methods
     public void acknowledge(String acknowledgedBy) {
         this.acknowledged = true;
         this.acknowledgedBy = acknowledgedBy;
-        this.acknowledgedAt = Instant.now();
+        this.acknowledgedAt = TimeProvider.now();
     }
-    
+
     public void resolve(String resolvedBy, String resolutionNotes) {
         this.resolved = true;
         this.resolvedBy = resolvedBy;
-        this.resolvedAt = Instant.now();
+        this.resolvedAt = TimeProvider.now();
         this.resolutionNotes = resolutionNotes;
     }
     

@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -23,10 +24,12 @@ public class AlertRuleFactory {
 
     private final GeofenceService geofenceService;
     private final RuleStateStore stateStore;
+    private final Clock clock;
 
-    public AlertRuleFactory(GeofenceService geofenceService, RuleStateStore stateStore) {
+    public AlertRuleFactory(GeofenceService geofenceService, RuleStateStore stateStore, Clock clock) {
         this.geofenceService = geofenceService;
         this.stateStore = stateStore;
+        this.clock = clock;
     }
 
     /**
@@ -148,7 +151,7 @@ public class AlertRuleFactory {
                         point.getLatitude(),
                         point.getLongitude(),
                         0.0f, // Speed not relevant for geofence points
-                        java.time.Instant.now()
+                        clock.instant()
                 ))
                 .toList();
     }
@@ -167,7 +170,7 @@ public class AlertRuleFactory {
                     lat + latOffset,
                     lon + lonOffset,
                     0.0f,
-                    java.time.Instant.now()
+                    clock.instant()
             ));
         }
 

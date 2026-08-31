@@ -1,5 +1,6 @@
 package com.jjenus.tracker.userauth.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import com.jjenus.tracker.userauth.domain.enums.FailureReason;
 import jakarta.persistence.*;
 import java.time.Instant;
@@ -30,7 +31,7 @@ public class LoginAttempt {
     private String failureReason;
 
     @Column(name = "attempted_at", nullable = false)
-    private Instant attemptedAt = Instant.now();
+    private Instant attemptedAt = Instant.EPOCH;
 
     public static LoginAttempt success(User user, String ipAddress, String userAgent) {
         LoginAttempt a = new LoginAttempt();

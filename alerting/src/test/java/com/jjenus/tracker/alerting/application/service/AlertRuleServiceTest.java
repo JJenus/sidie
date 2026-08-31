@@ -25,6 +25,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -33,6 +36,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AlertRuleServiceTest {
+
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-08-30T12:00:00Z"), ZoneOffset.UTC);
 
     @Mock
     private AlertRuleRepository ruleRepository;
@@ -63,6 +69,19 @@ class AlertRuleServiceTest {
 
     @BeforeEach
     void setUp() {
+        alertRuleService = new AlertRuleService(
+            ruleRepository,
+            ruleCacheService,
+            vehicleRuleCacheService,
+            null, // GeofenceCacheService
+            geofenceRuleValidator,
+            null, // GeofenceService
+            objectMapper,
+            redisTemplate,
+            keyGenerator,
+            FIXED_CLOCK
+        );
+
         testRule = AlertRuleTestBuilder.defaultRule()
             .ruleKey("test-rule")
             .vehicleId("vehicle-001")

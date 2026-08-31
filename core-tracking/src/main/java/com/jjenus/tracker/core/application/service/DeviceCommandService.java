@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,16 @@ public class DeviceCommandService {
     private DeviceCommandRepository commandRepository;
     @Autowired
     private TrackerRepository trackerRepository;
+    private final Clock clock;
+
+    public DeviceCommandService(
+            DeviceCommandRepository commandRepository,
+            TrackerRepository trackerRepository,
+            Clock clock) {
+        this.commandRepository = commandRepository;
+        this.trackerRepository = trackerRepository;
+        this.clock = clock;
+    }
 
     @Transactional
     public DeviceCommand createCommand(String trackerId, CommandType commandType,
@@ -32,7 +43,7 @@ public class DeviceCommandService {
         command.setCommandData(commandData);
         command.setStatus(CommandStatus.PENDING);
         command.setInitiatedBy(initiatedBy);
-        command.setCreatedAt(Instant.now());
+        command.setCreatedAt(clock.instant());
 
         return commandRepository.save(command);
     }
@@ -45,11 +56,11 @@ public class DeviceCommandService {
                 .orElseThrow(() -> new IllegalArgumentException("Command not found"));
 
         command.setStatus(status);
-        command.setUpdatedAt(Instant.now());
+        command.setUpdatedAt(clock.instant());
 
         if (responseData != null) {
             command.setResponseData(responseData);
-            command.setRespondedAt(Instant.now());
+            command.setRespondedAt(clock.instant());
         }
 
         if (errorMessage != null) {
@@ -104,7 +115,7 @@ public class DeviceCommandService {
 
     @Transactional
     public void cleanupOldCommands(int daysToKeep) {
-        Instant cutoffTime = Instant.now().minusSeconds(daysToKeep * 24 * 60 * 60);
+        Instant cutoffTime = clock.instant().minusSeconds(daysToKeep * 24 * 60 * 60);
         commandRepository.cleanupOldCommands(cutoffTime);
     }
 }

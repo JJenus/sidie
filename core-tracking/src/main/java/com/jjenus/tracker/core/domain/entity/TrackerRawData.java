@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -26,7 +27,7 @@ public class TrackerRawData {
     private String sourceIp;
     
     @Column(name = "received_at")
-    private Instant receivedAt = Instant.now();
+    private Instant receivedAt = Instant.EPOCH;
     
     @Column(name = "processed")
     private Boolean processed = false;
@@ -38,7 +39,7 @@ public class TrackerRawData {
     private String parsedData;
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
     
     // Getters and Setters
     public Long getRawDataId() { return rawDataId; }

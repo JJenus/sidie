@@ -1,5 +1,6 @@
 package com.jjenus.tracker.alerting.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -26,7 +27,7 @@ public class GeofencePoint {
     private Double longitude;
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
     
     // Getters and Setters
     public Long getPointId() { return pointId; }

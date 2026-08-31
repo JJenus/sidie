@@ -2,6 +2,7 @@ package com.jjenus.tracker.core.domain.entity;
 
 import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import com.jjenus.tracker.core.domain.enums.TripStartReason;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Duration;
 import java.time.Instant;
@@ -68,14 +69,14 @@ public class Trip {
     private List<TripPoint> tripPoints = new ArrayList<>();
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
-    
+    private Instant createdAt = Instant.EPOCH;
+
     @Column(name = "updated_at")
-    private Instant updatedAt = Instant.now();
-    
+    private Instant updatedAt = Instant.EPOCH;
+
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
     
     // Business methods

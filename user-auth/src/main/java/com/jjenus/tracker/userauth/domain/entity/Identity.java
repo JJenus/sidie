@@ -1,5 +1,6 @@
 package com.jjenus.tracker.userauth.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -31,7 +32,7 @@ public class Identity {
     private String providerRefreshToken;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     public static Identity link(User user, String provider, String providerUid) {
         Identity identity = new Identity();

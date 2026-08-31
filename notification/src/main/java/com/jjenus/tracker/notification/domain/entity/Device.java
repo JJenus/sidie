@@ -1,9 +1,9 @@
 package com.jjenus.tracker.notification.domain.entity;
 
 import com.jjenus.tracker.notification.domain.enums.DevicePlatform;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "devices", indexes = {
@@ -38,23 +38,24 @@ public class Device {
     private boolean isValid = true;
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @PrePersist
     protected void onCreate() {
         if (deviceId == null) {
-            deviceId = UUID.randomUUID().toString();
+            deviceId = TimeProvider.newId();
         }
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
+        Instant now = TimeProvider.now();
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = TimeProvider.now();
     }
 
     public void markInvalid() {

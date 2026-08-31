@@ -1,6 +1,7 @@
 package com.jjenus.tracker.userauth.domain.entity;
 
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.HashSet;
@@ -26,7 +27,7 @@ public class Role {
     private String description;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(

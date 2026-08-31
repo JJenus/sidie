@@ -2,6 +2,7 @@ package com.jjenus.tracker.userauth.application.service;
 
 import com.jjenus.tracker.shared.exception.BusinessRuleException;
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import com.jjenus.tracker.userauth.application.dto.LoginResponse;
 import com.jjenus.tracker.userauth.application.dto.RegisterRequest;
 import com.jjenus.tracker.userauth.application.dto.RegisterResponse;
@@ -367,7 +368,7 @@ public class AuthService {
         if (base.length() < 3) base = (base + "-org").substring(0, Math.min(100, base.length() + 4));
         if (base.length() > 100) base = base.substring(0, 100);
         if (organizationRepository.existsBySlug(base)) {
-            base = base.substring(0, Math.min(95, base.length())) + "-" + UUID.randomUUID().toString().substring(0, 4);
+            base = base.substring(0, Math.min(95, base.length())) + "-" + TimeProvider.newId().substring(0, 4);
         }
         return base;
     }

@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +25,11 @@ import java.util.Map;
 public class AlertController {
 
     private final AlertService alertService;
+    private final Clock clock;
 
-    public AlertController(AlertService alertService) {
+    public AlertController(AlertService alertService, Clock clock) {
         this.alertService = alertService;
+        this.clock = clock;
     }
 
     // ========== CRUD ENDPOINTS ==========
@@ -186,8 +189,8 @@ public class AlertController {
             @Parameter(description = "Start date for statistics (ISO format)")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startDate) {
 
-        Instant start = startDate != null ? startDate : Instant.now().minusSeconds(7 * 24 * 60 * 60); // Default: last 7 days
-        Map<String, Long> stats = alertService.getAlertStatistics(start, Instant.now());
+        Instant start = startDate != null ? startDate : clock.instant().minusSeconds(7 * 24 * 60 * 60); // Default: last 7 days
+        Map<String, Long> stats = alertService.getAlertStatistics(start, clock.instant());
         return ResponseEntity.ok(stats);
     }
 

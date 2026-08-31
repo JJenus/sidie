@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -49,6 +50,7 @@ public class AlertRuleService {
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisKeyGenerator keyGenerator;
+    private final Clock clock;
 
     public AlertRuleService(
             AlertRuleRepository ruleRepository,
@@ -59,7 +61,8 @@ public class AlertRuleService {
             GeofenceService geofenceService,
             ObjectMapper objectMapper,
             RedisTemplate<String, Object> redisTemplate,
-            RedisKeyGenerator keyGenerator) {
+            RedisKeyGenerator keyGenerator,
+            Clock clock) {
         this.ruleRepository = ruleRepository;
         this.ruleCacheService = ruleCacheService;
         this.vehicleRuleCacheService = vehicleRuleCacheService;
@@ -69,6 +72,7 @@ public class AlertRuleService {
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
         this.keyGenerator = keyGenerator;
+        this.clock = clock;
     }
 
     // ========== TEMPLATE METHODS ==========
@@ -331,7 +335,7 @@ public class AlertRuleService {
         }
 
         if (hasChanges) {
-            rule.setUpdatedAt(Instant.now());
+            rule.setUpdatedAt(clock.instant());
             AlertRule updated = ruleRepository.save(rule);
 
             // Update cache
@@ -372,7 +376,7 @@ public class AlertRuleService {
 
         if (!Boolean.TRUE.equals(rule.isEnabled())) {
             rule.setIsEnabled(true);
-            rule.setUpdatedAt(Instant.now());
+            rule.setUpdatedAt(clock.instant());
             ruleRepository.save(rule);
 
             // Update cache
@@ -407,7 +411,7 @@ public class AlertRuleService {
 
         if (Boolean.TRUE.equals(rule.isEnabled())) {
             rule.setIsEnabled(false);
-            rule.setUpdatedAt(Instant.now());
+            rule.setUpdatedAt(clock.instant());
             ruleRepository.save(rule);
 
             // Remove from cache
@@ -477,7 +481,7 @@ public class AlertRuleService {
 
     private AlertRule saveAndCacheRule(AlertRule rule) {
         // Set timestamps
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         if (rule.getCreatedAt() == null) {
             rule.setCreatedAt(now);
         }
@@ -608,8 +612,8 @@ public class AlertRuleService {
         rule.setRuleType(ruleType);
         rule.setParameters(parameters);
         rule.setCooldownMinutes(5);
-        rule.setCreatedAt(Instant.now());
-        rule.setUpdatedAt(Instant.now());
+        rule.setCreatedAt(clock.instant());
+        rule.setUpdatedAt(clock.instant());
 
         return rule;
     }

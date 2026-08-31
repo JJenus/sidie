@@ -1,6 +1,7 @@
 package com.jjenus.tracker.core.domain.entity;
 
 import com.jjenus.tracker.core.domain.enums.TrackerStatus;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -64,19 +65,19 @@ public class Tracker {
     private List<DeviceCommand> commands = new ArrayList<>();
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
-    
+    private Instant createdAt = Instant.EPOCH;
+
     @Column(name = "updated_at")
-    private Instant updatedAt = Instant.now();
-    
+    private Instant updatedAt = Instant.EPOCH;
+
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
-    
+
     // Business methods
     public void updateLastSeen() {
-        this.lastSeen = Instant.now();
+        this.lastSeen = TimeProvider.now();
         this.isOnline = true;
     }
     

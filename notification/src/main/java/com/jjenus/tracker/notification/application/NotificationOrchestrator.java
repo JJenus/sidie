@@ -20,12 +20,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Service
 @Transactional
@@ -40,6 +42,8 @@ public class NotificationOrchestrator {
     private final NotificationQueuePublisher queuePublisher;
     private final PreferenceResolver preferenceResolver;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
+    private final Supplier<UUID> uuidSupplier;
 
     public NotificationOrchestrator(
         NotificationHubRepository hubRepository,
@@ -48,7 +52,23 @@ public class NotificationOrchestrator {
         DeliveryEventRepository eventRepository,
         NotificationQueuePublisher queuePublisher,
         PreferenceResolver preferenceResolver,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        Clock clock
+    ) {
+        this(hubRepository, templateRepository, deliveryRepository, eventRepository,
+             queuePublisher, preferenceResolver, objectMapper, clock, UUID::randomUUID);
+    }
+
+    NotificationOrchestrator(
+        NotificationHubRepository hubRepository,
+        NotificationTemplateRepository templateRepository,
+        DeliveryRepository deliveryRepository,
+        DeliveryEventRepository eventRepository,
+        NotificationQueuePublisher queuePublisher,
+        PreferenceResolver preferenceResolver,
+        ObjectMapper objectMapper,
+        Clock clock,
+        Supplier<UUID> uuidSupplier
     ) {
         this.hubRepository = hubRepository;
         this.templateRepository = templateRepository;
@@ -57,6 +77,8 @@ public class NotificationOrchestrator {
         this.queuePublisher = queuePublisher;
         this.preferenceResolver = preferenceResolver;
         this.objectMapper = objectMapper;
+        this.clock = clock;
+        this.uuidSupplier = uuidSupplier;
     }
 
     public void processAlert(AlertRaisedEvent alert) {
@@ -85,7 +107,7 @@ public class NotificationOrchestrator {
             : (message.getCategory() != null ? message.getCategory() : "DEFAULT");
 
         NotificationHub hub = new NotificationHub();
-        hub.setNotificationId(UUID.randomUUID().toString());
+        hub.setNotificationId(uuidSupplier.get().toString());
         hub.setUserId(message.getUserId());
         hub.setTemplateId(template.getTemplateId());
         hub.setCategory(category);
@@ -109,7 +131,7 @@ public class NotificationOrchestrator {
                 DeliveryEvent event = DeliveryEvent.created(
                     delivery.getDeliveryId(),
                     "Created via queue for alert: " + message.getAlertId(),
-                    Instant.now()
+                    clock.instant()
                 );
                 eventRepository.save(event);
             }
@@ -132,7 +154,7 @@ public class NotificationOrchestrator {
     private Delivery createDelivery(NotificationHub hub, NotificationChannel channel,
                                    NotificationTemplate template, Map<String, Object> context) {
         Delivery delivery = new Delivery();
-        delivery.setDeliveryId(UUID.randomUUID().toString());
+        delivery.setDeliveryId(uuidSupplier.get().toString());
         delivery.setChannel(channel);
         delivery.setTemplateId(template.getTemplateId());
         delivery.setTitle(renderTemplate(template.getSubjectTemplate(), context));

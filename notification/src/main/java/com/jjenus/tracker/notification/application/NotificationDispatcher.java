@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +30,7 @@ public class NotificationDispatcher {
     private final DeliveryRepository deliveryRepository;
     private final DeliveryEventRepository eventRepository;
     private final DeviceRepository deviceRepository;
+    private final Clock clock;
 
     public NotificationDispatcher(
         WebSocketNotificationService webSocketService,
@@ -37,12 +39,14 @@ public class NotificationDispatcher {
         PushNotificationService pushService,
         DeliveryRepository deliveryRepository,
         DeliveryEventRepository eventRepository,
-        DeviceRepository deviceRepository
+        DeviceRepository deviceRepository,
+        Clock clock
     ) {
         this.serviceMap = new ConcurrentHashMap<>();
         this.deliveryRepository = deliveryRepository;
         this.eventRepository = eventRepository;
         this.deviceRepository = deviceRepository;
+        this.clock = clock;
 
         serviceMap.put(NotificationChannel.WEBSOCKET, webSocketService);
         serviceMap.put(NotificationChannel.EMAIL, emailService);
@@ -101,12 +105,13 @@ public class NotificationDispatcher {
     }
 
     private void handleSuccess(Delivery delivery) {
+        Instant now = clock.instant();
         delivery.setStatus(DeliveryStatus.SENT);
-        delivery.setSentAt(Instant.now());
+        delivery.setSentAt(now);
         delivery.setNextRetryAt(null);
         deliveryRepository.save(delivery);
 
-        DeliveryEvent event = DeliveryEvent.sent(delivery.getDeliveryId(), null, Instant.now());
+        DeliveryEvent event = DeliveryEvent.sent(delivery.getDeliveryId(), null, now);
         eventRepository.save(event);
 
         logger.info("Successfully dispatched delivery {} via {}",
@@ -114,6 +119,7 @@ public class NotificationDispatcher {
     }
 
     private void handleFailure(Delivery delivery, String error, ErrorType errorType) {
+        Instant now = clock.instant();
         delivery.setStatus(DeliveryStatus.FAILED);
         delivery.setLastError(error);
         delivery.setLastErrorType(errorType);
@@ -134,7 +140,7 @@ public class NotificationDispatcher {
                 DeliveryEvent retryEvent = DeliveryEvent.retryScheduled(
                     delivery.getDeliveryId(),
                     "Next retry at: " + delivery.getNextRetryAt(),
-                    Instant.now()
+                    now
                 );
                 eventRepository.save(retryEvent);
             } else {
@@ -143,7 +149,7 @@ public class NotificationDispatcher {
                 DeliveryEvent exhaustedEvent = DeliveryEvent.exhausted(
                     delivery.getDeliveryId(),
                     "Max attempts reached",
-                    Instant.now()
+                    now
                 );
                 eventRepository.save(exhaustedEvent);
             }
@@ -151,7 +157,7 @@ public class NotificationDispatcher {
 
         deliveryRepository.save(delivery);
 
-        DeliveryEvent failedEvent = DeliveryEvent.failed(delivery.getDeliveryId(), error, Instant.now());
+        DeliveryEvent failedEvent = DeliveryEvent.failed(delivery.getDeliveryId(), error, now);
         eventRepository.save(failedEvent);
 
         logger.error("Failed to dispatch delivery {}: {}", delivery.getDeliveryId(), error);

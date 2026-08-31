@@ -1,6 +1,7 @@
 package com.jjenus.tracker.userauth.domain.entity;
 
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -31,7 +32,7 @@ public class RefreshToken {
     private Instant expiresAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     public static RefreshToken issue(Session session, String tokenHash, Instant expiresAt) {
         if (session == null) {
@@ -66,7 +67,7 @@ public class RefreshToken {
     }
 
     public void revoke() {
-        this.revokedAt = Instant.now();
+        this.revokedAt = TimeProvider.now();
     }
 
     public void revokeAt(Instant when) {

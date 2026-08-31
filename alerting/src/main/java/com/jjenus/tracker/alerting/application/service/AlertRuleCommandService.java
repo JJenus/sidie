@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 
@@ -32,16 +33,19 @@ public class AlertRuleCommandService {
     private final AlertRuleQueryService ruleQueryService;
     private final GeofenceRuleValidator geofenceRuleValidator;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     public AlertRuleCommandService(
             AlertRuleRepository ruleRepository,
             AlertRuleQueryService ruleQueryService,
             GeofenceRuleValidator geofenceRuleValidator,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            Clock clock) {
         this.ruleRepository = ruleRepository;
         this.ruleQueryService = ruleQueryService;
         this.geofenceRuleValidator = geofenceRuleValidator;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     // ========== TEMPLATE METHODS ==========
@@ -183,7 +187,7 @@ public class AlertRuleCommandService {
         }
 
         if (hasChanges) {
-            rule.setUpdatedAt(Instant.now());
+            rule.setUpdatedAt(clock.instant());
             AlertRule updated = ruleRepository.save(rule);
 
             logger.info("Alert rule updated successfully: {}", ruleKey);
@@ -211,7 +215,7 @@ public class AlertRuleCommandService {
 
         if (!Boolean.TRUE.equals(rule.isEnabled())) {
             rule.setIsEnabled(true);
-            rule.setUpdatedAt(Instant.now());
+            rule.setUpdatedAt(clock.instant());
             ruleRepository.save(rule);
 
             logger.info("Alert rule enabled: {}", ruleKey);
@@ -237,7 +241,7 @@ public class AlertRuleCommandService {
 
         if (Boolean.TRUE.equals(rule.isEnabled())) {
             rule.setIsEnabled(false);
-            rule.setUpdatedAt(Instant.now());
+            rule.setUpdatedAt(clock.instant());
             ruleRepository.save(rule);
 
             logger.info("Alert rule disabled: {}", ruleKey);
@@ -310,7 +314,7 @@ public class AlertRuleCommandService {
     // ========== HELPER METHODS ==========
 
     private AlertRule saveRule(AlertRule rule) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         if (rule.getCreatedAt() == null) {
             rule.setCreatedAt(now);
         }
@@ -429,8 +433,8 @@ public class AlertRuleCommandService {
         rule.setRuleType(ruleType);
         rule.setParameters(parameters);
         rule.setCooldownMinutes(5);
-        rule.setCreatedAt(Instant.now());
-        rule.setUpdatedAt(Instant.now());
+        rule.setCreatedAt(clock.instant());
+        rule.setUpdatedAt(clock.instant());
 
         return rule;
     }

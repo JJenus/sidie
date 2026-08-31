@@ -1,6 +1,7 @@
 package com.jjenus.tracker.notification.domain.entity;
 
 import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -49,12 +50,12 @@ public class NotificationTemplate {
     private String variablesDescription;
 
     private String createdBy = "system";
-    private Instant createdAt = Instant.now();
-    private Instant updatedAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
+    private Instant updatedAt = Instant.EPOCH;
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = TimeProvider.now();
     }
 
     public Long getId() { return id; }

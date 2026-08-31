@@ -3,10 +3,10 @@ package com.jjenus.tracker.notification.domain.entity;
 import com.jjenus.tracker.notification.domain.enums.DeliveryStatus;
 import com.jjenus.tracker.notification.domain.enums.ErrorType;
 import com.jjenus.tracker.notification.domain.enums.NotificationChannel;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "deliveries", indexes = {
@@ -76,34 +76,35 @@ public class Delivery {
     private Instant deliveredAt;
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @PrePersist
     protected void onCreate() {
         if (deliveryId == null) {
-            deliveryId = UUID.randomUUID().toString();
+            deliveryId = TimeProvider.newId();
         }
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
+        Instant now = TimeProvider.now();
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = TimeProvider.now();
     }
 
     public void markSent() {
         this.status = DeliveryStatus.SENT;
-        this.sentAt = Instant.now();
+        this.sentAt = TimeProvider.now();
         this.nextRetryAt = null;
     }
 
     public void markDelivered() {
         this.status = DeliveryStatus.DELIVERED;
-        this.deliveredAt = Instant.now();
+        this.deliveredAt = TimeProvider.now();
     }
 
     public void markFailed(String error, ErrorType errorType) {
@@ -132,7 +133,7 @@ public class Delivery {
             return;
         }
         Duration delay = computeNextRetryDelay(attemptCount);
-        this.nextRetryAt = Instant.now().plus(delay);
+        this.nextRetryAt = TimeProvider.now().plus(delay);
     }
 
     public static Duration computeNextRetryDelay(int attemptCount) {

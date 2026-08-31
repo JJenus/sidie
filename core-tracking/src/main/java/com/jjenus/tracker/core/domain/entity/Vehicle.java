@@ -6,6 +6,7 @@ import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import com.jjenus.tracker.core.exception.TripException;
 import com.jjenus.tracker.core.exception.VehicleException;
 import com.jjenus.tracker.shared.domain.LocationPoint;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Duration;
 import java.time.Instant;
@@ -74,14 +75,14 @@ public class Vehicle {
     private List<Trip> trips = new ArrayList<>();
 
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(name = "updated_at")
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
 
     public void processNewTelemetry(LocationPoint newLocation, Instant now) {
@@ -107,7 +108,7 @@ public class Vehicle {
             throw TripException.alreadyActive(vehicleId);
         }
         Trip trip = new Trip();
-        trip.setTripId("TRIP_" + vehicleId + "_" + java.util.UUID.randomUUID().toString().substring(0, 8));
+        trip.setTripId("TRIP_" + vehicleId + "_" + TimeProvider.newId().substring(0, 8));
         trip.setVehicle(this);
         trip.setStartLocation(null);
         trip.setStartTime(now);

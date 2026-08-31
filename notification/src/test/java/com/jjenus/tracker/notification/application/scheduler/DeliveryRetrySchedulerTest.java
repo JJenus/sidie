@@ -13,7 +13,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,7 +37,8 @@ class DeliveryRetrySchedulerTest {
 
     @BeforeEach
     void setUp() {
-        scheduler = new DeliveryRetryScheduler(deliveryRepository, eventRepository, dispatcher);
+        Clock fixed = Clock.fixed(Instant.parse("2026-08-30T12:00:00Z"), java.time.ZoneOffset.UTC);
+        scheduler = new DeliveryRetryScheduler(deliveryRepository, eventRepository, dispatcher, fixed);
     }
 
     @Test

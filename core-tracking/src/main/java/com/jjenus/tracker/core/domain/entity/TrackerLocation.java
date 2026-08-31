@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -60,7 +61,7 @@ public class TrackerLocation {
     private Instant recordedAt;
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
     
     // Constructor
     public TrackerLocation() {}

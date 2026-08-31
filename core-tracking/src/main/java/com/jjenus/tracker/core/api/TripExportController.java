@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -25,9 +26,11 @@ public class TripExportController {
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     private final TripExportService tripExportService;
+    private final Clock clock;
 
-    public TripExportController(TripExportService tripExportService) {
+    public TripExportController(TripExportService tripExportService, Clock clock) {
         this.tripExportService = tripExportService;
+        this.clock = clock;
     }
 
     @GetMapping("/export")
@@ -42,7 +45,7 @@ public class TripExportController {
         tripExportService.exportToCsv(vehicleId, startDate, endDate, buffer);
 
         String filename = String.format("trips-%s.csv",
-                FILENAME_TS.format(Instant.now()));
+                FILENAME_TS.format(clock.instant()));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,

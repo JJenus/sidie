@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -30,7 +31,7 @@ public class TripPoint {
     private Float segmentDurationMinutes;
     
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
     
     // Getters and Setters
     public Long getTripPointId() { return tripPointId; }

@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -27,9 +28,11 @@ public class TripExportService {
             .withZone(ZoneId.of("UTC"));
 
     private final TripRepository tripRepository;
+    private final Clock clock;
 
-    public TripExportService(TripRepository tripRepository) {
+    public TripExportService(TripRepository tripRepository, Clock clock) {
         this.tripRepository = tripRepository;
+        this.clock = clock;
     }
 
     public void exportToCsv(
@@ -85,7 +88,7 @@ public class TripExportService {
 
     private long durationMinutes(Trip trip) {
         if (trip.getStartTime() == null) return 0;
-        Instant end = trip.getEndTime() != null ? trip.getEndTime() : Instant.now();
+        Instant end = trip.getEndTime() != null ? trip.getEndTime() : clock.instant();
         return java.time.Duration.between(trip.getStartTime(), end).toMinutes();
     }
 

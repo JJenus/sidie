@@ -1,6 +1,7 @@
 package com.jjenus.tracker.alerting.domain.entity;
 
 import com.jjenus.tracker.alerting.domain.enums.AlertRuleType;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -64,14 +65,14 @@ public class AlertRule {
     private String createdBy;
 
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(name = "updated_at")
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
 
     // Business methods
@@ -79,7 +80,7 @@ public class AlertRule {
         if (cooldownMinutes == null || cooldownMinutes == 0) return false;
         if (lastTriggered == null) return false;
 
-        return Instant.now().isBefore(
+        return TimeProvider.now().isBefore(
                 lastTriggered.plusSeconds(cooldownMinutes * 60L)
         );
     }

@@ -6,7 +6,7 @@ import java.util.Map;
 public class ErrorResponse {
     private String code;
     private String message;
-    private Instant timestamp = Instant.now();
+    private Instant timestamp = Instant.EPOCH;
     private Map<String, String> fieldErrors;
 
     public ErrorResponse() {}

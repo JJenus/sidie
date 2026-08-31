@@ -1,6 +1,7 @@
 package com.jjenus.tracker.userauth.domain.entity;
 
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.HashSet;
@@ -25,17 +26,17 @@ public class Organization {
     private String slug;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @OneToMany(mappedBy = "org", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Role> roles = new HashSet<>();
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
 
     public static Organization create(String name, String slug) {

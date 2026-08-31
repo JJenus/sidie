@@ -2,6 +2,7 @@ package com.jjenus.tracker.core.domain.entity;
 
 import com.jjenus.tracker.core.domain.enums.CommandStatus;
 import com.jjenus.tracker.core.domain.enums.CommandType;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -51,37 +52,37 @@ public class DeviceCommand {
     private String initiatedBy;
 
     @Column(name = "created_at")
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(name = "updated_at")
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = Instant.now();
+        this.updatedAt = TimeProvider.now();
     }
 
     // Business methods
     public void markAsSent() {
         this.status = CommandStatus.SENT;
-        this.sentAt = Instant.now();
+        this.sentAt = TimeProvider.now();
     }
 
     public void markAsDelivered(String response) {
         this.status = CommandStatus.DELIVERED;
         this.responseData = response;
-        this.respondedAt = Instant.now();
+        this.respondedAt = TimeProvider.now();
     }
 
     public void markAsFailed(String error) {
         this.status = CommandStatus.FAILED;
         this.errorMessage = error;
-        this.respondedAt = Instant.now();
+        this.respondedAt = TimeProvider.now();
     }
 
     public void markAsTimeout() {
         this.status = CommandStatus.TIMEOUT;
-        this.respondedAt = Instant.now();
+        this.respondedAt = TimeProvider.now();
     }
 
     public void incrementRetryCount() {

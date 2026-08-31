@@ -7,6 +7,7 @@ import com.jjenus.tracker.shared.events.VehicleUpdatedEvent;
 import com.jjenus.tracker.shared.metrics.MetricsRegistry;
 import com.jjenus.tracker.shared.pubsub.EventPublisher;
 import com.jjenus.tracker.shared.redis.VehicleActivityTracker;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.annotation.JmsListener;
@@ -16,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.UUID;
 
 @Component
 public class VehicleEventHandler {
@@ -58,7 +58,7 @@ public class VehicleEventHandler {
 
             VehicleUpdatedEvent vehicleUpdatedEvent = new VehicleUpdatedEvent(
                     clock,
-                    UUID.randomUUID(),
+                    TimeProvider.newUuid(),
                     vehicleId,
                     event.getLocation(),
                     event.getMetaData()

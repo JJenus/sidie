@@ -1,5 +1,6 @@
 package com.jjenus.tracker.core.domain.entity;
 
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -43,14 +44,14 @@ public class TrackerAssignment {
     @PrePersist
     protected void onCreate() {
         if (assignedAt == null) {
-            assignedAt = Instant.now();
+            assignedAt = TimeProvider.now();
         }
     }
 
     // Business methods
     public void deactivateAssignment(String removedBy, String reason) {
         this.isActive = false;
-        this.removedAt = Instant.now();
+        this.removedAt = TimeProvider.now();
         this.removedBy = removedBy;
         this.removalReason = reason;
     }

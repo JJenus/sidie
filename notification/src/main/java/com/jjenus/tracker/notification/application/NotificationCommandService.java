@@ -14,9 +14,11 @@ import com.jjenus.tracker.notification.infrastructure.repository.NotificationTem
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,24 +29,40 @@ public class NotificationCommandService {
     private final DeliveryEventRepository eventRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final NotificationTemplateRepository templateRepository;
+    private final Clock clock;
+    private final Supplier<UUID> uuidSupplier;
 
     public NotificationCommandService(
         DeliveryRepository deliveryRepository,
         DeliveryEventRepository eventRepository,
         NotificationPreferenceRepository preferenceRepository,
-        NotificationTemplateRepository templateRepository
+        NotificationTemplateRepository templateRepository,
+        Clock clock
+    ) {
+        this(deliveryRepository, eventRepository, preferenceRepository, templateRepository, clock, UUID::randomUUID);
+    }
+
+    NotificationCommandService(
+        DeliveryRepository deliveryRepository,
+        DeliveryEventRepository eventRepository,
+        NotificationPreferenceRepository preferenceRepository,
+        NotificationTemplateRepository templateRepository,
+        Clock clock,
+        Supplier<UUID> uuidSupplier
     ) {
         this.deliveryRepository = deliveryRepository;
         this.eventRepository = eventRepository;
         this.preferenceRepository = preferenceRepository;
         this.templateRepository = templateRepository;
+        this.clock = clock;
+        this.uuidSupplier = uuidSupplier;
     }
 
     public void markAsRead(String deliveryId) {
         Delivery delivery = deliveryRepository.findByDeliveryId(deliveryId)
             .orElseThrow(() -> new IllegalArgumentException("Delivery not found: " + deliveryId));
 
-        DeliveryEvent event = DeliveryEvent.opened(deliveryId, "Marked as read", Instant.now());
+        DeliveryEvent event = DeliveryEvent.opened(deliveryId, "Marked as read", clock.instant());
         eventRepository.save(event);
     }
 
@@ -53,7 +71,7 @@ public class NotificationCommandService {
             userId, org.springframework.data.domain.PageRequest.of(0, 1000)
         ).getContent();
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         for (Delivery delivery : deliveries) {
             eventRepository.save(DeliveryEvent.opened(delivery.getDeliveryId(), "Bulk read", now));
         }
@@ -140,7 +158,7 @@ public class NotificationCommandService {
     }
 
     private String generateTemplateId() {
-        return "TMPL_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        return "TMPL_" + uuidSupplier.get().toString().substring(0, 8).toUpperCase();
     }
 
     private NotificationTemplateResponse toTemplateResponse(NotificationTemplate template) {

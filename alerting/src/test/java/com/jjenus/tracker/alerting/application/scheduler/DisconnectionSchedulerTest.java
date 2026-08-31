@@ -17,7 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 
@@ -41,30 +41,21 @@ class DisconnectionSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        scheduler = new DisconnectionScheduler(activityTracker, deduplicator, eventPublisher);
+        Clock clock = Clock.fixed(Instant.parse("2026-08-30T14:00:00Z"), ZoneOffset.UTC);
+        scheduler = new DisconnectionScheduler(activityTracker, deduplicator, eventPublisher, clock);
         ReflectionTestUtils.setField(scheduler, "thresholdMinutes", 5);
-    }
-
-    @Test
-    void checkDisconnectedVehicles_allActive_doesNotPublish() {
-        when(activityTracker.getAllActiveVehicleIds()).thenReturn(Set.of("v1"));
-        when(activityTracker.getLastSeen("v1")).thenReturn(Optional.of(Instant.now()));
-
-        scheduler.checkDisconnectedVehicles();
-
-        verify(eventPublisher, never()).publish(any());
     }
 
     @Test
     void checkDisconnectedVehicles_silentVehicle_publishesAlert() {
         Clock fixed = Clock.fixed(
                 Instant.parse("2026-08-30T14:00:00Z"),
-                ZoneId.of("UTC")
+                ZoneOffset.UTC
         );
-        Instant twoMinutesAgo = fixed.instant().minusSeconds(120);
+        Instant tenMinutesAgo = fixed.instant().minusSeconds(600);
 
         when(activityTracker.getAllActiveVehicleIds()).thenReturn(Set.of("v1"));
-        when(activityTracker.getLastSeen("v1")).thenReturn(Optional.of(twoMinutesAgo));
+        when(activityTracker.getLastSeen("v1")).thenReturn(Optional.of(tenMinutesAgo));
         when(deduplicator.tryAcquire(any(AlertDetectedEvent.class))).thenReturn(true);
 
         scheduler.checkDisconnectedVehicles();
@@ -77,7 +68,7 @@ class DisconnectionSchedulerTest {
 
     @Test
     void checkDisconnectedVehicles_vehicleWithinThreshold_doesNotPublish() {
-        Instant oneMinuteAgo = Instant.now().minusSeconds(60);
+        Instant oneMinuteAgo = fixed().instant().minusSeconds(60);
 
         when(activityTracker.getAllActiveVehicleIds()).thenReturn(Set.of("v1"));
         when(activityTracker.getLastSeen("v1")).thenReturn(Optional.of(oneMinuteAgo));
@@ -99,7 +90,7 @@ class DisconnectionSchedulerTest {
 
     @Test
     void checkDisconnectedVehicles_multipleVehicles_publishesForEach() {
-        Instant tenMinutesAgo = Instant.now().minusSeconds(600);
+        Instant tenMinutesAgo = fixed().instant().minusSeconds(600);
 
         when(activityTracker.getAllActiveVehicleIds()).thenReturn(Set.of("v1", "v2"));
         when(activityTracker.getLastSeen("v1")).thenReturn(Optional.of(tenMinutesAgo));
@@ -109,5 +100,20 @@ class DisconnectionSchedulerTest {
         scheduler.checkDisconnectedVehicles();
 
         verify(eventPublisher, times(2)).publish(any(AlertDetectedEvent.class));
+    }
+
+    @Test
+    void checkDisconnectedVehicles_allActive_doesNotPublish() {
+        Instant justNow = fixed().instant();
+        when(activityTracker.getAllActiveVehicleIds()).thenReturn(Set.of("v1"));
+        when(activityTracker.getLastSeen("v1")).thenReturn(Optional.of(justNow));
+
+        scheduler.checkDisconnectedVehicles();
+
+        verify(eventPublisher, never()).publish(any());
+    }
+
+    private static Clock fixed() {
+        return Clock.fixed(Instant.parse("2026-08-30T14:00:00Z"), ZoneOffset.UTC);
     }
 }

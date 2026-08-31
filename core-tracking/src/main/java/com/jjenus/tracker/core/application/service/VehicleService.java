@@ -5,6 +5,7 @@ import com.jjenus.tracker.core.domain.enums.TripEndReason;
 import com.jjenus.tracker.core.domain.enums.TripStartReason;
 import com.jjenus.tracker.core.infrastructure.repository.*;
 import com.jjenus.tracker.shared.domain.LocationPoint;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -84,7 +85,7 @@ public class VehicleService {
             .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
         
         Trip trip = new Trip();
-        trip.setTripId("TRIP_" + vehicleId + "_" + java.util.UUID.randomUUID().toString().substring(0, 8));
+        trip.setTripId("TRIP_" + vehicleId + "_" + TimeProvider.newId().substring(0, 8));
         trip.setVehicle(vehicle);
         trip.setStartLocation(startLocation);
         trip.setStartTime(startLocation.getRecordedAt());

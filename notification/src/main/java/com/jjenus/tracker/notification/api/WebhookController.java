@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -27,13 +28,16 @@ public class WebhookController {
     private final DeliveryRepository deliveryRepository;
     private final DeliveryEventRepository eventRepository;
     private final DeviceRepository deviceRepository;
+    private final Clock clock;
 
     public WebhookController(DeliveryRepository deliveryRepository,
                             DeliveryEventRepository eventRepository,
-                            DeviceRepository deviceRepository) {
+                            DeviceRepository deviceRepository,
+                            Clock clock) {
         this.deliveryRepository = deliveryRepository;
         this.eventRepository = eventRepository;
         this.deviceRepository = deviceRepository;
+        this.clock = clock;
     }
 
     @PostMapping("/push/{provider}")
@@ -62,15 +66,17 @@ public class WebhookController {
         Delivery delivery = deliveryOpt.get();
 
         if ("DELIVERED".equalsIgnoreCase(status)) {
+            Instant now = clock.instant();
             delivery.setStatus(DeliveryStatus.DELIVERED);
-            delivery.setDeliveredAt(Instant.now());
+            delivery.setDeliveredAt(now);
             deliveryRepository.save(delivery);
-            eventRepository.save(DeliveryEvent.delivered(deliveryId, null, Instant.now()));
+            eventRepository.save(DeliveryEvent.delivered(deliveryId, null, now));
         } else if ("OPENED".equalsIgnoreCase(status)) {
-            eventRepository.save(DeliveryEvent.opened(deliveryId, null, Instant.now()));
+            eventRepository.save(DeliveryEvent.opened(deliveryId, null, clock.instant()));
         } else if ("CLICKED".equalsIgnoreCase(status)) {
-            eventRepository.save(DeliveryEvent.clicked(deliveryId, null, Instant.now()));
+            eventRepository.save(DeliveryEvent.clicked(deliveryId, null, clock.instant()));
         } else if ("FAILED".equalsIgnoreCase(status) || "ERROR".equalsIgnoreCase(status)) {
+            Instant now = clock.instant();
             ErrorType errorType = classifyPushError(errorCode);
             delivery.setStatus(DeliveryStatus.FAILED);
             delivery.setLastError(errorMessage != null ? errorMessage : "Provider error");
@@ -78,7 +84,7 @@ public class WebhookController {
             delivery.incrementAttemptCount();
             deliveryRepository.save(delivery);
 
-            eventRepository.save(DeliveryEvent.failed(deliveryId, errorMessage, Instant.now()));
+            eventRepository.save(DeliveryEvent.failed(deliveryId, errorMessage, now));
 
             if (errorType == ErrorType.PERMANENT && delivery.getDeviceId() != null) {
                 deviceRepository.findById(delivery.getDeviceId()).ifPresent(device -> {
@@ -115,20 +121,22 @@ public class WebhookController {
         Delivery delivery = deliveryOpt.get();
 
         if ("DELIVERED".equalsIgnoreCase(status)) {
+            Instant now = clock.instant();
             delivery.setStatus(DeliveryStatus.DELIVERED);
-            delivery.setDeliveredAt(Instant.now());
+            delivery.setDeliveredAt(now);
             deliveryRepository.save(delivery);
-            eventRepository.save(DeliveryEvent.delivered(deliveryId, null, Instant.now()));
+            eventRepository.save(DeliveryEvent.delivered(deliveryId, null, now));
         } else if ("OPENED".equalsIgnoreCase(status)) {
-            eventRepository.save(DeliveryEvent.opened(deliveryId, null, Instant.now()));
+            eventRepository.save(DeliveryEvent.opened(deliveryId, null, clock.instant()));
         } else if ("FAILED".equalsIgnoreCase(status)) {
+            Instant now = clock.instant();
             ErrorType errorType = classifyEmailError(errorMessage);
             delivery.setStatus(DeliveryStatus.FAILED);
             delivery.setLastError(errorMessage);
             delivery.setLastErrorType(errorType);
             delivery.incrementAttemptCount();
             deliveryRepository.save(delivery);
-            eventRepository.save(DeliveryEvent.failed(deliveryId, errorMessage, Instant.now()));
+            eventRepository.save(DeliveryEvent.failed(deliveryId, errorMessage, now));
         }
 
         return ResponseEntity.ok().build();

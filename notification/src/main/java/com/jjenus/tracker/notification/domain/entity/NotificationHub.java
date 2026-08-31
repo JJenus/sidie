@@ -1,11 +1,11 @@
 package com.jjenus.tracker.notification.domain.entity;
 
 import com.jjenus.tracker.notification.domain.enums.NotificationStatus;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "notification_hubs", indexes = {
@@ -47,10 +47,10 @@ public class NotificationHub {
     private String metadata;
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Instant.EPOCH;
 
     @OneToMany(mappedBy = "notificationHub", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Delivery> deliveries = new ArrayList<>();
@@ -58,15 +58,16 @@ public class NotificationHub {
     @PrePersist
     protected void onCreate() {
         if (notificationId == null) {
-            notificationId = UUID.randomUUID().toString();
+            notificationId = TimeProvider.newId();
         }
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
+        Instant now = TimeProvider.now();
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = TimeProvider.now();
     }
 
     public void addDelivery(Delivery delivery) {

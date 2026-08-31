@@ -1,6 +1,7 @@
 package com.jjenus.tracker.userauth.domain.entity;
 
 import com.jjenus.tracker.shared.exception.ValidationException;
+import com.jjenus.tracker.shared.util.TimeProvider;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -15,7 +16,7 @@ public class Session {
     private Long id;
 
     @Column(name = "session_uuid", nullable = false, unique = true, length = 36)
-    private String sessionUuid = UUID.randomUUID().toString();
+    private String sessionUuid = TimeProvider.newId();
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
@@ -28,7 +29,7 @@ public class Session {
     private Instant expiresAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(name = "revoked_at")
     private Instant revokedAt;
@@ -55,7 +56,7 @@ public class Session {
     }
 
     public void revoke() {
-        this.revokedAt = Instant.now();
+        this.revokedAt = TimeProvider.now();
     }
 
     public void revokeAt(Instant when) {

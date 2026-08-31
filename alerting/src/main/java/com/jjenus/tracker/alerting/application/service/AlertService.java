@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +34,12 @@ public class AlertService {
 
     private final TrackerAlertRepository alertRepository;
     private final AlertQueryService alertQueryService;
+    private final Clock clock;
 
-    public AlertService(TrackerAlertRepository alertRepository, AlertQueryService alertQueryService) {
+    public AlertService(TrackerAlertRepository alertRepository, AlertQueryService alertQueryService, Clock clock) {
         this.alertRepository = alertRepository;
         this.alertQueryService = alertQueryService;
+        this.clock = clock;
     }
 
     // ========== CRUD OPERATIONS ==========
@@ -73,7 +76,7 @@ public class AlertService {
             request.getMetadata().forEach(alert::addMetadata);
         }
 
-        alert.setTriggeredAt(Instant.now());
+        alert.setTriggeredAt(clock.instant());
         alert.setAcknowledged(false);
         alert.setResolved(false);
 
@@ -294,9 +297,9 @@ public class AlertService {
     @Transactional(readOnly = true)
     @Cacheable(value = "alerts", key = "'recent_' + #vehicleId + '_' + #limit")
     public List<AlertResponse> getRecentAlerts(String vehicleId, int limit) {
-        Instant startTime = Instant.now().minusSeconds(24 * 60 * 60);
+        Instant startTime = clock.instant().minusSeconds(24 * 60 * 60);
         List<TrackerAlert> alerts = alertRepository.findVehicleAlertsInRange(
-                vehicleId, startTime, Instant.now());
+                vehicleId, startTime, clock.instant());
 
         return alerts.stream()
                 .limit(limit)
