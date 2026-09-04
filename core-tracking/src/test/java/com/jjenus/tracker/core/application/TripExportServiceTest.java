@@ -18,6 +18,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -61,8 +64,9 @@ class TripExportServiceTest {
 
     @Test
     void exportToCsv_writesHeaderAndRow() {
-        when(tripRepository.findByVehicleVehicleIdAndOrganizationId("vehicle-001", ORG_ID))
-                .thenReturn(List.of(trip));
+        when(tripRepository.findByVehicleVehicleIdAndOrganizationId(
+                eq("vehicle-001"), eq(ORG_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(trip)));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv("vehicle-001", null, null, out);
@@ -77,8 +81,8 @@ class TripExportServiceTest {
 
     @Test
     void exportToCsv_allVehicles_noFilter() {
-        when(tripRepository.findByOrganizationId(eq(ORG_ID), any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(trip)));
+        when(tripRepository.findByOrganizationId(eq(ORG_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(trip)));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv(null, null, null, out);
@@ -91,8 +95,9 @@ class TripExportServiceTest {
     void exportToCsv_withDateRange_usesBetween() {
         Instant start = Instant.parse("2026-08-30T00:00:00Z");
         Instant end = Instant.parse("2026-08-30T23:59:59Z");
-        when(tripRepository.findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId("vehicle-001", start, end, ORG_ID))
-                .thenReturn(List.of(trip));
+        when(tripRepository.findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(
+                eq("vehicle-001"), eq(start), eq(end), eq(ORG_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(trip)));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv("vehicle-001", start, end, out);
@@ -103,7 +108,9 @@ class TripExportServiceTest {
 
     @Test
     void exportToCsv_emptyResult_writesHeaderOnly() {
-        when(tripRepository.findByVehicleVehicleIdAndOrganizationId("vehicle-001", ORG_ID)).thenReturn(List.of());
+        when(tripRepository.findByVehicleVehicleIdAndOrganizationId(
+                eq("vehicle-001"), eq(ORG_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv("vehicle-001", null, null, out);
@@ -119,8 +126,9 @@ class TripExportServiceTest {
         Vehicle v = new Vehicle();
         v.setVehicleId("v,1,with,commas");
         trip.setVehicle(v);
-        when(tripRepository.findByVehicleVehicleIdAndOrganizationId("v,1,with,commas", ORG_ID))
-                .thenReturn(List.of(trip));
+        when(tripRepository.findByVehicleVehicleIdAndOrganizationId(
+                eq("v,1,with,commas"), eq(ORG_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(trip)));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         service.exportToCsv("v,1,with,commas", null, null, out);

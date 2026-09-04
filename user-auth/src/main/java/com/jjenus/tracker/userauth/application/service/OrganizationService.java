@@ -60,6 +60,28 @@ public class OrganizationService {
         return result;
     }
 
+    @Transactional(readOnly = true)
+    public Page<Organization> listAllPaged(Pageable pageable) {
+        return organizationRepository.findAll(pageable);
+    }
+
+    @Transactional
+    public Organization update(Long id, String name, String slug) {
+        Organization org = getById(id);
+        if (organizationRepository.existsBySlug(slug) && !slug.equals(org.getSlug())) {
+            throw new ValidationException("ORG_SLUG_TAKEN", "slug already in use");
+        }
+        org.rename(name);
+        org.changeSlug(slug);
+        return organizationRepository.save(org);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Organization org = getById(id);
+        organizationRepository.delete(org);
+    }
+
     private void findAllBatched(Pageable pageable, Consumer<Organization> consumer) {
         Page<Organization> page;
         do {

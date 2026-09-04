@@ -11,9 +11,12 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TrackerAlertRepository extends JpaRepository<TrackerAlert, Long> {
+
+    Optional<TrackerAlert> findByIdAndOrganizationId(Long alertId, Long organizationId);
 
     Page<TrackerAlert> findByVehicleIdAndOrganizationId(String vehicleId, Long organizationId, Pageable pageable);
 

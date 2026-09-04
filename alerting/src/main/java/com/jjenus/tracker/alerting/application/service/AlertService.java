@@ -189,6 +189,48 @@ public class AlertService {
 
     @Transactional
     @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
+    public AlertResponse updateAlert(Long alertId, UpdateAlertRequest request) {
+        logger.info("Updating alert: {}", alertId);
+
+        TrackerAlert alert = findOrgScopedAlert(alertId);
+
+        boolean hasChanges = false;
+        if (StringUtils.hasText(request.getMessage())) {
+            alert.setMessage(request.getMessage());
+            hasChanges = true;
+        }
+        if (request.getSeverity() != null) {
+            alert.setSeverity(request.getSeverity());
+            hasChanges = true;
+        }
+        if (hasChanges) {
+            alert.setUpdatedAt(clock.instant());
+            TrackerAlert updated = alertRepository.save(alert);
+            logger.info("Alert {} updated successfully", alertId);
+            return toResponse(updated);
+        }
+
+        logger.debug("No changes detected for alert: {}", alertId);
+        return toResponse(alert);
+    }
+
+    @Transactional
+    @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
+    public void deleteAlert(Long alertId) {
+        logger.info("Deleting alert: {}", alertId);
+
+        TrackerAlert alert = findOrgScopedAlert(alertId);
+        alertRepository.delete(alert);
+        logger.info("Alert {} deleted successfully", alertId);
+    }
+
+    private TrackerAlert findOrgScopedAlert(Long alertId) {
+        return alertRepository.findByIdAndOrganizationId(alertId, TenantContext.getCurrentOrgId())
+                .orElseThrow(() -> AlertException.alertNotFound(alertId));
+    }
+
+    @Transactional
+    @CacheEvict(value = {"alerts", "alertsPaged", "alertStats"}, allEntries = true)
     public void bulkAcknowledgeAlerts(List<Long> alertIds, String acknowledgedBy) {
         logger.info("Bulk acknowledging {} alerts by {}", alertIds.size(), acknowledgedBy);
 

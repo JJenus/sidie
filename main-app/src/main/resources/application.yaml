@@ -15,11 +15,18 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
 
+  # Flyway schema migrations (authoritative schema owner)
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
   # JPA/Hibernate Configuration
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: update
+      # Flyway owns the schema; Hibernate only validates entities against it
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true

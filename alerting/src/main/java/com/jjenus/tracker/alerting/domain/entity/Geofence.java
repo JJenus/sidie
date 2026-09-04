@@ -54,6 +54,9 @@ public class Geofence {
     @Column(name = "created_by", length = 100)
     private String createdBy;
 
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @Column(name = "created_at")
     private Instant createdAt = Instant.EPOCH;
 
@@ -183,4 +186,7 @@ public class Geofence {
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+
+    public Long getOrganizationId() { return organizationId; }
+    public void setOrganizationId(Long organizationId) { this.organizationId = organizationId; }
 }

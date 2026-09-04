@@ -4,7 +4,10 @@ import com.jjenus.tracker.core.domain.entity.*;
 import com.jjenus.tracker.core.domain.enums.CommandStatus;
 import com.jjenus.tracker.core.domain.enums.CommandType;
 import com.jjenus.tracker.core.infrastructure.repository.*;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,7 +37,8 @@ public class DeviceCommandService {
     public DeviceCommand createCommand(String trackerId, CommandType commandType,
                                        String commandData, String initiatedBy) {
 
-        Tracker tracker = trackerRepository.findById(trackerId)
+        Long orgId = TenantContext.getCurrentOrgId();
+        Tracker tracker = trackerRepository.findByIdAndOrganizationId(trackerId, orgId)
                 .orElseThrow(() -> new IllegalArgumentException("Tracker not found: " + trackerId));
 
         DeviceCommand command = new DeviceCommand();
@@ -52,7 +56,7 @@ public class DeviceCommandService {
     public void updateCommandStatus(Long commandId, CommandStatus status,
                                     String responseData, String errorMessage) {
 
-        DeviceCommand command = commandRepository.findById(commandId)
+        DeviceCommand command = commandRepository.findByIdAndOrganizationId(commandId, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> new IllegalArgumentException("Command not found"));
 
         command.setStatus(status);
@@ -72,7 +76,7 @@ public class DeviceCommandService {
 
     @Transactional
     public void markCommandAsSent(Long commandId) {
-        DeviceCommand command = commandRepository.findById(commandId)
+        DeviceCommand command = commandRepository.findByIdAndOrganizationId(commandId, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> new IllegalArgumentException("Command not found"));
 
         command.markAsSent();
@@ -81,7 +85,7 @@ public class DeviceCommandService {
 
     @Transactional
     public void markCommandAsDelivered(Long commandId, String response) {
-        DeviceCommand command = commandRepository.findById(commandId)
+        DeviceCommand command = commandRepository.findByIdAndOrganizationId(commandId, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> new IllegalArgumentException("Command not found"));
 
         command.markAsDelivered(response);
@@ -90,7 +94,7 @@ public class DeviceCommandService {
 
     @Transactional
     public void markCommandAsFailed(Long commandId, String error) {
-        DeviceCommand command = commandRepository.findById(commandId)
+        DeviceCommand command = commandRepository.findByIdAndOrganizationId(commandId, TenantContext.getCurrentOrgId())
                 .orElseThrow(() -> new IllegalArgumentException("Command not found"));
 
         command.markAsFailed(error);
@@ -99,18 +103,27 @@ public class DeviceCommandService {
 
     @Transactional(readOnly = true)
     public List<DeviceCommand> getPendingCommands() {
-        return commandRepository.findByStatus(CommandStatus.PENDING);
+        return commandRepository.findByStatusAndOrganizationId(CommandStatus.PENDING,
+                        TenantContext.getCurrentOrgId(), Pageable.unpaged())
+                .getContent();
     }
 
     @Transactional(readOnly = true)
     public List<DeviceCommand> getCommandsByTracker(String trackerId) {
-        return commandRepository.findByTrackerTrackerId(trackerId,
-                org.springframework.data.domain.Pageable.unpaged()).getContent();
+        return commandRepository.findByTrackerTrackerIdAndOrganizationId(trackerId,
+                        TenantContext.getCurrentOrgId(), Pageable.unpaged())
+                .getContent();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DeviceCommand> getCommandsByTrackerPaged(String trackerId, Pageable pageable) {
+        return commandRepository.findByTrackerTrackerIdAndOrganizationId(trackerId,
+                        TenantContext.getCurrentOrgId(), pageable);
     }
 
     @Transactional(readOnly = true)
     public Optional<DeviceCommand> getCommand(Long commandId) {
-        return commandRepository.findById(commandId);
+        return commandRepository.findByIdAndOrganizationId(commandId, TenantContext.getCurrentOrgId());
     }
 
     @Transactional

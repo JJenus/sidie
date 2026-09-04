@@ -268,6 +268,46 @@ public class AuthService {
             .getContent();
     }
 
+    @Transactional(readOnly = true)
+    public Page<UserResponse> listUsersInOrgPaged(Long orgId, Pageable pageable) {
+        return userRepository.findByOrgId(orgId, pageable)
+            .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(Long userId, Long orgId) {
+        User user = userRepository.findByIdAndOrgId(userId, orgId)
+            .orElseThrow(() -> new BusinessRuleException("USER_NOT_FOUND", "user not found"));
+        return toResponse(user);
+    }
+
+    @Transactional
+    public UserResponse updateUserProfile(Long userId, Long orgId, String firstName, String lastName, String email) {
+        User user = userRepository.findByIdAndOrgId(userId, orgId)
+            .orElseThrow(() -> new BusinessRuleException("USER_NOT_FOUND", "user not found"));
+        if (firstName != null) {
+            user.setFirstName(firstName);
+        }
+        if (lastName != null) {
+            user.setLastName(lastName);
+        }
+        if (email != null && !email.isBlank()) {
+            String normalized = email.toLowerCase(Locale.ROOT);
+            if (!normalized.equals(user.getEmail()) && userRepository.existsByEmail(normalized)) {
+                throw new ValidationException("EMAIL_TAKEN", "email already registered");
+            }
+            user.setEmail(normalized);
+        }
+        return toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(Long userId, Long orgId) {
+        User user = userRepository.findByIdAndOrgId(userId, orgId)
+            .orElseThrow(() -> new BusinessRuleException("USER_NOT_FOUND", "user not found"));
+        userRepository.delete(user);
+    }
+
     private void seedOrgRoles(Organization org) {
         Map<String, List<String>> rolePerms = Map.of(
             "TENANT_ADMIN", List.of("users.read", "users.write", "users.delete", "users.assign_roles",

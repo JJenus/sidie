@@ -120,6 +120,22 @@ public class AlertController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{alertId}")
+    @Operation(summary = "Update an alert")
+    public ResponseEntity<AlertResponse> updateAlert(
+            @PathVariable Long alertId,
+            @Valid @RequestBody UpdateAlertRequest request) {
+        AlertResponse response = alertService.updateAlert(alertId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{alertId}")
+    @Operation(summary = "Delete an alert")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAlert(@PathVariable Long alertId) {
+        alertService.deleteAlert(alertId);
+    }
+
     @PostMapping("/{alertId}/resolve")
     @Operation(summary = "Resolve an alert")
     public ResponseEntity<AlertResponse> resolveAlert(

@@ -1,10 +1,12 @@
 package com.jjenus.tracker.userauth.application.service;
 
+import com.jjenus.tracker.shared.exception.BusinessRuleException;
 import com.jjenus.tracker.shared.exception.DomainException;
 import com.jjenus.tracker.shared.exception.ValidationException;
 import com.jjenus.tracker.userauth.application.dto.LoginResponse;
 import com.jjenus.tracker.userauth.application.dto.RegisterRequest;
 import com.jjenus.tracker.userauth.application.dto.RegisterResponse;
+import com.jjenus.tracker.userauth.application.dto.UserResponse;
 import com.jjenus.tracker.userauth.domain.entity.*;
 import com.jjenus.tracker.userauth.infrastructure.repository.*;
 import com.jjenus.tracker.userauth.infrastructure.security.*;
@@ -309,6 +311,98 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> service.getCurrentUser(99L))
             .isInstanceOf(DomainException.class);
+    }
+
+    @Test
+    void getUserById_userInOrg_returnsUserResponse() {
+        // given
+        User user = userInOrg(1L);
+        when(userRepository.findByIdAndOrgId(1L, 10L)).thenReturn(Optional.of(user));
+
+        // when
+        UserResponse response = service.getUserById(1L, 10L);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(1L);
+        assertThat(response.getEmail()).isEqualTo("alice@example.com");
+        assertThat(response.getOrganizationId()).isEqualTo(10L);
+    }
+
+    @Test
+    void getUserById_userNotInOrg_throws() {
+        // given
+        when(userRepository.findByIdAndOrgId(1L, 10L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> service.getUserById(1L, 10L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("not found");
+    }
+
+    @Test
+    void updateUserProfile_validRequest_updatesFields() {
+        // given
+        User user = userInOrg(1L);
+        when(userRepository.findByIdAndOrgId(1L, 10L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        // when
+        UserResponse response = service.updateUserProfile(1L, 10L, "Alice", "Smith", "alice@new.com");
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(user.getFirstName()).isEqualTo("Alice");
+        assertThat(user.getLastName()).isEqualTo("Smith");
+        assertThat(user.getEmail()).isEqualTo("alice@new.com");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateUserProfile_emailTaken_throws() {
+        // given
+        User user = userInOrg(1L);
+        user.setEmail("alice@example.com");
+        when(userRepository.findByIdAndOrgId(1L, 10L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> service.updateUserProfile(1L, 10L, null, null, "taken@example.com"))
+            .isInstanceOf(ValidationException.class)
+            .hasMessageContaining("already");
+    }
+
+    @Test
+    void deleteUser_validRequest_deletes() {
+        // given
+        User user = userInOrg(1L);
+        when(userRepository.findByIdAndOrgId(1L, 10L)).thenReturn(Optional.of(user));
+
+        // when
+        service.deleteUser(1L, 10L);
+
+        // then
+        verify(userRepository).delete(user);
+    }
+
+    @Test
+    void deleteUser_userNotInOrg_throws() {
+        // given
+        when(userRepository.findByIdAndOrgId(1L, 10L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> service.deleteUser(1L, 10L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("not found");
+    }
+
+    private User userInOrg(Long userId) {
+        User u = makeUserWithHash("alice@example.com", "hash");
+        u.setId(userId);
+        Organization org = Organization.create("Acme", "acme");
+        org.setId(10L);
+        u.assignRole(Role.orgRole(org, "OPERATOR", "operator for acme"));
+        return u;
     }
 
     private User makeUserWithHash(String email, String hash) {

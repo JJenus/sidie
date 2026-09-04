@@ -1,16 +1,17 @@
 package com.jjenus.tracker.userauth.api;
 
+import com.jjenus.tracker.userauth.api.dto.PagedResponse;
 import com.jjenus.tracker.userauth.application.dto.OrganizationRequest;
 import com.jjenus.tracker.userauth.application.dto.OrganizationResponse;
+import com.jjenus.tracker.userauth.application.dto.UpdateOrganizationRequest;
 import com.jjenus.tracker.userauth.application.service.OrganizationService;
 import com.jjenus.tracker.userauth.domain.entity.Organization;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/organizations")
@@ -23,11 +24,12 @@ public class OrganizationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<OrganizationResponse>> list() {
-        List<OrganizationResponse> result = organizationService.listAll().stream()
-            .map(this::toResponse)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(result);
+    public ResponseEntity<PagedResponse<OrganizationResponse>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(new PagedResponse<>(
+            organizationService.listAllPaged(pageable).map(this::toResponse)));
     }
 
     @GetMapping("/{id}")
@@ -39,6 +41,20 @@ public class OrganizationController {
     public ResponseEntity<OrganizationResponse> create(@Valid @RequestBody OrganizationRequest request) {
         Organization created = organizationService.create(request.getName(), request.getSlug());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<OrganizationResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateOrganizationRequest request) {
+        Organization updated = organizationService.update(id, request.getName(), request.getSlug());
+        return ResponseEntity.ok(toResponse(updated));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        organizationService.delete(id);
     }
 
     private OrganizationResponse toResponse(Organization org) {

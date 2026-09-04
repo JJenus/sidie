@@ -134,14 +134,22 @@ public class VehicleService {
     @Transactional(readOnly = true)
     public Optional<Vehicle> getVehicle(String vehicleId) {
         Long orgId = TenantContext.getCurrentOrgId();
-        return vehicleRepository.findById(vehicleId)
-            .filter(v -> orgId.equals(v.getOrganizationId()));
+        return vehicleRepository.findByIdAndOrganizationId(vehicleId, orgId);
     }
     
     @Transactional(readOnly = true)
     public Optional<Vehicle> getVehicleByDeviceId(String deviceId) {
         Long orgId = TenantContext.getCurrentOrgId();
         return vehicleRepository.findByDeviceIdAndOrganizationId(deviceId, orgId);
+    }
+    
+    @Transactional
+    public void deleteVehicle(String vehicleId) {
+        Long orgId = TenantContext.getCurrentOrgId();
+        if (vehicleRepository.findByIdAndOrganizationId(vehicleId, orgId).isEmpty()) {
+            throw new IllegalArgumentException("Vehicle not found: " + vehicleId);
+        }
+        vehicleRepository.deleteByIdAndOrganizationId(vehicleId, orgId);
     }
     
     @Transactional(readOnly = true)

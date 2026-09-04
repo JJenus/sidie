@@ -6,6 +6,8 @@ import com.jjenus.tracker.shared.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.io.OutputStream;
@@ -56,19 +58,54 @@ public class TripExportService {
             };
 
             if (vehicleId != null && startDate != null && endDate != null) {
-                tripRepository.findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(vehicleId, startDate, endDate, orgId)
-                        .forEach(rowWriter);
+                findTripsByVehicleAndRange(vehicleId, startDate, endDate, orgId, rowWriter);
             } else if (vehicleId != null && startDate != null) {
-                tripRepository.findByVehicleVehicleIdAndOrganizationId(vehicleId, orgId).stream()
-                        .filter(t -> t.getStartTime().compareTo(startDate) >= 0)
-                        .forEach(rowWriter);
+                tripsByVehicleSince(vehicleId, startDate, orgId, rowWriter);
             } else if (vehicleId != null) {
-                tripRepository.findByVehicleVehicleIdAndOrganizationId(vehicleId, orgId).forEach(rowWriter);
+                tripsByVehicle(vehicleId, orgId, rowWriter);
             } else {
-                Pageable pageable = Pageable.unpaged();
-                tripRepository.findByOrganizationId(orgId, pageable).forEach(rowWriter);
+                Pageable pageable = PageRequest.of(0, 500);
+                Page<Trip> page;
+                do {
+                    page = tripRepository.findByOrganizationId(orgId, pageable);
+                    page.forEach(rowWriter);
+                    pageable = pageable.next();
+                } while (page.hasNext());
             }
         }
+    }
+
+    private void tripsByVehicle(String vehicleId, Long orgId, Consumer<Trip> rowWriter) {
+        Pageable pageable = PageRequest.of(0, 500);
+        Page<Trip> page;
+        do {
+            page = tripRepository.findByVehicleVehicleIdAndOrganizationId(vehicleId, orgId, pageable);
+            page.forEach(rowWriter);
+            pageable = pageable.next();
+        } while (page.hasNext());
+    }
+
+    private void tripsByVehicleSince(String vehicleId, Instant startDate, Long orgId, Consumer<Trip> rowWriter) {
+        Pageable pageable = PageRequest.of(0, 500);
+        Page<Trip> page;
+        do {
+            page = tripRepository.findByVehicleVehicleIdAndOrganizationId(vehicleId, orgId, pageable);
+            page.getContent().stream()
+                    .filter(t -> t.getStartTime().compareTo(startDate) >= 0)
+                    .forEach(rowWriter);
+            pageable = pageable.next();
+        } while (page.hasNext());
+    }
+
+    private void findTripsByVehicleAndRange(String vehicleId, Instant startDate, Instant endDate, Long orgId, Consumer<Trip> rowWriter) {
+        Pageable pageable = PageRequest.of(0, 500);
+        Page<Trip> page;
+        do {
+            page = tripRepository.findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(
+                    vehicleId, startDate, endDate, orgId, pageable);
+            page.forEach(rowWriter);
+            pageable = pageable.next();
+        } while (page.hasNext());
     }
 
     private String[] toRow(Trip trip) {

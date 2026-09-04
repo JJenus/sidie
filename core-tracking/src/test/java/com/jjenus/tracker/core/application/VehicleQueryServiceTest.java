@@ -70,52 +70,53 @@ class VehicleQueryServiceTest {
 
     @Test
     void getVehicleByIdFound_returnsVehicle() {
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle1));
 
         Optional<Vehicle> result = queryService.getVehicleById("VEH-001");
 
         assertThat(result).isPresent();
         assertThat(result.get().getVehicleId()).isEqualTo("VEH-001");
-        verify(vehicleRepository, times(1)).findById("VEH-001");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-001", ORG_ID);
     }
 
     @Test
     void getVehicleByIdNotFound_returnsEmpty() {
-        when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-999", ORG_ID)).thenReturn(Optional.empty());
 
         Optional<Vehicle> result = queryService.getVehicleById("VEH-999");
 
         assertThat(result).isEmpty();
-        verify(vehicleRepository, times(1)).findById("VEH-999");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-999", ORG_ID);
     }
 
     @Test
-    void getAllVehicles_returnsAll() {
+    void getVehicles_returnsPage() {
         List<Vehicle> vehicles = Arrays.asList(testVehicle1, testVehicle2);
-        Page<Vehicle> page = new PageImpl<>(vehicles, PageRequest.of(0, 500), 2);
+        Page<Vehicle> page = new PageImpl<>(vehicles, PageRequest.of(0, 10), 2);
         when(vehicleRepository.findByOrganizationId(eq(ORG_ID), any(Pageable.class))).thenReturn(page);
 
-        List<Vehicle> result = queryService.getAllVehicles();
+        Page<Vehicle> result = queryService.getVehicles(PageRequest.of(0, 10));
 
-        assertThat(result).hasSize(2);
-        assertThat(result).contains(testVehicle1, testVehicle2);
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getContent()).contains(testVehicle1, testVehicle2);
         verify(vehicleRepository, times(1)).findByOrganizationId(eq(ORG_ID), any(Pageable.class));
     }
 
     @Test
-    void getAllVehiclesEmpty_returnsEmpty() {
-        Page<Vehicle> page = new PageImpl<>(List.of(), PageRequest.of(0, 500), 0);
+    void getVehiclesEmpty_returnsEmptyPage() {
+        Page<Vehicle> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
         when(vehicleRepository.findByOrganizationId(eq(ORG_ID), any(Pageable.class))).thenReturn(page);
 
-        List<Vehicle> result = queryService.getAllVehicles();
+        Page<Vehicle> result = queryService.getVehicles(PageRequest.of(0, 10));
 
-        assertThat(result).isEmpty();
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isZero();
         verify(vehicleRepository, times(1)).findByOrganizationId(eq(ORG_ID), any(Pageable.class));
     }
 
     @Test
     void getCurrentLocationFound_returnsLocation() {
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle1));
 
         Optional<LocationPoint> result = queryService.getCurrentLocation("VEH-001");
 
@@ -123,90 +124,90 @@ class VehicleQueryServiceTest {
         assertThat(result.get().latitude()).isEqualTo(40.7128);
         assertThat(result.get().longitude()).isEqualTo(-74.0060);
         assertThat(result.get().speedKmh()).isEqualTo(30.0f);
-        verify(vehicleRepository, times(1)).findById("VEH-001");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-001", ORG_ID);
     }
 
     @Test
     void getCurrentLocationNotFound_returnsEmpty() {
-        when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-999", ORG_ID)).thenReturn(Optional.empty());
 
         Optional<LocationPoint> result = queryService.getCurrentLocation("VEH-999");
 
         assertThat(result).isEmpty();
-        verify(vehicleRepository, times(1)).findById("VEH-999");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-999", ORG_ID);
     }
 
     @Test
     void isVehicleMovingTrue() {
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle1));
 
         boolean result = queryService.isVehicleMoving("VEH-001");
 
         assertThat(result).isTrue();
-        verify(vehicleRepository, times(1)).findById("VEH-001");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-001", ORG_ID);
     }
 
     @Test
     void isVehicleMovingFalse() {
-        when(vehicleRepository.findById("VEH-002")).thenReturn(Optional.of(testVehicle2));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-002", ORG_ID)).thenReturn(Optional.of(testVehicle2));
 
         boolean result = queryService.isVehicleMoving("VEH-002");
 
         assertThat(result).isFalse();
-        verify(vehicleRepository, times(1)).findById("VEH-002");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-002", ORG_ID);
     }
 
     @Test
     void isVehicleMovingNotFound_returnsFalse() {
-        when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-999", ORG_ID)).thenReturn(Optional.empty());
 
         boolean result = queryService.isVehicleMoving("VEH-999");
 
         assertThat(result).isFalse();
-        verify(vehicleRepository, times(1)).findById("VEH-999");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-999", ORG_ID);
     }
 
     @Test
     void getVehicleSpeedMoving() {
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle1));
 
         Optional<Float> result = queryService.getVehicleSpeed("VEH-001");
 
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualTo(30.0f);
-        verify(vehicleRepository, times(1)).findById("VEH-001");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-001", ORG_ID);
     }
 
     @Test
     void getVehicleSpeedStationary() {
-        when(vehicleRepository.findById("VEH-002")).thenReturn(Optional.of(testVehicle2));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-002", ORG_ID)).thenReturn(Optional.of(testVehicle2));
 
         Optional<Float> result = queryService.getVehicleSpeed("VEH-002");
 
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualTo(0.0f);
-        verify(vehicleRepository, times(1)).findById("VEH-002");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-002", ORG_ID);
     }
 
     @Test
     void getVehicleSpeedNotFound_returnsEmpty() {
-        when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-999", ORG_ID)).thenReturn(Optional.empty());
 
         Optional<Float> result = queryService.getVehicleSpeed("VEH-999");
 
         assertThat(result).isEmpty();
-        verify(vehicleRepository, times(1)).findById("VEH-999");
+        verify(vehicleRepository, times(1)).findByIdAndOrganizationId("VEH-999", ORG_ID);
     }
 
     @Test
     void queryMethodsCallRepositoryOnlyOnce() {
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle1));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle1));
 
         queryService.getVehicleById("VEH-001");
         queryService.getCurrentLocation("VEH-001");
         queryService.isVehicleMoving("VEH-001");
         queryService.getVehicleSpeed("VEH-001");
 
-        verify(vehicleRepository, times(4)).findById("VEH-001");
+        verify(vehicleRepository, times(4)).findByIdAndOrganizationId("VEH-001", ORG_ID);
     }
 }

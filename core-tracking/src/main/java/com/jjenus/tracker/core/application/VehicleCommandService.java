@@ -35,8 +35,7 @@ public class VehicleCommandService {
     public void handleFuelCutRequest(String vehicleId) {
         try {
             Long orgId = TenantContext.getCurrentOrgId();
-            Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                .filter(v -> orgId.equals(v.getOrganizationId()))
+            Vehicle vehicle = vehicleRepository.findByIdAndOrganizationId(vehicleId, orgId)
                 .orElseThrow(() -> VehicleException.notFound(vehicleId));
 
             Instant now = clock.instant();
@@ -66,8 +65,7 @@ public class VehicleCommandService {
     public void handleFuelRestoreRequest(String vehicleId) {
         try {
             Long orgId = TenantContext.getCurrentOrgId();
-            Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                .filter(v -> orgId.equals(v.getOrganizationId()))
+            Vehicle vehicle = vehicleRepository.findByIdAndOrganizationId(vehicleId, orgId)
                 .orElseThrow(() -> VehicleException.notFound(vehicleId));
 
             Instant now = clock.instant();

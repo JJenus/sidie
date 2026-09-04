@@ -16,14 +16,21 @@ import java.util.Optional;
 @Repository
 public interface TripRepository extends JpaRepository<Trip, String> {
     
-    List<Trip> findByVehicleVehicleIdAndOrganizationId(String vehicleId, Long organizationId);
+    @Query("SELECT t FROM Trip t WHERE t.vehicle.vehicleId = :vehicleId AND t.vehicle.organizationId = :organizationId")
+    Page<Trip> findByVehicleVehicleIdAndOrganizationId(
+        @Param("vehicleId") String vehicleId, @Param("organizationId") Long organizationId, Pageable pageable);
     
-    Optional<Trip> findByVehicleVehicleIdAndIsActiveAndOrganizationId(String vehicleId, boolean isActive, Long organizationId);
+    @Query("SELECT t FROM Trip t WHERE t.vehicle.vehicleId = :vehicleId AND t.isActive = :isActive AND t.vehicle.organizationId = :organizationId")
+    Optional<Trip> findByVehicleVehicleIdAndIsActiveAndOrganizationId(
+        @Param("vehicleId") String vehicleId, @Param("isActive") boolean isActive, @Param("organizationId") Long organizationId);
     
-    List<Trip> findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(
-        String vehicleId, Instant startTime, Instant endTime, Long organizationId);
+    @Query("SELECT t FROM Trip t WHERE t.vehicle.vehicleId = :vehicleId AND t.startTime BETWEEN :startTime AND :endTime AND t.vehicle.organizationId = :organizationId")
+    Page<Trip> findByVehicleVehicleIdAndStartTimeBetweenAndOrganizationId(
+        @Param("vehicleId") String vehicleId, @Param("startTime") Instant startTime, @Param("endTime") Instant endTime,
+        @Param("organizationId") Long organizationId, Pageable pageable);
     
-    List<Trip> findByIsActiveAndOrganizationId(boolean isActive, Long organizationId);
+    @Query("SELECT t FROM Trip t WHERE t.isActive = :isActive AND t.vehicle.organizationId = :organizationId")
+    Page<Trip> findByIsActiveAndOrganizationId(@Param("isActive") boolean isActive, @Param("organizationId") Long organizationId, Pageable pageable);
     
     @Query("SELECT t FROM Trip t WHERE t.vehicle.vehicleId = :vehicleId " +
            "AND t.endReason = :endReason " +
@@ -57,5 +64,9 @@ public interface TripRepository extends JpaRepository<Trip, String> {
         @Param("endTime") Instant endTime,
         @Param("organizationId") Long organizationId);
 
-    Page<Trip> findByOrganizationId(Long organizationId, Pageable pageable);
+    @Query("SELECT t FROM Trip t WHERE t.vehicle.organizationId = :organizationId")
+    Page<Trip> findByOrganizationId(@Param("organizationId") Long organizationId, Pageable pageable);
+
+    @Query("SELECT t FROM Trip t WHERE t.tripId = :tripId AND t.vehicle.organizationId = :organizationId")
+    Optional<Trip> findByIdAndOrganizationId(@Param("tripId") String tripId, @Param("organizationId") Long organizationId);
 }

@@ -82,6 +82,12 @@
             <artifactId>user-auth</artifactId>
         </dependency>
 
+        <!-- Database migrations (H2 is a community DB bundled in flyway-core) -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
         <!-- Redis client (lettuce is auto-configured by spring-boot-starter-data-redis) -->
 
         <!-- Test dependencies -->

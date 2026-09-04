@@ -1,5 +1,6 @@
 package com.jjenus.tracker.userauth.api;
 
+import com.jjenus.tracker.userauth.api.dto.PagedResponse;
 import com.jjenus.tracker.userauth.application.dto.*;
 import com.jjenus.tracker.userauth.application.service.AuthService;
 import com.jjenus.tracker.shared.security.TenantContext;
@@ -10,8 +11,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -30,13 +29,17 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserResponse>> list(@RequestParam(defaultValue = "0") int page,
-                                                   @RequestParam(defaultValue = "50") int size) {
+    public ResponseEntity<PagedResponse<UserResponse>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
         Long orgId = TenantContext.getCurrentOrgId();
         if (orgId == null) {
-            return ResponseEntity.ok(List.of());
+            return ResponseEntity.ok(new PagedResponse<>(
+                Page.empty(PageRequest.of(page, size))));
         }
-        return ResponseEntity.ok(authService.listUsersInOrg(orgId));
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(new PagedResponse<>(
+            authService.listUsersInOrgPaged(orgId, pageable)));
     }
 
     @PostMapping
@@ -48,6 +51,28 @@ public class UserController {
             orgId != null ? orgId : request.getOrganizationId()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
+        Long orgId = TenantContext.getCurrentOrgId();
+        return ResponseEntity.ok(authService.getUserById(id, orgId));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<UserResponse> updateUser(@PathVariable Long id,
+                                                   @Valid @RequestBody UpdateUserRequest request) {
+        Long orgId = TenantContext.getCurrentOrgId();
+        UserResponse updated = authService.updateUserProfile(
+            id, orgId, request.getFirstName(), request.getLastName(), request.getEmail());
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        Long orgId = TenantContext.getCurrentOrgId();
+        authService.deleteUser(id, orgId);
     }
 
     @PutMapping("/{id}/roles")

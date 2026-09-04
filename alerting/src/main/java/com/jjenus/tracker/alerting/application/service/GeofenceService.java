@@ -11,6 +11,7 @@ import com.jjenus.tracker.alerting.infrastructure.cache.GeofenceCacheService;
 import com.jjenus.tracker.alerting.infrastructure.cache.RedisKeyGenerator;
 import com.jjenus.tracker.alerting.infrastructure.repository.GeofenceRepository;
 import com.jjenus.tracker.shared.redis.RedisKeyScanner;
+import com.jjenus.tracker.shared.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -50,6 +51,7 @@ public class GeofenceService {
 
     @Transactional
     public Geofence createGeofence(Geofence geofence) {
+        geofence.setOrganizationId(TenantContext.getCurrentOrgId());
         Geofence saved = geofenceRepository.save(geofence);
 
         // Cache the geofence
@@ -73,7 +75,8 @@ public class GeofenceService {
         }
 
         // Cache miss - load from DB
-        List<Geofence> geofences = geofenceRepository.findByVehicleId(vehicleId);
+        Long orgId = TenantContext.getCurrentOrgId();
+        List<Geofence> geofences = geofenceRepository.findByVehicleId(vehicleId, orgId);
 
         // Cache the result
         geofenceCacheService.cacheVehicleGeofences(vehicleId, geofences);
@@ -106,7 +109,7 @@ public class GeofenceService {
 
         // Cache miss - query database
         Pageable pageable = createPageable(searchRequest);
-        Page<Geofence> page = geofenceRepository.findByVehicleId(vehicleId, pageable);
+        Page<Geofence> page = geofenceRepository.findByVehicleId(vehicleId, TenantContext.getCurrentOrgId(), pageable);
 
         PagedResponse<GeofenceResponse> response = new PagedResponse<>(page.map(this::toResponse));
 
@@ -123,7 +126,7 @@ public class GeofenceService {
 
     @Transactional(readOnly = true)
     public List<Geofence> getActiveGeofences(String vehicleId) {
-        return geofenceRepository.findByVehicleIdAndIsActive(vehicleId);
+        return geofenceRepository.findByVehicleIdAndIsActive(vehicleId, TenantContext.getCurrentOrgId());
     }
 
     @Transactional(readOnly = true)
@@ -151,7 +154,7 @@ public class GeofenceService {
 
         // Cache miss - query database
         Pageable pageable = createPageable(searchRequest);
-        Page<Geofence> page = geofenceRepository.findByVehicleIdAndIsActive(vehicleId, pageable);
+        Page<Geofence> page = geofenceRepository.findByVehicleIdAndIsActive(vehicleId, TenantContext.getCurrentOrgId(), pageable);
 
         PagedResponse<GeofenceResponse> response = new PagedResponse<>(page.map(this::toResponse));
 
@@ -195,6 +198,7 @@ public class GeofenceService {
                 searchRequest.getVehicleId(),
                 searchRequest.getSearch(),
                 searchRequest.getActive(),
+                TenantContext.getCurrentOrgId(),
                 pageable);
 
         PagedResponse<GeofenceResponse> response = new PagedResponse<>(page.map(this::toResponse));
@@ -212,11 +216,13 @@ public class GeofenceService {
 
     @Transactional(readOnly = true)
     public Geofence getGeofenceById(Long geofenceId) {
+        Long orgId = TenantContext.getCurrentOrgId();
         // Try cache first
         return geofenceCacheService.getGeofenceById(geofenceId)
+                .filter(g -> orgId.equals(g.getOrganizationId()))
                 .orElseGet(() -> {
-                    // Cache miss - load from DB
-                    Geofence geofence = geofenceRepository.findById(geofenceId)
+                    // Cache miss - load from DB with org scoping
+                    Geofence geofence = geofenceRepository.findByIdAndOrganizationId(geofenceId, orgId)
                             .orElseThrow(() -> new IllegalArgumentException("Geofence not found"));
 
                     // Cache for future requests
@@ -228,7 +234,8 @@ public class GeofenceService {
 
     @Transactional
     public Geofence updateGeofence(Long geofenceId, Geofence updates) {
-        Geofence geofence = geofenceRepository.findById(geofenceId)
+        Long orgId = TenantContext.getCurrentOrgId();
+        Geofence geofence = geofenceRepository.findByIdAndOrganizationId(geofenceId, orgId)
                 .orElseThrow(() -> new IllegalArgumentException("Geofence not found"));
 
         // Track affected vehicles for cache invalidation
@@ -280,7 +287,8 @@ public class GeofenceService {
 
     @Transactional
     public void deleteGeofence(Long geofenceId) {
-        Geofence geofence = geofenceRepository.findById(geofenceId)
+        Long orgId = TenantContext.getCurrentOrgId();
+        Geofence geofence = geofenceRepository.findByIdAndOrganizationId(geofenceId, orgId)
                 .orElseThrow(() -> new IllegalArgumentException("Geofence not found"));
 
         Set<String> affectedVehicles = geofence.getVehicleIds();
@@ -301,7 +309,8 @@ public class GeofenceService {
     public List<Geofence> findNearbyGeofencesForVehicle(String vehicleId,
                                                         Double latitude,
                                                         Double longitude) {
-        return geofenceRepository.findNearbyGeofencesForVehicle(vehicleId, latitude, longitude);
+        return geofenceRepository.findNearbyGeofencesForVehicle(vehicleId, latitude, longitude,
+                TenantContext.getCurrentOrgId());
     }
 
     public void checkGeofenceViolations(String vehicleId, Double latitude, Double longitude) {
@@ -319,7 +328,8 @@ public class GeofenceService {
 
     @Transactional(readOnly = true)
     public boolean existsAndActive(Long geofenceId) {
-        return geofenceRepository.findById(geofenceId)
+        Long orgId = TenantContext.getCurrentOrgId();
+        return geofenceRepository.findByIdAndOrganizationId(geofenceId, orgId)
                 .map(g -> Boolean.TRUE.equals(g.getIsActive()))
                 .orElse(false);
     }

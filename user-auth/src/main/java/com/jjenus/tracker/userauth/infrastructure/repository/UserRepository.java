@@ -19,4 +19,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.org.id = :orgId")
     Page<User> findByOrgId(@Param("orgId") Long orgId, Pageable pageable);
+
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE u.id = :userId AND r.org.id = :orgId")
+    Optional<User> findByIdAndOrgId(@Param("userId") Long userId, @Param("orgId") Long orgId);
 }

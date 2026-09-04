@@ -83,7 +83,7 @@ class VehicleCommandServiceTest {
     void handleFuelCutRequestSuccess() {
         setVehicleStationary(testVehicle);
 
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle));
 
         commandService.handleFuelCutRequest("VEH-001");
 
@@ -99,7 +99,7 @@ class VehicleCommandServiceTest {
 
     @Test
     void handleFuelCutRequestVehicleNotFound() {
-        when(vehicleRepository.findById("VEH-999")).thenReturn(Optional.empty());
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-999", ORG_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> commandService.handleFuelCutRequest("VEH-999"))
             .isInstanceOf(VehicleException.class)
@@ -113,7 +113,7 @@ class VehicleCommandServiceTest {
     void handleFuelCutRequestWhenMovingTooFast() {
         setVehicleMoving(testVehicle, 50.0f);
 
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle));
 
         assertThatThrownBy(() -> commandService.handleFuelCutRequest("VEH-001"))
             .isInstanceOf(VehicleException.class)
@@ -128,7 +128,7 @@ class VehicleCommandServiceTest {
         setVehicleStationary(testVehicle);
         testVehicle.setFuelCutActive(true);
 
-        when(vehicleRepository.findById("VEH-001")).thenReturn(Optional.of(testVehicle));
+        when(vehicleRepository.findByIdAndOrganizationId("VEH-001", ORG_ID)).thenReturn(Optional.of(testVehicle));
 
         commandService.handleFuelRestoreRequest("VEH-001");
 

@@ -13,15 +13,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DeviceCommandRepository extends JpaRepository<DeviceCommand, Long> {
 
     Page<DeviceCommand> findByTrackerTrackerId(String trackerId, Pageable pageable);
 
+    @Query("SELECT dc FROM DeviceCommand dc WHERE dc.tracker.trackerId = :trackerId AND dc.tracker.vehicle.organizationId = :organizationId")
+    Page<DeviceCommand> findByTrackerTrackerIdAndOrganizationId(@Param("trackerId") String trackerId, @Param("organizationId") Long organizationId, Pageable pageable);
+
     List<DeviceCommand> findByStatus(CommandStatus status);
 
+    @Query("SELECT dc FROM DeviceCommand dc WHERE dc.status = :status AND dc.tracker.vehicle.organizationId = :organizationId")
+    Page<DeviceCommand> findByStatusAndOrganizationId(@Param("status") CommandStatus status, @Param("organizationId") Long organizationId, Pageable pageable);
+
     List<DeviceCommand> findByTrackerTrackerIdAndStatus(String trackerId, CommandStatus status);
+
+    @Query("SELECT dc FROM DeviceCommand dc WHERE dc.commandId = :commandId AND dc.tracker.vehicle.organizationId = :organizationId")
+    Optional<DeviceCommand> findByIdAndOrganizationId(@Param("commandId") Long commandId, @Param("organizationId") Long organizationId);
 
     @Query("SELECT dc FROM DeviceCommand dc WHERE dc.status IN ('PENDING', 'FAILED', 'TIMEOUT') " +
             "AND dc.retryCount < dc.maxRetries " +
